@@ -145,7 +145,7 @@ struct ShelfView: View {
 }
 
 /// A copied text or image. Click to copy it again, drag it out to use it. Text that is a link, an
-/// address, or a color adds one action along the bottom.
+/// address, or a color adds one action along the bottom; an image adds Read Text.
 private struct ClipboardCard: View {
     let entry: ClipboardEntry
     let onAction: (SmartAction) -> Void
@@ -194,7 +194,9 @@ private struct ClipboardCard: View {
                 ChipButton(title: action.title) { onAction(action) }
                     .padding(6)
             } else if case .image(let image) = entry.content {
-                ChipButton(title: "Copy Text") { onCopyText(image) }
+                // The picture is not text: the chip says it reads the picture, and copies what it finds.
+                ChipButton(title: "Read Text", accessibilityLabel: "Copy Text from Image") { onCopyText(image) }
+                    .help("Reads the text in this image and copies it")
                     .padding(6)
             }
         }

@@ -237,7 +237,7 @@ A **Files / Clipboard** choice.
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
-  image card gets **Copy Text**. Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
+  image card gets **Read Text** (it reads the text in the picture with Vision and copies it; the label says *Read*, not *Copy*, so it doesn't look like the picture is text). Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
   Snippet* (kept in Notes, and written to disk because you chose to). History itself stays in memory.
 
 ### Clock
