@@ -431,6 +431,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Music playing, then a video: the play/pause button controls the **music**; first use asks for Automation permission
 - [ ] Shuffle, repeat, Favorite (Apple Music), app volume, and lyrics on a real track
 - [ ] The Automation prompt for Spotify
+- [ ] The peek and the Media tab size themselves to the song (written, not run): a track with no lyrics (or an instrumental) has no lyric row, 24 pt shorter than one with lyrics; the next track with lyrics grows the island when they arrive and the next without shrinks it again; hover peek and Media tab agree; Home's Music widget never shows the row. If there is still extra height, note which surface, which track, and whether the lyric row is blank (a line not yet started) or absent
 
 **Home, Clock, Reminders**
 - [ ] Reminder field: typing works in the panel (focus), Return saves, access prompt appears once

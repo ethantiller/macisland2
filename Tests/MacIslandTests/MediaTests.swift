@@ -58,6 +58,8 @@ struct LyricsModelTests {
     @Test func plainOrMissingLyricsAreEmpty() {
         #expect(LyricsModel.lines(fromResponse: Data(#"{"plainLyrics": "x", "syncedLyrics": null}"#.utf8)).isEmpty)
         #expect(LyricsModel.lines(fromResponse: Data("nope".utf8)).isEmpty)
+        // Stamps without words (an instrumental) leave no lyrics, so no blank row.
+        #expect(LyricsModel.lines(fromResponse: Data(#"{"syncedLyrics": "[00:00.00] \n[00:30.00]"}"#.utf8)).isEmpty)
         #expect(LyricsModel.lines(fromResponse: response).count == 2)
     }
 
