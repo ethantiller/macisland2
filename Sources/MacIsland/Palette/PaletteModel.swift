@@ -113,6 +113,10 @@ final class PaletteModel {
             }
         }
 
+        if let query = Self.clipboardQuery(from: text) {
+            items += clipboardItems(matching: query)
+        }
+
         if let match = SearchEngine.match(text, in: settings.searchEngines) {
             items.append(searchItem(engine: match.engine, query: match.query))
         }
@@ -121,6 +125,30 @@ final class PaletteModel {
             items.append(translationItem(for: request))
         }
         return items
+    }
+
+    /// `clip foo` or `cb foo`: what follows the keyword. Just the keyword asks for the recent copies.
+    nonisolated static func clipboardQuery(from text: String) -> String? {
+        let lowered = text.lowercased()
+        for keyword in ["clip", "cb"] {
+            if lowered == keyword { return "" }
+            if lowered.hasPrefix(keyword + " ") { return String(text.dropFirst(keyword.count)).trimmingCharacters(in: .whitespaces) }
+        }
+        return nil
+    }
+
+    private static let clipboardRows = 5
+
+    /// Copied text that matches, newest first. Return copies one back.
+    private func clipboardItems(matching query: String) -> [PaletteItem] {
+        viewModel.clipboard.matches(query).prefix(Self.clipboardRows).compactMap { entry in
+            guard case .text(let text) = entry.content else { return nil }
+            let line = text.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? ""
+            return PaletteItem(
+                id: "clip-\(entry.id)", title: String(line.prefix(70)), subtitle: "Clipboard \u{00B7} Return to copy",
+                icon: .symbol("doc.on.clipboard")
+            ) { [viewModel] in viewModel.copyFromClipboardHistory(entry) }
+        }
     }
 
     private func searchItem(engine: SearchEngine, query: String) -> PaletteItem {

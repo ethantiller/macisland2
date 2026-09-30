@@ -196,7 +196,8 @@ A **Files / Clipboard** choice.
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
-  image card gets **Copy Text**.
+  image card gets **Copy Text**. Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
+  Snippet* (kept in Notes, and written to disk because you chose to). History itself stays in memory.
 
 ### Clock
 
@@ -264,6 +265,7 @@ lists the modules. A web search is always the last row.
 | `25m`, `1h30m`, `90s`, `timer 45` | *Start a 25-minute timer* |
 | `remind buy milk` or `todo buy milk` | *Add Reminder "buy milk"* |
 | `new note`, `settings` | The action |
+| `clip alpha` or `cb alpha` | Up to five recent copies that contain "alpha"; Return copies one back. `clip` alone lists the latest |
 | `yt swift`, `gh repo`, `w rome` | Searches that engine |
 | Anything else | The last row: *Search Google for "…"* (your default engine) |
 | `tr hello` | *Translate to* your system language |

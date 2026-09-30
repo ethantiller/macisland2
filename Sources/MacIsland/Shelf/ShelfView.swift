@@ -99,7 +99,9 @@ struct ShelfView: View {
                     ForEach(clipboard.entries) { entry in
                         ClipboardCard(
                             entry: entry, onAction: viewModel.perform,
-                            onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } }
+                            onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
+                            onPlain: { viewModel.copyPlainText(entry) },
+                            onSnippet: { viewModel.saveAsSnippet(entry) }
                         ) {
                             viewModel.copyFromClipboardHistory(entry)
                         } onRemove: {
@@ -129,6 +131,8 @@ private struct ClipboardCard: View {
     let entry: ClipboardEntry
     let onAction: (SmartAction) -> Void
     let onCopyText: (NSImage) -> Void
+    let onPlain: () -> Void
+    let onSnippet: () -> Void
     let onCopy: () -> Void
     let onRemove: () -> Void
 
@@ -155,7 +159,14 @@ private struct ClipboardCard: View {
             .buttonStyle(IslandButtonStyle())
             .onHover { isHovering = $0 }
             .onDrag { provider }
-            .contextMenu { Button("Remove", action: onRemove) }
+            .contextMenu {
+                if case .text = entry.content {
+                    Button("Copy as Plain Text", action: onPlain)
+                    Button("Save as Snippet", action: onSnippet)
+                    Divider()
+                }
+                Button("Remove", action: onRemove)
+            }
             .help("Click to copy again. Drag out to use it.")
             .accessibilityLabel(accessibilityText)
             .accessibilityAction(named: "Remove", onRemove)

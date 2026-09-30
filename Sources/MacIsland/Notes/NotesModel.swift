@@ -89,6 +89,17 @@ final class NotesModel {
         return snippet
     }
 
+    /// Keeps `text` as a snippet, named by its first line. Written to disk because the person chose to.
+    @discardableResult
+    func saveSnippet(text: String) -> Snippet {
+        let first = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let snippet = Snippet(title: String(first.trimmingCharacters(in: .whitespaces).prefix(40)), text: text)
+        snippets.insert(snippet, at: 0)
+        selectedSnippetID = snippet.id
+        scheduleSave()
+        return snippet
+    }
+
     func setTitle(_ title: String, ofSnippet id: UUID) {
         update(snippet: id) { $0.title = title }
     }

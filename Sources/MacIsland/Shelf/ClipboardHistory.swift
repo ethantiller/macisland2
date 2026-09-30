@@ -79,6 +79,15 @@ final class ClipboardHistory {
         lastChangeCount = pasteboard.changeCount
     }
 
+    /// The copied text that contains `query` (ignoring case and accents), newest first. Nothing typed lists all text.
+    func matches(_ query: String) -> [ClipboardEntry] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return entries.filter { entry in
+            guard case .text(let text) = entry.content else { return false }
+            return needle.isEmpty || text.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
+
     func remove(_ entry: ClipboardEntry) {
         entries.removeAll { $0.id == entry.id }
     }

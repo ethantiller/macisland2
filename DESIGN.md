@@ -161,7 +161,7 @@ and may not draw `.glassEffect`. Check those in the running app.
 ## Reach: the palette, the menu bar, and windows
 
 - **Command palette (⌃⌥K).** A floating glass panel hung below the notch, centered on it, 520 wide. Rows: modules, tools,
-  timers ("25m", "1h30m", "timer 45"), apps, Shortcuts, snippets, "remind …", web searches, and translation. Empty, it lists the
+  timers ("25m", "1h30m", "timer 45"), apps, Shortcuts, snippets, "remind …", `clip …`, web searches, and translation. Empty, it lists the
   modules. A web search is always the last row. Search with a keyword (`yt swift`) or the default engine; there are nine
   built-in engines and any number of custom ones (Settings, with `%s` where the search goes). `tr hello` translates into the
   system language and `tr es hello` picks the language, through the system Translation framework. Arrows move, Return runs,

@@ -510,6 +510,20 @@ final class IslandViewModel {
         }
     }
 
+    /// Puts a text card back on the pasteboard as plain text only (no other types).
+    func copyPlainText(_ entry: ClipboardEntry) {
+        guard case .text(let text) = entry.content else { return }
+        features.clipboard.copyText(text)
+        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+    }
+
+    /// Keeps a text card as a snippet in Notes.
+    func saveAsSnippet(_ entry: ClipboardEntry) {
+        guard case .text(let text) = entry.content else { return }
+        features.notes.saveSnippet(text: text)
+        flash(IslandAlert(systemImage: "text.badge.plus", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+    }
+
     func copyFromClipboardHistory(_ entry: ClipboardEntry) {
         features.clipboard.copy(entry)
         flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
