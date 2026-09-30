@@ -64,7 +64,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 637 tests, about a second.
+lines; 652 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -165,6 +165,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | --- | --- |
 | `IslandPanel.swift` | The always-there `NSPanel`: borderless, non-activating, over everything, click-through by default, first-click-acts hosting view |
 | `ScreenGeometry.swift` | Notch detection and sizes; `panelSize` (560 x 276); `islandRect(for:)` |
+| `MenuHoldObserver.swift` | Holds the island open while any AppKit menu is tracking |
 | `MouseTracker.swift` | Global and local event monitors: hover, click-through, file-drag detection, swipes, click-outside |
 | `SwipeRecognizer.swift` | Turns one gesture's scroll deltas into down, up, left, or right, once |
 | `Announcements.swift` | `AmbientEvent` (what can be muted) and the banners and alerts of each, built once for the island and the preview |
@@ -319,12 +320,13 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **637 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 41 files, about 9,200 lines, **652 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
 | `TestSupport.swift` | `makeViewModel()`: a view model from test doubles |
 | `KeyboardTests.swift` | Hotkey pinning, arrow tabs, banners |
+| `HoldTests.swift` | The named holds (menu, Quick Look, panel, text focus, Mirror): what they block and when the close resumes |
 | `SettingsPreviewTests.swift`, `SettingsSnapshots.swift` | The Settings preview: size parity, isolation, sample data; its opt-in renders |
 | `CustomWidgetTests.swift` | Web values, freshness and overlap, `BoundedProcess` (timeout, cap, environment), custom widgets in settings |
 | `BehaviorTests.swift` | Shortcuts, Peek on Hover, the display choice, muting events |

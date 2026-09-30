@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (637 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (652 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -426,6 +426,12 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**The island stays open (written, not run)**
+- [ ] Right-click a Shelf file and move into the menu, then into **Convert To** and **Resize**: the island stays open; when the menu closes with the pointer outside, it folds after a moment. The same for the clipboard card, the tab strip, Home's widget menu, the Tools pin menu, the Media output chip's menu, and Notes' Delete
+- [ ] Quick Look (Space, or the menu): clicking in its panel does not fold the island; closing it lets the island fold once the pointer is away
+- [ ] A menu open while Esc or ⌃⌥Space is pressed still closes the island (a hold never traps it)
+- [ ] Mirror on: the pointer leaving, a click outside, Esc, ⌃⌥Space, and a swipe up do nothing; tab swipes and ←/→ do nothing; **Done** turns it off and the island folds normally; a meeting banner's **Check Camera** works; a banner arriving while it is on waits as an alert; with Camera denied, nothing is held
 
 **Media**
 - [ ] Music playing, then a video: the play/pause button controls the **music**; first use asks for Automation permission

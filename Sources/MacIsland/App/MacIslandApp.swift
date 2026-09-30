@@ -71,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkey = GlobalHotkey()
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
+    private var menuHold: MenuHoldObserver?
     private var sigtermSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -94,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
 
         mouseTracker = MouseTracker(panel: panel, viewModel: viewModel)
+        menuHold = MenuHoldObserver(viewModel: viewModel)
         connectKeyboard(panel: panel)
         connectReach()
         connectOnboarding()

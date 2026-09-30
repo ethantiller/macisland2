@@ -37,7 +37,7 @@ struct RemindersView: View {
         .padding(.horizontal, 12)
         .frame(height: Theme.Metrics.hitTarget)
         .background(Theme.Palette.fill, in: Capsule())
-        .onChange(of: isFocused) { _, focused in if focused, !isFloating { viewModel.holdOpen() } }
+        .onChange(of: isFocused) { _, focused in if focused, !isFloating { viewModel.hold(.textFocus) } }
     }
 
     @ViewBuilder

@@ -52,7 +52,7 @@ final class MouseTracker {
         }
         if event.type == .leftMouseDown {
             dragStartedOnIsland = viewModel.hitRect.contains(NSEvent.mouseLocation)
-            if viewModel.isPinnedOpen, !dragStartedOnIsland { viewModel.closePinned() }
+            if viewModel.closesOnClickOutside, !dragStartedOnIsland { viewModel.closePinned() }
             dragPasteboardCount = NSPasteboard(name: .drag).changeCount
             startDragPolling()
         }

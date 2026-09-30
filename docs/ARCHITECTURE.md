@@ -494,6 +494,27 @@ change with nothing wired. A phase that is running, or paused, keeps `startedLen
 it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
 against the new number.
 
+### Holds: what keeps the island open
+
+`IslandHold` names the reasons the island stays open while the pointer is elsewhere: `.menu`, `.quickLook`, `.panel`, `.textFocus`, and `.mirror`.
+They are a set on the view model (`hold(_:)`, `release(_:)`, and `holding(_:during:)` for a panel that is shown and answered), so two
+reasons can't cancel each other. The keyboard pin (`isPinnedOpen`) is separate.
+- **Menus.** `MenuHoldObserver` listens for `NSMenu.didBeginTrackingNotification` and `didEndTrackingNotification`, which cover SwiftUI's
+  `.contextMenu`, `Menu`, and `ShareLink`, for every menu in the island at once. It counts, because a submenu nests.
+- **Mirror** is not taken by name: `activeHolds` adds it for exactly as long as the camera is on, not `isUnavailable`, and not denied.
+- **What a hold does.** The pointer leaving doesn't fold the island (`setHovering`). A click outside doesn't close it
+  (`closesOnClickOutside`, read by `MouseTracker`) while a menu, Quick Look, a panel, or Mirror holds. `.textFocus` is soft: the
+  pointer coming back or a close ends it, as the keyboard pin. Esc, the shortcut, and a swipe up (`closePinned()`) refuse only for
+  Mirror, which stays until **Done**; a menu or panel never traps them, so a stuck hold can't trap the island open. With Mirror on, tab
+  swipes and the arrow keys are ignored (changing tab would turn the camera off; clicking a tab still does), and a banner waits as an
+  alert that stays until seen instead of folding the island (any hard hold does this).
+- **When the last hold ends** (`resumeAfterHold`), an island the pointer is not over folds after the usual 300 ms, counted from then.
+  The pointer is read through `pointerLocation`, which tests replace.
+- **Where menus and panels are opened in the island** (checked by grep): the Shelf item menu (Convert To, Resize, Share), the clipboard
+  card menu, the tab strip's menu, Home's widget menu, the Tools pin menu, the Media output chip's Disconnect menu, Notes' Delete, and
+  Quick Look. There is no `NSSavePanel`, `NSOpenPanel`, or `NSAlert` in the island yet; Phase 3's save panel uses `holding(.panel)`.
+  A window another app or the system opens from the share menu (Mail's compose window) is not seen by any of this.
+
 ### Now Playing
 
 Apple restricts MediaRemote to its own binaries since macOS 15.4, so the vendored `mediaremote-adapter` is compiled to a framework and
@@ -546,7 +567,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **637 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **652 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -580,12 +601,12 @@ Things that cost time. Read before changing the related code.
 | **Home's grid geometry** | It is computed once, in `HomeGridSpec`, and used by the renderer (`HomeGrid`) and the editor. Don't measure widgets or hard-code a column or row size elsewhere. A torn-off Home window keeps the size it opened at if the layout grows later. |
 | **Tab order** | Tab order is the order the person arranged, not module order; `normalized` keeps it. |
 | **Right side of the strip** | Widths are worst-case constants in `TrailingStrip`; if a new item goes there, add it to `TrailingStrip.plan` and its test, or it can reach the notch. |
-| **Blur while pinning** | Focusing a text field calls `holdOpen()`; floating windows must not (`\.isFloatingWindow`). |
+| **Blur while pinning** | Focusing a text field calls `hold(.textFocus)`; floating windows must not (`\.isFloatingWindow`). |
 | **File drags from other apps** | The source app runs its own drag loop, so the island stops getting mouse events; `MouseTracker` polls the cursor at 30 Hz from mouse-down until release. A drag counts as a file drag only if the drag pasteboard's change count moved since mouse-down **and** it holds a file URL. (An early version used `canReadObject(forClasses:)`, which also matched links and URL-like text, and grew the island with no file.) Not checked against every source app; if it misfires, note what was being dragged. |
 | **Hover during a drag** | While a file is dragged, hovering must not open the island (only the drop target does), but hovering may keep it open. `setDropTargeted` sets `isHovering` so it still closes when the pointer leaves. Drop halves are decided from the drop location (`x > width / 2` is AirDrop), which keeps working while the island resizes. |
 | **AirDrop** | Incoming can't be intercepted (the Accept/Decline notification belongs to `sharingd`; nothing is observable until the file starts arriving in Downloads, where `TransferMonitor` shows it). Sending is picker-only. See [ROADMAP.md](ROADMAP.md#dropped-for-good). |
 | **Snapshots and drags** | Drag and drop states can't be simulated in `ImageRenderer`; check them in the running app. |
-| **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()` and `holdOpen()`; hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
+| **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()`, and setting `quickLookURL` takes the `.quickLook` hold (clearing it releases it); hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
 | **First-run evidence** | A new setting stored in `UserDefaults` needs its key in `InstallEvidence.keys`, or an updater who only ever changed it looks like a fresh install and is shown the guide. `evidenceKeysCoverEverySetting` guards it. |
 | **No `.defaultAction` in Settings** | A default button takes Return from the focused search field and the weather field, so the tour's Return is a key monitor. Esc is not bound either: Settings already uses it to clear search, cancel the recorder, and call off a drag. |
 | **Esc and arrows in the guide** | They are the stage island's: the panel takes them (`keyHandler`) and Esc never reaches its close. A titled `NSPanel` answers Esc by closing itself (the guide closed on Esc), so `cancelOperation` is overridden. Don't bind them in SwiftUI: they need focus. |

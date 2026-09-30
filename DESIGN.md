@@ -102,7 +102,7 @@ Reduce Motion turns every token into a short ease, removes the swell, and swaps 
 | --- | --- |
 | Hover | Swell (`track`), then peek after 120 ms (Peek on Hover off: the swell only, and a click or swipe opens it) |
 | Click, two-finger swipe down, or ⌃⌥Space | Expanded |
-| Pointer leaves for 300 ms | Compact (`close`) |
+| Pointer leaves for 300 ms | Compact (`close`), unless something holds it open: a menu, Quick Look, a panel, a text field, or the Mirror camera. The 300 ms starts when the last hold ends |
 | Two-finger horizontal swipe | Previous or next tab; over the timer dial, it scrubs the dial. Swiping (down opens, up closes, sideways changes tab) can be turned off in Settings |
 | ←/→ | Previous or next tab |
 | Esc | Close |

@@ -69,7 +69,7 @@ private struct NotesPane: View {
             if let note = notes.selectedNote {
                 EditorField(
                     text: Binding(get: { note.body }, set: { notes.setBody($0, ofNote: note.id) }),
-                    onFocus: { if !isFloating { viewModel.holdOpen() } }
+                    onFocus: { if !isFloating { viewModel.hold(.textFocus) } }
                 )
                 .id(note.id)
             } else {
@@ -112,7 +112,7 @@ private struct SnippetsPane: View {
                     }
                     EditorField(
                         text: Binding(get: { snippet.text }, set: { notes.setText($0, ofSnippet: snippet.id) }),
-                        onFocus: { if !isFloating { viewModel.holdOpen() } }
+                        onFocus: { if !isFloating { viewModel.hold(.textFocus) } }
                     )
                 }
                 .id(snippet.id)

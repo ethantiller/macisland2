@@ -287,7 +287,7 @@ Right-click a tool to pin it. The row is always full: unpinning fills the gap wi
 | **Screenshot** | Area capture to the clipboard |
 | **Focus** | Turns a Focus on or off through *your* Shortcuts named `Focus On` and `Focus Off` (a banner explains if missing) |
 | **Clean Keys** | Swallows every key for 30 seconds so the keyboard can be wiped; the mouse still works. Needs Accessibility |
-| **Mirror** | Replaces the tools with your camera (16:9, mirrored, no frames kept), Ring Light and its brightness beside it, and **Done**. The island stays open; folding it, changing tab, or Done turns the camera off. Asks for Camera access the first time, and says so, with **Open Settings**, if it is off |
+| **Mirror** | Replaces the tools with your camera (16:9, mirrored, no frames kept), Ring Light and its brightness beside it, and **Done**. The island stays open for as long as the camera is on: it does not fold when the pointer leaves, on a click outside, Esc, the shortcut, or a swipe up, and a banner waits as an alert; tab swipes and the arrow keys are ignored. Done, clicking another tab, or the camera failing turns it off. Asks for Camera access the first time, and says so, with **Open Settings**, if it is off |
 | **Record** (*Record Screen*) | Folds the island and lets you drag a region (click for the whole display, Esc to cancel), then records it, without MacIsland's own windows, to a movie in your Movies folder (30 minutes at most). The blue record dot and time sit beside the notch; click it to stop. The movie lands on the Shelf. Asks for Screen Recording access, with a red banner and **Open Settings** if it is off |
 
 ### Notes

@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 637 tests, under a second
+./scripts/test.sh                                                     # 652 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
