@@ -55,7 +55,7 @@ struct TourStop: Identifiable, Equatable {
             id: "preview", since: 1, pane: .general, target: .previewBand, placement: .below, scrollAnchor: nil,
             preview: nil, title: "Your Island, Live",
             copy:
-                "Each pane shows the real island from sample data, so a change appears where it lands. Click Compact, Peek, Banner, or Expanded above it, or swipe on it."
+                "Each pane shows the real island from sample data, so a change appears where it lands. Swipe on it, or use the arrows, to see Compact, Peek, Banner, and Expanded."
         ),
         TourStop(
             id: "shortcut", since: 1, pane: .general, target: .shortcut, placement: .below,

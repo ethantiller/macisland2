@@ -370,7 +370,7 @@ Note picks a note. Right-click any widget on the real island and choose **Edit H
 
 ## First run
 
-The first launch of a fresh install shows the **guide**: a floating glass window hung below the island, with the real island as its
+The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it anywhere that isn't a control), with the real island as its
 stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
 
 | # | Step | What it shows |

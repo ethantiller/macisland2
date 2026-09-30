@@ -35,7 +35,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
-- **First run:** a ten-step guide (floating glass below the island, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a fifteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
+- **First run:** a ten-step guide (floating glass in the middle of the screen, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a fifteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
@@ -67,7 +67,7 @@ Where the app ended up differently from what was first planned, and why. The des
 | Type gains `prompter`, `headline`, `subheadline` | The Prompter and the music player |
 | `expandedWidth` stays 520; the right side gets one tab | Fits without widening |
 | Agents is an idea, not a module | The user moved to everyday features: see [Next](#next) and [Ideas](#ideas) |
-| **The first-run guide is floating glass hung below the island**, with the real island as its stage; the tour is a black callout with an accent ring | The island is too small, folds when the pointer leaves, and would block the practice steps. A standard window reads as a template |
+| **The first-run guide is floating glass, centered on the screen and draggable**, with the real island as its stage; the tour is a black callout with an accent ring | The island is too small, folds when the pointer leaves, and would block the practice steps. A standard window reads as a template. It first hung below the island; it is centered (asked for), and the open island covers its top while it is practised on |
 | **The guide asks for Calendars, Reminders, and Bluetooth** (Skip asks for all three); everything else is still asked on first use | Those power things that arrive on their own, so there is no first use to ask at. The rest send the person to System Settings, which is best next to the feature |
 | **Existing installs skip both the guide and the tour**; closing the guide with ⊗ counts as seen | An updater knows the app; the state is written once because every clean quit writes `notes.json` |
 | Granting Calendars or Reminders in the guide also turns on its Up Next switch | The permission and the choice it serves are one step |
@@ -412,7 +412,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 **First run** (`open macisland://guide`; debug builds: `open 'macisland://guide?reset=1'` to see it as a fresh install)
 - [ ] `defaults read com.ethantiller.MacIsland onboarding.install` prints `existing` on your Mac, and neither the guide nor the tour appeared after the update
-- [ ] The guide drops in below the island, centered, with the compact island and music on its stage; Return continues; ⊗ closes and `onboarding.guide` becomes 1
+- [ ] The guide opens in the middle of the screen, with the compact island and music on its stage, and can be dragged by its background (not by a button); Return continues; ⊗ closes and `onboarding.guide` becomes 1
 - [ ] Hover (the peek step turns green), click (open), swipe sideways (tabs), move away (close), all on the real notch; ⌃⌥Space, the arrows, and Esc work on the island and never change the guide's step; hovering the island **while the guide is the key window** still peeks (if not, see the plan's Risk 3)
 - [ ] Seven Modules: every chip shows its tab at 1:1. Drag a Finder file toward the notch: the drop step turns green. The menu bar step slides to the menu bar and comes back on Back
 - [ ] Access (after `tccutil reset Calendar`, `Reminders`, and `BluetoothAlways` for `com.ethantiller.MacIsland`): each Allow shows its prompt once, above the guide; Allowed and Off draw as specified; granting Calendars turns on Calendar Events in Settings → Home → Up Next. The step is left out when all three are allowed

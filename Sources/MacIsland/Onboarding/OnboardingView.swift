@@ -300,6 +300,10 @@ struct OnboardingRoot: View {
     var body: some View {
         OnboardingView(model: model, island: island, onFolded: onFolded)
             .floatingGlass()
+            // Dragging anywhere that isn't a control moves the window. The panel's `isMovableByWindowBackground` alone did not
+            // move it (found by hand), so the drag is SwiftUI's. A button's own click wins over this, so the controls still work.
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Metrics.floatRadius, style: .continuous))
+            .gesture(WindowDragGesture())
             .environment(\.islandSurface, .glass)
             // Scale and fade in; opacity only under Reduce Motion. A modifier, not a transition, so the window can be sized
             // from the view's fitting size before it has arrived.

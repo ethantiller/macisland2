@@ -505,8 +505,7 @@ stored under a key that isn't in it. An existing install gets the guide and the 
 
 **The guide.** `OnboardingFlow` holds the ten steps as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
 shortcut, the notch, the tabs, the drag target), all tested. `OnboardingModel` walks them, keeps the practice checks, and runs each way
-out. The window is an `OnboardingPanel`, a `FloatingGlassPanel` without a resize edge, hung below the island's full extent so the island
-can open all the way while it is practised on. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
+out. The window is an `OnboardingPanel`, a `FloatingGlassPanel` without a resize edge, centered on the island's screen and moved by a `WindowDragGesture` on its glass (the panel's `isMovableByWindowBackground` alone did not move it). The open island, the higher window, draws over the top of the guide while it is practised on; drag the guide aside if it is in the way. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
 `IslandPreviewModel`, which stops when the guide closes. **Practice** is observed, not polled: the view reports the live island's
 state, tab, and file-drag flag to the model, and `PracticeGoal.isMet(from:to:)` decides. When the live island folds back in while the app is
 active, the guide takes the keyboard back (⌃⌥Space gave it to the island) so Return continues. The guide never binds Esc or the arrows.

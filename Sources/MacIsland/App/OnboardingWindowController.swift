@@ -75,15 +75,13 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
     }
 
-    /// Centered on the island's screen, its top edge `floatGap` under the island panel's full extent so the island can open all the
-    /// way while the person practises. On a short screen it moves up just enough to fit, and the island draws over its top.
+    /// The middle of the island's screen, in the part the menu bar and the Dock leave free. While the person practises on the real
+    /// island, it opens over the top of the guide (it is the higher window); the guide can be dragged out of the way.
     static func origin(for size: CGSize, geometry: ScreenGeometry) -> NSPoint {
         let screen = NSScreen.screens.first { $0.frame == geometry.screenFrame } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? geometry.screenFrame
-        let top = geometry.panelFrame.minY - Theme.Metrics.floatGap
-        var origin = NSPoint(x: geometry.screenFrame.midX - size.width / 2, y: top - size.height)
-        origin.y = max(origin.y, visible.minY + Theme.Metrics.floatGap)
-        return origin
+        // A window taller than the screen keeps its footer (Back, Continue) on it.
+        return NSPoint(x: visible.midX - size.width / 2, y: max(visible.midY - size.height / 2, visible.minY))
     }
 
     /// The guide has ended: fade it out, then let go of it.
