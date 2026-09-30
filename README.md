@@ -20,10 +20,8 @@ project). One borderless `NSPanel` hosts the whole island.
 | [docs/FEATURES.md](docs/FEATURES.md) | Every feature, module by module, with pictures and exact behavior |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: layers, state, windows, input, data, permissions, gotchas |
 | [docs/SCRIPTS.md](docs/SCRIPTS.md) | Every script and config file, and a map of every source file |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | What is built, what is next (Phase 6), what has not been tried by hand |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is built, what is next, what has not been tried by hand, and what was ruled out |
 | [DESIGN.md](DESIGN.md) | The design system: surfaces, presentations, color, type, motion, metrics |
-| [docs/plan-v2.md](docs/plan-v2.md) | The original phased plan, saved as written |
-| [NOTES.md](NOTES.md) | An older working log (partly out of date; kept for the findings) |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code sessions in this repo |
 
 ## Quick start
@@ -32,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 215 tests, under a second
+./scripts/test.sh                                                     # 216 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -88,7 +86,7 @@ Up to **five tabs left of the notch and one right of it**, arranged in Settings.
 | **Reminders** | **Notes** |
 | ![Reminders](docs/images/04c-expanded-reminders.png) | ![Notes](docs/images/08d-expanded-notes.png) |
 
-Also **Shelf** (files and clipboard). An eighth module, Agents, is Phase 6. Everything is in [docs/FEATURES.md](docs/FEATURES.md).
+Also **Shelf** (files and clipboard). Everything is in [docs/FEATURES.md](docs/FEATURES.md).
 
 ## How it works, in brief
 
@@ -151,8 +149,10 @@ Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissio
 
 ## Status
 
-Phases 1 to 5 of the [plan](docs/plan-v2.md) are built. Phase 6 (agents: a local API, approvals, usage, shell activity) is
-next. What is done, what changed from the plan, and what still needs a hand test: [docs/ROADMAP.md](docs/ROADMAP.md).
+The island, its seven modules, the command palette, and menu-bar and torn-off windows are built. Next is a set of everyday
+features (file tools and converters, clipboard, palette answers, Outlook and Teams, ambient banners, capture): see
+[docs/ROADMAP.md](docs/ROADMAP.md#next). What is done, the decisions along the way, what still needs a hand test, and what was
+ruled out are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Third-party code
 

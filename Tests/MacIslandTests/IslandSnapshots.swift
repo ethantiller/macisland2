@@ -194,6 +194,26 @@ struct IslandSnapshots {
 
     private func makeViewModel() -> IslandViewModel { TestSupport.makeViewModel() }
 
+    /// The two drop tiles the Shelf shows while a file is dragged, as they look with the pointer over each half.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderDropTiles() {
+        let viewModel = makeViewModel()
+        viewModel.setFileDragActive(true)
+        for (name, zone) in [("14-drop-tiles-shelf", DropZone.shelf), ("14b-drop-tiles-airdrop", DropZone.airDrop)] {
+            let content = ShelfView(viewModel: viewModel, dropZone: zone)
+                .frame(width: 472, height: Theme.Metrics.shelfHeight)
+                .padding(18)
+                .background(Color.black)
+            guard let outputDirectory, let image = ImageRenderer(content: content).nsImage,
+                  let tiff = image.tiffRepresentation,
+                  let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            else { continue }
+            try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+            try? png.write(to: outputDirectory.appendingPathComponent("\(name).png"))
+        }
+        viewModel.setFileDragActive(false)
+    }
+
     private func sampleTrack() -> NowPlayingState {
         var state = NowPlayingState()
         state.title = "Midnight City"

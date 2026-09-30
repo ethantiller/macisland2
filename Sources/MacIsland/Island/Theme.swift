@@ -37,6 +37,8 @@ enum Theme {
         /// Needs you: an approval, low battery, a missing permission.
         static let attention = Color.red
         static let neutral = Color.white
+        /// AirDrop's own blue, for the AirDrop drop target only, so it reads as AirDrop and not as storage.
+        static let airDrop = Color(red: 0.16, green: 0.62, blue: 1.0)
     }
 
     enum Typography {

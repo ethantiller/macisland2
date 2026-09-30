@@ -62,7 +62,7 @@ struct IslandView: View {
             if viewModel.showsDragTarget {
                 HStack(spacing: 0) {
                     dragHint("Shelf", systemImage: "tray.and.arrow.down")
-                    dragHint("AirDrop", systemImage: "airdrop")
+                    dragHint("AirDrop", systemImage: nil, tint: Theme.Tint.airDrop)
                 }
                 .padding(.top, notchSize.height)
                 .padding(.horizontal, edgeInset)
@@ -127,10 +127,17 @@ struct IslandView: View {
     // MARK: Compact
 
     /// Names one half of the drop target while a file is being dragged toward the island.
-    private func dragHint(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
+    private func dragHint(_ title: String, systemImage: String?, tint: Color? = nil) -> some View {
+        HStack(spacing: 6) {
+            if let systemImage {
+                Image(systemName: systemImage)
+            } else {
+                AirDropGlyph()
+            }
+            Text(title)
+        }
             .font(Theme.Typography.title)
-            .foregroundStyle(Theme.Palette.secondary)
+            .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.secondary))
             .frame(maxWidth: .infinity)
     }
 

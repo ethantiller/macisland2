@@ -268,3 +268,40 @@ struct Glyph: View {
             .accessibilityHidden(true)
     }
 }
+
+/// AirDrop's icon: three arcs opening downward around a dot. Apple doesn't ship it as a symbol, so it is drawn.
+/// Takes the current foreground color, and scales with `size`.
+struct AirDropGlyph: View {
+    var size: CGFloat = Theme.Metrics.glyphSlot - 4
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let unit = min(canvasSize.width, canvasSize.height)
+            let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height * 0.58)
+            let lineWidth = unit * 0.11
+            // The gap at the bottom is 90 to 140 degrees either side of straight down.
+            for radius in [0.20, 0.34, 0.48] {
+                var arc = Path()
+                let start = 140.0, end = 400.0
+                let steps = 40
+                for step in 0...steps {
+                    let degrees = start + (end - start) * Double(step) / Double(steps)
+                    let radians = degrees * .pi / 180
+                    let point = CGPoint(
+                        x: center.x + cos(radians) * radius * unit,
+                        y: center.y + sin(radians) * radius * unit
+                    )
+                    step == 0 ? arc.move(to: point) : arc.addLine(to: point)
+                }
+                context.stroke(arc, with: .foreground, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            }
+            let dot = unit * 0.075
+            context.fill(
+                Path(ellipseIn: CGRect(x: center.x - dot, y: center.y - dot, width: dot * 2, height: dot * 2)),
+                with: .foreground
+            )
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}

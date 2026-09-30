@@ -30,7 +30,7 @@ struct ShelfView: View {
         if let dropZone, Self.showsDropTiles(zone: dropZone, isFileDragActive: viewModel.isFileDragActive) {
             HStack(spacing: 8) {
                 DropTile(title: "Add to Shelf", systemImage: "tray.and.arrow.down", isTargeted: dropZone == .shelf)
-                DropTile(title: "AirDrop", systemImage: "airdrop", isTargeted: dropZone == .airDrop)
+                DropTile(title: "AirDrop", systemImage: nil, isTargeted: dropZone == .airDrop, tint: Theme.Tint.airDrop)
             }
         } else {
             VStack(spacing: 6) {
@@ -219,27 +219,50 @@ private extension Color {
     }
 }
 
-/// One half of the drop target. The selected half is filled white, like other "on" states.
+/// One half of the drop target. The targeted half is filled, like other "on" states. A tile with a `tint` (AirDrop)
+/// is tinted all the time, with a soft fill even at rest, so it reads as a different place from the Shelf.
 private struct DropTile: View {
     let title: String
-    let systemImage: String
+    /// A symbol name, or `nil` for AirDrop, whose icon is drawn (`AirDropGlyph`).
+    let systemImage: String?
     let isTargeted: Bool
+    var tint: Color?
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
+    }
+
+    /// The name, with its icon: a symbol, or the drawn AirDrop glyph.
+    private var tileLabel: some View {
+        HStack(spacing: 6) {
+            if let systemImage {
+                Image(systemName: systemImage)
+            } else {
+                AirDropGlyph()
+            }
+            Text(title)
+        }
+        .font(Theme.Typography.bodyEmphasized)
+    }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
-            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: isTargeted ? [] : [5, 4]))
-            .foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.tertiary)
-            .background(
-                isTargeted ? Theme.Palette.fill : Theme.Palette.none,
-                in: RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
-            )
-            .overlay {
-                Label(title, systemImage: systemImage)
-                    .font(Theme.Typography.bodyEmphasized)
-                    .foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.secondary)
+        Group {
+            if let tint {
+                shape
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: isTargeted ? [] : [5, 4]))
+                    .foregroundStyle(tint.opacity(isTargeted ? 1 : 0.7))
+                    .background(tint.opacity(isTargeted ? 0.3 : 0.14), in: shape)
+                    .overlay { tileLabel.foregroundStyle(tint) }
+            } else {
+                shape
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: isTargeted ? [] : [5, 4]))
+                    .foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.tertiary)
+                    .background(isTargeted ? Theme.Palette.fill : Theme.Palette.none, in: shape)
+                    .overlay { tileLabel.foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.secondary) }
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(title)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
     }
 }
 
