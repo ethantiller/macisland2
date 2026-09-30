@@ -100,6 +100,8 @@ struct OnboardingView: View {
             ChipButton(
                 title: "Open at Login", systemImage: "power", isSelected: model.launchAtLogin
             ) { model.toggleLaunchAtLogin() }
+            // Login Items can be changed in System Settings while the guide is open.
+            .onAppear { model.refreshLaunchAtLogin() }
         default:
             EmptyView()
         }
