@@ -8,13 +8,17 @@ enum URLCommand: Equatable {
     case open(IslandModule)
     case addToShelf(URL)
     case banner(title: String, detail: String?, symbol: String?)
+    /// Shows the first-run guide again. `reset` (debug builds only) first makes this install a fresh one.
+    case guide(reset: Bool)
+    /// Opens Settings on its tour.
+    case settingsTour
 
     static let maxMinutes = 1440
     static let titleLimit = 60
     static let detailLimit = 80
 
-    /// `timer?minutes=`, `stopwatch`, `pomodoro`, `open?module=`, `shelf/add?path=`, and
-    /// `banner?title=&detail=&symbol=`. Anything else is `nil`.
+    /// `timer?minutes=`, `stopwatch`, `pomodoro`, `open?module=`, `shelf/add?path=`,
+    /// `banner?title=&detail=&symbol=`, `guide` (and, in debug builds, `guide?reset=1`), and `tour`. Anything else is `nil`.
     nonisolated static func parse(_ url: URL) -> URLCommand? {
         guard url.scheme?.lowercased() == "macisland",
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -54,6 +58,14 @@ enum URLCommand: Equatable {
                 title: title, detail: detail.isEmpty ? nil : detail,
                 symbol: query["symbol"].flatMap { isSymbolName($0) ? $0 : nil }
             )
+        case "guide":
+            #if DEBUG
+                return .guide(reset: query["reset"] == "1")
+            #else
+                return .guide(reset: false)
+            #endif
+        case "tour":
+            return .settingsTour
         default:
             return nil
         }
@@ -74,6 +86,9 @@ final class URLCommandRunner {
     private let viewModel: IslandViewModel
     private let now: () -> Date
     private var lastBanner: Date?
+    /// Set by the app, which owns the guide and Settings. Both only show UI, so a link can't do harm with them.
+    var onGuide: ((_ reset: Bool) -> Void)?
+    var onTour: (() -> Void)?
 
     init(viewModel: IslandViewModel, now: @escaping () -> Date = Date.init) {
         self.viewModel = viewModel
@@ -101,6 +116,10 @@ final class URLCommandRunner {
             viewModel.flash(
                 IslandAlert(systemImage: "tray.and.arrow.down.fill", tint: Theme.Tint.neutral, text: "Shelf"),
                 respectingFocus: false)
+        case .guide(let reset):
+            onGuide?(reset)
+        case .settingsTour:
+            onTour?()
         case .banner(let title, let detail, let symbol):
             if let lastBanner, now().timeIntervalSince(lastBanner) < Self.bannerInterval { return }
             lastBanner = now()

@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
     private let accessoryMonitor = AudioAccessoryMonitor()
+    private let bluetoothAccess = BluetoothAccess()
     private let diskSpace = DiskSpace()
     private let hotkey = GlobalHotkey()
     private var panel: IslandPanel?
@@ -94,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseTracker = MouseTracker(panel: panel, viewModel: viewModel)
         connectKeyboard(panel: panel)
         connectReach()
+        connectOnboarding()
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -394,6 +396,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         features.settings.onQuietChange = applyQuiet
         applyQuiet()
+    }
+
+    /// The first-run guide: what it needs from the app, its links, and showing it at the end of launch when this install hasn't
+    /// seen it.
+    private func connectOnboarding() {
+        let onboarding = onboarding
+        OnboardingWindowController.shared.context = OnboardingContext(
+            features: features, island: viewModel, state: onboarding,
+            access: LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess),
+            startDeferredMonitors: { [weak self] in self?.startDeferredMonitors() },
+            openSettings: { SettingsWindowController.shared.show() })
+        urlCommands.onGuide = { reset in
+            #if DEBUG
+                if reset { onboarding.resetToFresh() }
+            #endif
+            OnboardingWindowController.shared.show(replay: !reset)
+        }
+        if onboarding.needsGuide { OnboardingWindowController.shared.show(replay: false) }
+    }
+
+    /// Starts what `connectEvents` starts, for anything it held back. Safe to call again.
+    private func startDeferredMonitors() {
+        accessoryMonitor.start()
+        features.transfers.start()
     }
 
     /// Windows torn off the island, and opening Settings from it.

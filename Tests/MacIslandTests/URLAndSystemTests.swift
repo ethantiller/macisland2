@@ -24,6 +24,30 @@ struct URLCommandTests {
         #expect(parse("macisland://shelf/add?path=\(encoded)") == .addToShelf(file.standardizedFileURL))
     }
 
+    @Test func guideAndTourLinksParse() {
+        #expect(parse("macisland://guide") == .guide(reset: false))
+        #expect(parse("macisland://tour") == .settingsTour)
+        #if DEBUG
+            #expect(parse("macisland://guide?reset=1") == .guide(reset: true))
+        #else
+            #expect(parse("macisland://guide?reset=1") == .guide(reset: false))
+        #endif
+        #expect(parse("macisland://guide/extra") == nil)
+        #expect(parse("macisland://tours") == nil)
+    }
+
+    @Test func guideAndTourLinksReachTheApp() {
+        let viewModel = TestSupport.makeViewModel()
+        let runner = URLCommandRunner(viewModel: viewModel)
+        var guides: [Bool] = []
+        var tours = 0
+        runner.onGuide = { guides.append($0) }
+        runner.onTour = { tours += 1 }
+        runner.run(.guide(reset: false))
+        runner.run(.settingsTour)
+        #expect(guides == [false] && tours == 1)
+    }
+
     @Test func enforcesTheLimits() {
         #expect(parse("macisland://timer?minutes=0") == nil)
         #expect(parse("macisland://timer?minutes=99999") == nil)

@@ -1,0 +1,365 @@
+import Testing
+
+@testable import MacIsland
+
+struct OnboardingFlowTests {
+    private func setup(
+        shortcut: KeyCombo? = .openDefault, hasNotch: Bool = true, tabs: [IslandModule] = IslandModule.defaultTabs,
+        hidden: [IslandModule] = [.shelf, .notes], drag: DragTarget = .shelfAndAirDrop, screenshots: Bool = true
+    ) -> GuideSetup {
+        GuideSetup(
+            openShortcut: shortcut, hasNotch: hasNotch, tabs: tabs, hiddenModules: hidden, dragTarget: drag,
+            addsScreenshots: screenshots)
+    }
+
+    // MARK: Flow
+
+    @Test func everyStepForAFreshInstall() {
+        let flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: false)
+        #expect(flow.steps.map(\.id) == GuideStepID.allCases)
+        #expect(flow.count == 10)
+    }
+
+    @Test func accessIsLeftOutWhenAllAllowed() {
+        let flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: true)
+        #expect(flow.count == 9)
+        #expect(!flow.steps.contains { $0.id == .access })
+    }
+
+    @Test func replayShowsEveryStep() {
+        let flow = OnboardingFlow.make(seen: 1, replay: true, allAccessAllowed: false)
+        #expect(flow.steps.map(\.id) == GuideStepID.allCases)
+    }
+
+    @Test func aRerunShowsOnlyWhatIsNewThenTheLastStep() {
+        // Nothing has `since` above 1 yet, so someone who saw version 1 sees just the last step.
+        let flow = OnboardingFlow.make(seen: 1, replay: false, allAccessAllowed: false)
+        #expect(flow.steps.map(\.id) == [.finish])
+        #expect(flow.isFirst && flow.isLast)
+    }
+
+    @Test func nextAndBackClamp() {
+        var flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: false)
+        flow.back()
+        #expect(flow.isFirst && flow.current.id == .welcome)
+        for _ in 0..<20 { flow.next() }
+        #expect(flow.isLast && flow.current.id == .finish)
+        flow.back()
+        #expect(flow.current.id == .access)
+    }
+
+    @Test func everyStepHasItsStage() {
+        for step in GuideStep.all {
+            #expect((step.stage == nil) == (step.id == .menuBar), "\(step.id)")
+        }
+    }
+
+    // MARK: Copy
+
+    @Test func everyStepHasATitleAndACopy() {
+        for id in GuideStepID.allCases {
+            #expect(!GuideCopy.title(id).isEmpty)
+            #expect(!GuideCopy.body(id, setup: setup()).isEmpty)
+        }
+    }
+
+    @Test func copyFollowsTheShortcut() {
+        let on = setup()
+        let off = setup(shortcut: nil)
+        #expect(GuideCopy.body(.open, setup: on).contains("\u{2303}\u{2325}Space"))
+        #expect(!GuideCopy.body(.open, setup: off).contains("From anywhere"))
+        #expect(!GuideCopy.body(.open, setup: off).contains("\u{2303}"))
+        #expect(GuideCopy.showsShortcutCaps(.open, setup: on))
+        #expect(!GuideCopy.showsShortcutCaps(.open, setup: off))
+        #expect(GuideCopy.body(.tabs, setup: on).contains("\u{2190} and \u{2192}"))
+        #expect(!GuideCopy.body(.tabs, setup: off).contains("\u{2190}"))
+        #expect(GuideCopy.keyCaps(.tabs, setup: on) == ["\u{2190}", "\u{2192}"])
+        #expect(GuideCopy.keyCaps(.tabs, setup: off).isEmpty)
+        #expect(GuideCopy.body(.close, setup: on).contains("opened it from the keyboard"))
+        #expect(!GuideCopy.body(.close, setup: off).contains("keyboard"))
+        #expect(GuideCopy.body(.close, setup: off).contains("typing in it"))
+        #expect(GuideCopy.keyCaps(.close, setup: off) == ["Esc"])
+    }
+
+    @Test func copyFollowsTheDragTarget() {
+        #expect(GuideCopy.body(.drop, setup: setup(drag: .shelfAndAirDrop)).contains("left half"))
+        #expect(GuideCopy.body(.drop, setup: setup(drag: .shelfOnly)).contains("keep it on the Shelf"))
+        #expect(!GuideCopy.body(.drop, setup: setup(drag: .shelfOnly)).contains("AirDrop"))
+        #expect(GuideCopy.body(.drop, setup: setup(drag: .airDropOnly)).contains("to AirDrop it"))
+        let off = GuideCopy.body(.drop, setup: setup(drag: .nothing))
+        #expect(off.contains("is off") && off.contains("Settings \u{2192} Shelf"))
+        let dropStep = GuideStep.all.first { $0.id == .drop }!
+        #expect(GuideCopy.practice(for: dropStep, setup: setup(drag: .nothing)) == nil)
+        #expect(GuideCopy.practice(for: dropStep, setup: setup()) == .dropFile)
+    }
+
+    @Test func theScreenshotSentenceFollowsTheSetting() {
+        #expect(GuideCopy.body(.drop, setup: setup(screenshots: true)).contains("screenshots"))
+        #expect(!GuideCopy.body(.drop, setup: setup(screenshots: false)).contains("screenshots"))
+    }
+
+    @Test func modulesCopyNamesTheTabs() {
+        let text = GuideCopy.body(.modules, setup: setup())
+        #expect(text.hasPrefix("Your tabs are Home, Media, Clock, Reminders"))
+        #expect(text.contains("Shelf and Notes open when you need them."))
+        let moved = GuideCopy.body(
+            .modules,
+            setup: setup(tabs: [.home, .media, .clock, .notes, .tools], hidden: [.shelf, .reminders]))
+        #expect(moved.contains("Notes"))
+        #expect(moved.contains("Shelf and Reminders open when you need them."))
+    }
+
+    @Test func oneHiddenModuleIsSingular() {
+        let text = GuideCopy.body(.modules, setup: setup(hidden: [.notes]))
+        #expect(text.contains("Notes opens when you need it."))
+    }
+
+    @Test func nothingHiddenLeavesThatSentenceOut() {
+        let text = GuideCopy.body(.modules, setup: setup(hidden: []))
+        #expect(!text.contains("when you need"))
+        #expect(text.hasSuffix("Choose one to see it."))
+    }
+
+    @Test func noNotchSaysTopCenter() {
+        let none = setup(hasNotch: false)
+        #expect(GuideCopy.body(.peek, setup: none).contains("the top center of the screen"))
+        #expect(!GuideCopy.body(.peek, setup: none).contains("the notch"))
+        #expect(GuideCopy.prompt(.open, setup: none) == "Try it: click the top center of the screen.")
+        #expect(GuideCopy.prompt(.open, setup: setup()) == "Try it: click the notch.")
+    }
+
+    @Test func aModuleOutsideTheTabsAddsItsOtherWayIn() {
+        #expect(GuideCopy.moduleLines(.notes, inTabs: true).count == 1)
+        #expect(GuideCopy.moduleLines(.notes, inTabs: false).count == 2)
+        #expect(GuideCopy.moduleLines(.tools, inTabs: false).count == 1)
+        for module in IslandModule.allCases where module.isAvailable {
+            #expect(!GuideCopy.moduleLines(module, inTabs: true)[0].isEmpty, "\(module)")
+        }
+    }
+
+    @Test func thePrimaryButtonSaysWhereYouAre() {
+        #expect(GuideCopy.primaryTitle(.welcome, isLast: false) == "Get Started")
+        #expect(GuideCopy.primaryTitle(.peek, isLast: false) == "Continue")
+        #expect(GuideCopy.primaryTitle(.finish, isLast: true) == "Done")
+    }
+
+    // MARK: Practice
+
+    private func island(
+        _ state: IslandViewModel.State, tab: IslandModule = .home, drag: Bool = false
+    ) -> PracticeGoal.Island {
+        PracticeGoal.Island(state: state, tab: tab, isFileDragActive: drag)
+    }
+
+    @Test func peekIsMetByAPeekOrAnOpen() {
+        #expect(PracticeGoal.peek.isMet(from: island(.compact), to: island(.peek)))
+        #expect(PracticeGoal.peek.isMet(from: island(.compact), to: island(.expanded)))
+        #expect(!PracticeGoal.peek.isMet(from: island(.peek), to: island(.compact)))
+    }
+
+    @Test func openNeedsTheExpandedIsland() {
+        #expect(PracticeGoal.open.isMet(from: island(.peek), to: island(.expanded)))
+        #expect(!PracticeGoal.open.isMet(from: island(.compact), to: island(.peek)))
+    }
+
+    @Test func changeTabIsNotMetByTheFirstOpen() {
+        #expect(!PracticeGoal.changeTab.isMet(from: island(.compact), to: island(.expanded, tab: .media)))
+        #expect(PracticeGoal.changeTab.isMet(from: island(.expanded), to: island(.expanded, tab: .media)))
+        #expect(!PracticeGoal.changeTab.isMet(from: island(.expanded), to: island(.expanded)))
+    }
+
+    @Test func closeIsNotMetWhenTheIslandWasAlreadyCompact() {
+        #expect(PracticeGoal.close.isMet(from: island(.expanded), to: island(.compact)))
+        #expect(PracticeGoal.close.isMet(from: island(.peek), to: island(.compact)))
+        #expect(!PracticeGoal.close.isMet(from: island(.compact), to: island(.compact)))
+    }
+
+    @Test func dropFileNeedsTheDragToStart() {
+        #expect(PracticeGoal.dropFile.isMet(from: island(.compact), to: island(.compact, drag: true)))
+        #expect(!PracticeGoal.dropFile.isMet(from: island(.compact, drag: true), to: island(.compact, drag: true)))
+        #expect(!PracticeGoal.dropFile.isMet(from: island(.compact, drag: true), to: island(.compact)))
+    }
+}
+
+@MainActor
+struct OnboardingModelTests {
+    /// Everything a model needs, over test doubles: a private defaults suite, a stub for permissions, and a live view model
+    /// whose sample features feed the stage.
+    private struct Rig {
+        let model: OnboardingModel
+        let state: OnboardingState
+        let access: StubAccess
+        let reference: IslandViewModel
+        let ends: Ends
+        let monitorStarts: Counter
+        let settingsOpened: Counter
+    }
+
+    private final class Ends { var list: [GuideEnding] = [] }
+    private final class Counter { var count = 0 }
+
+    private func makeRig(existing: Bool = false, replay: Bool = false, access: StubAccess = StubAccess()) -> Rig {
+        let suite = "MacIslandOnboardingModel.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = OnboardingState(defaults: defaults, isExistingInstall: { existing })
+        let reference = TestSupport.makeViewModel()
+        let preview = IslandPreviewModel(live: reference.features)
+        let ends = Ends()
+        let starts = Counter()
+        let opened = Counter()
+        let accessModel = AccessModel(provider: access, settings: reference.settings, onBluetoothAllowed: {})
+        let model = OnboardingModel(
+            state: state, settings: reference.settings, geometry: { reference.geometry }, preview: preview,
+            access: accessModel,
+            island: PracticeGoal.Island(state: .compact, tab: .home, isFileDragActive: false), replay: replay,
+            startDeferredMonitors: { starts.count += 1 }, openSettings: { opened.count += 1 },
+            onEnd: { ends.list.append($0) })
+        return Rig(
+            model: model, state: state, access: access, reference: reference, ends: ends, monitorStarts: starts,
+            settingsOpened: opened)
+    }
+
+    private func island(_ state: IslandViewModel.State, tab: IslandModule = .home, drag: Bool = false)
+        -> PracticeGoal.Island
+    {
+        PracticeGoal.Island(state: state, tab: tab, isFileDragActive: drag)
+    }
+
+    @Test func startsOnTheWelcomeWithItsStage() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        #expect(rig.model.step.id == .welcome)
+        #expect(rig.model.preview.context.presentation == .compact)
+        #expect(rig.model.primaryTitle == "Get Started")
+    }
+
+    @Test func eachStepShowsItsStage() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()
+        #expect(rig.model.preview.context.presentation == .peek)
+        rig.model.next()
+        #expect(rig.model.preview.context == PreviewContext(presentation: .expanded, tab: .home))
+        rig.model.next()
+        #expect(rig.model.preview.context.tab == .media)
+        rig.model.back()
+        #expect(rig.model.preview.context.tab == .home)
+    }
+
+    @Test func theModulesStageFollowsTheChosenChip() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .modules { rig.model.next() }
+        rig.model.choose(.notes)
+        #expect(rig.model.preview.context.tab == .notes)
+        #expect(rig.model.preview.context.presentation == .expanded)
+    }
+
+    @Test func theMenuBarStepSlidesToTheMenuBarAndBackComes() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .menuBar { rig.model.next() }
+        #expect(rig.model.preview.context.presentation == .menuBar)
+        rig.model.back()
+        #expect(rig.model.preview.context.presentation != .menuBar)
+    }
+
+    @Test func aPracticeCheckTurnsGreenOnTheRightChangeOnly() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()  // peek
+        #expect(rig.model.practice == .peek)
+        rig.model.observe(island(.compact, drag: true))
+        #expect(!rig.model.isPracticeMet)
+        rig.model.observe(island(.peek))
+        #expect(rig.model.isPracticeMet)
+    }
+
+    @Test func aPracticeCheckNeverBlocksOrAdvances() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()
+        rig.model.observe(island(.peek))
+        #expect(rig.model.step.id == .peek)
+        rig.model.next()
+        #expect(rig.model.step.id == .open)
+    }
+
+    @Test func aMetCheckStaysMetWhenGoingBack() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()
+        rig.model.observe(island(.peek))
+        rig.model.next()
+        rig.model.back()
+        #expect(rig.model.isPracticeMet)
+    }
+
+    @Test func closeRecordsTheGuideAsSeenAndStartsDeferredMonitors() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        #expect(rig.state.needsGuide)
+        rig.model.close()
+        #expect(!rig.state.needsGuide)
+        #expect(rig.ends.list == [.closed])
+        #expect(rig.monitorStarts.count == 1)
+    }
+
+    @Test func doneOnTheLastStepFinishes() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while !rig.model.flow.isLast { rig.model.advance() }
+        #expect(rig.model.primaryTitle == "Done")
+        rig.model.advance()
+        #expect(rig.ends.list == [.done])
+        #expect(!rig.state.needsGuide)
+    }
+
+    @Test func openSettingsRequestsTheTourOnce() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.openSettings()
+        #expect(rig.ends.list == [.openSettings])
+        #expect(rig.settingsOpened.count == 1)
+        #expect(rig.state.tourRequested)
+        rig.model.openSettings()
+        #expect(rig.settingsOpened.count == 1)
+    }
+
+    @Test func openSettingsDoesNotRequestATourAnExistingInstallHasSeen() {
+        let rig = makeRig(existing: true, replay: true)
+        defer { rig.model.stop() }
+        rig.model.openSettings()
+        #expect(!rig.state.tourRequested)
+    }
+
+    @Test func skipEndsTheGuideThenAsksEveryPendingPermission() async {
+        let rig = makeRig(access: StubAccess(states: [.reminders: .allowed]))
+        defer { rig.model.stop() }
+        await rig.model.skip()
+        #expect(rig.ends.list == [.skipped])
+        #expect(!rig.state.needsGuide)
+        #expect(rig.access.requests == [.calendars, .bluetooth])
+        #expect(rig.monitorStarts.count == 1)
+    }
+
+    @Test func replayDoesNotAskForAnything() {
+        let rig = makeRig(existing: true, replay: true)
+        defer { rig.model.stop() }
+        while !rig.model.flow.isLast { rig.model.advance() }
+        rig.model.advance()
+        #expect(rig.access.requests.isEmpty)
+        #expect(rig.model.flow.count == 10)
+    }
+
+    @Test func endingTwiceDoesNothingTheSecondTime() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.close()
+        rig.model.close()
+        rig.model.finish()
+        #expect(rig.ends.list == [.closed])
+        #expect(rig.monitorStarts.count == 1)
+    }
+}
