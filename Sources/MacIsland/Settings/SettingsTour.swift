@@ -323,7 +323,7 @@ enum TourVisibility: Equatable {
 // MARK: Drawing
 
 /// The callout's arrow: a filled triangle with its tip toward the target.
-private struct TourArrow: Shape {
+struct TourArrow: Shape {
     /// The side of the target the callout is on. The tip points back at it.
     let side: TourStop.Placement
 
@@ -442,7 +442,7 @@ struct SettingsTourOverlay: View {
                         edgeInset: Theme.Metrics.tourEdgeInset, cornerRadius: Theme.Metrics.cardRadius)
                     ZStack(alignment: .topLeading) {
                         TourRing(frame: target)
-                        arrow(placed)
+                        TourArrowView(placed: placed)
                         callout(stop: stop, index: index, showsShowMe: false)
                             .offset(placed.frame.origin.asOffset)
                     }
@@ -481,32 +481,40 @@ struct SettingsTourOverlay: View {
             width: viewport.midX - Theme.Metrics.tourCalloutWidth / 2,
             height: viewport.maxY - Theme.Metrics.tourEdgeInset - calloutSize.height)
     }
+}
 
-    /// The arrow, on the callout's edge that faces the target. It reaches 1 pt into the callout to cover the hairline.
-    private func arrow(_ placed: CalloutPlacement) -> some View {
+/// The arrow, on the callout's edge that faces the target, placed in the tour's space. It reaches 1 pt into the callout to cover the
+/// hairline, so there is no seam.
+struct TourArrowView: View {
+    let placed: CalloutPlacement
+
+    /// Where the arrow sits: its base on the callout's edge, its tip toward the target.
+    private var rect: CGRect {
         let size = Theme.Metrics.tourArrow
         let frame = placed.frame
         let overlap: CGFloat = 1
-        let rect: CGRect
         switch placed.placement {
         case .below:
-            rect = CGRect(
+            return CGRect(
                 x: frame.minX + placed.arrowOffset - size.width / 2, y: frame.minY - size.height,
                 width: size.width, height: size.height + overlap)
         case .above:
-            rect = CGRect(
+            return CGRect(
                 x: frame.minX + placed.arrowOffset - size.width / 2, y: frame.maxY - overlap,
                 width: size.width, height: size.height + overlap)
         case .trailing:
-            rect = CGRect(
+            return CGRect(
                 x: frame.minX - size.height, y: frame.minY + placed.arrowOffset - size.width / 2,
                 width: size.height + overlap, height: size.width)
         case .leading:
-            rect = CGRect(
+            return CGRect(
                 x: frame.maxX - overlap, y: frame.minY + placed.arrowOffset - size.width / 2,
                 width: size.height + overlap, height: size.width)
         }
-        return TourArrow(side: placed.placement)
+    }
+
+    var body: some View {
+        TourArrow(side: placed.placement)
             .fill(Theme.Palette.surface)
             .frame(width: rect.width, height: rect.height)
             .offset(x: rect.minX, y: rect.minY)

@@ -70,14 +70,14 @@ final class OnboardingModel {
 
     // MARK: Moving
 
-    func next() {
+    func next(animated: Bool = true) {
         flow.next()
-        showStage()
+        showStage(animated: animated)
     }
 
-    func back() {
+    func back(animated: Bool = true) {
         flow.back()
-        showStage()
+        showStage(animated: animated)
     }
 
     func choose(_ module: IslandModule) {
@@ -92,7 +92,11 @@ final class OnboardingModel {
 
     private func showStage(animated: Bool = true) {
         if step.id == .menuBar {
-            preview.showMenuBar(.clock)
+            // `showMenuBar(.clock)`, which keeps everything else about the preview as it was.
+            var next = preview.context
+            next.presentation = .menuBar
+            next.menuBarTab = .clock
+            preview.show(next, animated: animated)
         } else if step.id == .modules {
             preview.show(PreviewContext(presentation: .expanded, tab: chosenModule), animated: animated)
         } else if let stage = step.stage {
