@@ -217,3 +217,95 @@ struct OnboardingTests {
         #expect(before == after)
     }
 }
+
+@MainActor
+struct AccessTests {
+    private func makeSettings() -> AppSettings {
+        let suite = "MacIslandAccess.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return AppSettings(defaults: defaults)
+    }
+
+    private func makeModel(
+        _ stub: StubAccess, settings: AppSettings? = nil, onBluetoothAllowed: @escaping () -> Void = {}
+    ) -> AccessModel {
+        AccessModel(provider: stub, settings: settings ?? makeSettings(), onBluetoothAllowed: onBluetoothAllowed)
+    }
+
+    @Test func allowGrantsAndTurnsOnUpNext() async {
+        let settings = makeSettings()
+        let model = makeModel(StubAccess(), settings: settings)
+        await model.allow(.calendars)
+        #expect(model.state(of: .calendars) == .allowed)
+        #expect(settings.showsCalendar && !settings.showsReminders)
+        await model.allow(.reminders)
+        #expect(settings.showsReminders)
+    }
+
+    @Test func denyLeavesUpNextOff() async {
+        let settings = makeSettings()
+        let model = makeModel(StubAccess(answers: [.calendars: false]), settings: settings)
+        await model.allow(.calendars)
+        #expect(model.state(of: .calendars) == .denied)
+        #expect(!settings.showsCalendar)
+    }
+
+    @Test func aDecidedRowIsNotAskedAgain() async {
+        let stub = StubAccess(states: [.calendars: .denied, .reminders: .allowed])
+        let model = makeModel(stub)
+        await model.allow(.calendars)
+        await model.allow(.reminders)
+        #expect(stub.requests.isEmpty)
+    }
+
+    @Test func skipAsksOnlyPendingInOrder() async {
+        let stub = StubAccess(states: [.reminders: .allowed])
+        let model = makeModel(stub)
+        await model.requestAllPending()
+        #expect(stub.requests == [.calendars, .bluetooth])
+        #expect(model.asking == nil)
+    }
+
+    @Test func skipAsksNothingWhenAllDecided() async {
+        let stub = StubAccess(states: [.calendars: .allowed, .reminders: .denied, .bluetooth: .allowed])
+        await makeModel(stub).requestAllPending()
+        #expect(stub.requests.isEmpty)
+    }
+
+    @Test func bluetoothGrantStartsTheMonitor() async {
+        var started = 0
+        let model = makeModel(StubAccess(), onBluetoothAllowed: { started += 1 })
+        await model.allow(.bluetooth)
+        #expect(started == 1)
+        await model.allow(.bluetooth)
+        #expect(started == 1)
+    }
+
+    @Test func bluetoothDenialDoesNotStartTheMonitor() async {
+        var started = 0
+        let model = makeModel(StubAccess(answers: [.bluetooth: false]), onBluetoothAllowed: { started += 1 })
+        await model.allow(.bluetooth)
+        #expect(started == 0)
+    }
+
+    @Test func allAllowedNeedsEveryRow() {
+        #expect(!makeModel(StubAccess()).allAllowed)
+        let all = StubAccess(states: [.calendars: .allowed, .reminders: .allowed, .bluetooth: .allowed])
+        #expect(makeModel(all).allAllowed)
+    }
+
+    @Test func refreshReadsTheSystemAgain() {
+        let stub = StubAccess()
+        let model = makeModel(stub)
+        stub.states[.calendars] = .allowed
+        model.refresh()
+        #expect(model.state(of: .calendars) == .allowed)
+    }
+
+    @Test func privacyAccessListsAccessibility() {
+        let rows = PrivacyAccess.current()
+        #expect(rows.contains { $0.id == "accessibility" })
+        for kind in AccessKind.allCases { #expect(rows.contains { $0.id == kind.rawValue }) }
+    }
+}

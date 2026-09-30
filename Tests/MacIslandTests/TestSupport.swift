@@ -90,6 +90,31 @@ final class StubBluetooth: BluetoothDeviceProviding {
     }
 }
 
+/// Answers access questions from a table and records what was asked, so no real permission is ever requested.
+@MainActor
+final class StubAccess: AccessProviding {
+    var states: [AccessKind: PrivacyAccess.State]
+    /// What the person would answer to each request.
+    var answers: [AccessKind: Bool]
+    private(set) var requests: [AccessKind] = []
+
+    init(
+        states: [AccessKind: PrivacyAccess.State] = [:], answers: [AccessKind: Bool] = [:]
+    ) {
+        self.states = Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, states[$0] ?? .notAsked) })
+        self.answers = answers
+    }
+
+    func state(of kind: AccessKind) -> PrivacyAccess.State { states[kind] ?? .notAsked }
+
+    func request(_ kind: AccessKind) async -> Bool {
+        requests.append(kind)
+        let granted = answers[kind] ?? true
+        states[kind] = granted ? .allowed : .denied
+        return granted
+    }
+}
+
 /// A camera that opens nothing.
 @MainActor
 final class StubCamera: CameraSessionProviding {

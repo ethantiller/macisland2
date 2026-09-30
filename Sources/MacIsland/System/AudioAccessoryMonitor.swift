@@ -76,7 +76,9 @@ final class AudioAccessoryMonitor: NSObject {
     private var notification: IOBluetoothUserNotification?
     private var startedAt = Date.distantFuture
 
+    /// Safe to call again: the first-run guide may hold this back on a fresh install, and more than one path can start it.
     func start() {
+        guard notification == nil else { return }
         startedAt = Date()
         notification = IOBluetoothDevice.register(
             forConnectNotifications: self,

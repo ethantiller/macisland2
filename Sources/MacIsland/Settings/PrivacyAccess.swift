@@ -66,6 +66,10 @@ struct PrivacyAccess: Identifiable, Equatable {
             row(
                 "screen", "Screen Recording", "Record Screen",
                 CGPreflightScreenCaptureAccess() ? .allowed : .denied, pane: "Privacy_ScreenCapture"),
+            // Like Screen Recording, it can't tell "never asked" from "off".
+            row(
+                "accessibility", "Accessibility", "Clean Keys",
+                KeyboardCleaner.hasAccess ? .allowed : .denied, pane: "Privacy_Accessibility"),
             row(
                 "bluetooth", "Bluetooth", "Headphone batteries and the device switcher", bluetooth,
                 pane: "Privacy_Bluetooth"),

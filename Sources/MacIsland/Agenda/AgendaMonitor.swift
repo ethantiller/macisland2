@@ -338,6 +338,10 @@ final class AgendaMonitor {
         if let first = AgendaRules.next(in: due) { onAnnounce?(first) }
     }
 
+    /// Asks for access to `type` if it was never asked, and says whether it is allowed. The same request the Calendar and
+    /// Reminders switches and the Reminders tab make; the first-run guide calls it so a person is asked in one place.
+    func requestAccess(to type: EKEntityType) async -> Bool { await hasAccess(type) }
+
     private func hasAccess(_ type: EKEntityType) async -> Bool {
         switch EKEventStore.authorizationStatus(for: type) {
         case .fullAccess:

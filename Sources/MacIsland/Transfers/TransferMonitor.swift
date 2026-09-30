@@ -27,8 +27,10 @@ final class TransferMonitor {
         return transfers.map(\.fraction).reduce(0, +) / Double(transfers.count)
     }
 
+    /// Safe to call again: the first-run guide may hold this back on a fresh install, and more than one path can start it.
     func start() {
-        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+        guard subscriber == nil,
+            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
             return
         }
         // The monitor lives as long as the app, so an unowned capture is safe.
