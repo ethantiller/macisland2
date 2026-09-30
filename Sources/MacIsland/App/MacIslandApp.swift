@@ -20,6 +20,8 @@ struct MacIslandApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// First, so it tells an existing install from a fresh one before anything in this launch can write a key.
+    let onboarding = OnboardingState()
     let features = AppDelegate.makeFeatures()
 
     private static func makeFeatures() -> IslandFeatures {

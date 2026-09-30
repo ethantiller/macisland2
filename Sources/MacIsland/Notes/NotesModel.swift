@@ -37,12 +37,15 @@ final class NotesModel {
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
-    init(directory: URL? = nil) {
-        let folder =
-            directory
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    /// Where the notes live unless a test gives another folder. Also how `InstallEvidence` tells a used install from a new one.
+    static var defaultFileURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("MacIsland", isDirectory: true)
-        fileURL = folder.appendingPathComponent("notes.json")
+            .appendingPathComponent("notes.json")
+    }
+
+    init(directory: URL? = nil) {
+        fileURL = directory?.appendingPathComponent("notes.json") ?? Self.defaultFileURL
         if let data = try? Data(contentsOf: fileURL), let stored = try? JSONDecoder().decode(Stored.self, from: data) {
             notes = stored.notes
             snippets = stored.snippets

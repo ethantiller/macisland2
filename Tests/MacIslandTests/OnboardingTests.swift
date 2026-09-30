@@ -1,0 +1,219 @@
+import Foundation
+import Testing
+
+@testable import MacIsland
+
+@MainActor
+struct OnboardingTests {
+    private func makeDefaults() -> (defaults: UserDefaults, suite: String) {
+        let suite = "MacIslandOnboarding.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return (defaults, suite)
+    }
+
+    private let notesFile = URL(fileURLWithPath: "/tmp/MacIslandTests/notes.json")
+
+    /// A state that classifies the way `InstallEvidence` would, but against a private suite and a pretend notes file.
+    private func makeState(
+        _ defaults: UserDefaults, notesExist: Bool = false, guideVersion: Int = OnboardingState.guideVersion
+    ) -> OnboardingState {
+        OnboardingState(
+            defaults: defaults,
+            isExistingInstall: {
+                InstallEvidence.isExisting(defaults: defaults, notesFile: notesFile, fileExists: { _ in notesExist })
+            },
+            guideVersion: guideVersion)
+    }
+
+    // MARK: State
+
+    @Test func freshInstallNeedsBoth() {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults)
+        #expect(state.install == .fresh)
+        #expect(state.needsGuide && state.needsTour)
+        #expect(defaults.string(forKey: "onboarding.install") == "fresh")
+    }
+
+    @Test func updaterWithSettingsSkipsBoth() {
+        let (defaults, _) = makeDefaults()
+        defaults.set(["clock"], forKey: "tabsLeft")
+        let state = makeState(defaults)
+        #expect(state.install == .existing)
+        #expect(!state.needsGuide && !state.needsTour)
+        #expect(defaults.integer(forKey: "onboarding.guide") == 1)
+        #expect(defaults.integer(forKey: "onboarding.settingsTour") == 1)
+    }
+
+    @Test func updaterWithOnlyTheNotesFileSkipsBoth() {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults, notesExist: true)
+        #expect(state.install == .existing)
+        #expect(!state.needsGuide && !state.needsTour)
+    }
+
+    @Test func classificationIsWrittenOnce() {
+        let (defaults, _) = makeDefaults()
+        _ = makeState(defaults)
+        // The person quits mid-guide: a setting and the notes file now exist.
+        defaults.set(["clock"], forKey: "tabsLeft")
+        let again = makeState(defaults, notesExist: true)
+        #expect(again.install == .fresh)
+        #expect(again.needsGuide && again.needsTour)
+    }
+
+    @Test func finishingIsRemembered() {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults)
+        state.finishGuide()
+        state.finishTour()
+        #expect(!state.needsGuide && !state.needsTour)
+        let again = makeState(defaults)
+        #expect(!again.needsGuide && !again.needsTour)
+    }
+
+    @Test func finishingTwiceDoesNotWriteAgain() {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults)
+        state.finishGuide()
+        defaults.removeObject(forKey: "onboarding.guide")
+        state.finishGuide()
+        #expect(defaults.object(forKey: "onboarding.guide") == nil)
+    }
+
+    @Test func aNewGuideVersionShowsAgain() {
+        let (defaults, _) = makeDefaults()
+        defaults.set(["clock"], forKey: "tabsLeft")
+        let seen = makeState(defaults)
+        #expect(!seen.needsGuide)
+        let newer = makeState(defaults, guideVersion: 2)
+        #expect(newer.needsGuide)
+        #expect(!newer.needsTour)
+        newer.finishGuide()
+        #expect(!makeState(defaults, guideVersion: 2).needsGuide)
+    }
+
+    @Test func tourRequestIsInMemoryOnly() {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults)
+        state.tourRequested = true
+        #expect(!makeState(defaults).tourRequested)
+    }
+
+    #if DEBUG
+        @Test func resetToFreshShowsBothAgain() {
+            let (defaults, _) = makeDefaults()
+            defaults.set(["clock"], forKey: "tabsLeft")
+            let state = makeState(defaults)
+            #expect(state.install == .existing)
+            state.resetToFresh()
+            #expect(state.install == .fresh)
+            #expect(state.needsGuide && state.needsTour)
+            // And it stays fresh on the next launch, whatever evidence is lying around.
+            let again = makeState(defaults, notesExist: true)
+            #expect(again.install == .fresh && again.needsGuide && again.needsTour)
+        }
+    #endif
+
+    // MARK: Evidence
+
+    /// The drift guard: every key `AppSettings` and the other stores write must be one `InstallEvidence` looks for, or an
+    /// updater who only ever changed that setting would be shown the guide.
+    @Test func evidenceKeysCoverEverySetting() {
+        let (defaults, suite) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        settings.setShortcut(.open, nil)
+        settings.peeksOnHover = false
+        settings.swipesEnabled = false
+        settings.islandDisplay = .primary
+        settings.move(.notes, to: .right)
+        settings.setInMenuBar(.clock, true)
+        settings.showsCalendar = true
+        settings.showsReminders = true
+        settings.weatherCity = "Paris"
+        settings.dragTarget = .shelfOnly
+        settings.addsScreenshots = false
+        settings.shelfRetention = .week
+        settings.clipboardLimit = 25
+        settings.shelfMode = .clipboard
+        settings.showsLyrics = false
+        settings.showsMusicCompact = false
+        settings.pinLimit = .eight
+        settings.movePinned(settings.visiblePinned[4], before: settings.visiblePinned[0])
+        settings.quietDuringFocus = true
+        settings.fullChargeLevel = 90
+        settings.setMuted(.hotspot, true)
+        settings.saveCustomWidget(
+            CustomWidget(
+                title: "Stocks", systemImage: "chart.line.uptrend.xyaxis",
+                source: .web(url: URL(string: "https://api.example.com/q")!, path: "p")))
+        var layout = settings.homeLayout
+        layout.widgets[1] = WidgetPlacement(widget: .custom(settings.customWidgets[0].id), size: GridSize(2, 1))
+        settings.setHomeLayout(layout)
+        _ = settings.saveHomePreset(named: "Mine")
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("a.txt")
+        try? Data("a".utf8).write(to: file)
+        ShelfModel(defaults: defaults).add([file])
+
+        let pomodoro = PomodoroModel(defaults: defaults)
+        pomodoro.advance(completed: true)
+
+        let written = Set(defaults.persistentDomain(forName: suite)?.keys.map { $0 } ?? [])
+        #expect(!written.isEmpty)
+        let missing = written.subtracting(InstallEvidence.keys)
+        #expect(missing.isEmpty, "Add to InstallEvidence.keys: \(missing.sorted())")
+    }
+
+    @Test func anyEvidenceKeyMakesAnExistingInstall() {
+        for key in InstallEvidence.keys {
+            let (defaults, _) = makeDefaults()
+            defaults.set("x", forKey: key)
+            #expect(
+                InstallEvidence.isExisting(defaults: defaults, notesFile: notesFile, fileExists: { _ in false }),
+                "\(key)")
+        }
+    }
+
+    @Test func otherKeysAreNotEvidence() {
+        let (defaults, _) = makeDefaults()
+        defaults.set(1, forKey: "NSStatusItem Preferred Position Item-0")
+        defaults.set("/Users/me", forKey: "NSNavLastRootDirectory")
+        #expect(!InstallEvidence.isExisting(defaults: defaults, notesFile: notesFile, fileExists: { _ in false }))
+    }
+
+    @Test func theNotesPathMatchesWhereNotesAreWritten() {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        NotesModel(directory: folder).save()
+        #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("notes.json").path))
+        #expect(NotesModel.defaultFileURL.lastPathComponent == "notes.json")
+        #expect(NotesModel.defaultFileURL.deletingLastPathComponent().lastPathComponent == "MacIsland")
+    }
+
+    // MARK: Settings file
+
+    @Test func onboardingNeverEntersTheSettingsFile() throws {
+        let (defaults, _) = makeDefaults()
+        let state = makeState(defaults)
+        state.finishGuide()
+        state.finishTour()
+        let settings = AppSettings(defaults: defaults)
+        let text = String(decoding: try SettingsArchive.make(from: settings).data(), as: UTF8.self)
+        #expect(!text.lowercased().contains("onboarding"))
+
+        let before = ["onboarding.install", "onboarding.guide", "onboarding.settingsTour"].map {
+            defaults.object(forKey: $0) as? NSObject
+        }
+        settings.resetAll()
+        let after = ["onboarding.install", "onboarding.guide", "onboarding.settingsTour"].map {
+            defaults.object(forKey: $0) as? NSObject
+        }
+        #expect(before == after)
+    }
+}
