@@ -149,6 +149,38 @@ struct PlayerControlsTests {
         #expect(ScriptablePlayer.music.setFavoriteScript(true).hasSuffix("set favorited of current track to true"))
     }
 
+    @Test func bothPlayerHeightsGrowAndShrinkWithTheLyricRow() async throws {
+        let viewModel = TestSupport.makeViewModel()
+        let lyrics = viewModel.nowPlaying.lyrics
+        var body: Data? = Data(#"{"syncedLyrics": "[00:10.00] Hi"}"#.utf8)
+        lyrics.fetch = { _ in body }
+        lyrics.setEnabled(true, for: NowPlayingState())
+        var state = NowPlayingState()
+        state.title = "T"
+        state.artist = "A"
+        viewModel.nowPlaying.apply(state)
+
+        // A lookup in flight has no row yet.
+        let bare = (peek: viewModel.mediaContentHeight(peek: true), tab: viewModel.mediaContentHeight(peek: false))
+        #expect(lyrics.lines.isEmpty)
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Lines that have not started (the first is at 10 s, the track is at 0) still have their row.
+        #expect(!lyrics.lines.isEmpty)
+        #expect(viewModel.mediaContentHeight(peek: true) == bare.peek + Theme.Metrics.lyricsRowHeight)
+        #expect(viewModel.mediaContentHeight(peek: false) == bare.tab + Theme.Metrics.lyricsRowHeight)
+
+        // The next track has none: the row goes at once and stays gone.
+        body = nil
+        state.title = "Other"
+        viewModel.nowPlaying.apply(state)
+        #expect(viewModel.mediaContentHeight(peek: true) == bare.peek)
+        #expect(viewModel.mediaContentHeight(peek: false) == bare.tab)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(viewModel.mediaContentHeight(peek: true) == bare.peek)
+        #expect(viewModel.mediaContentHeight(peek: false) == bare.tab)
+    }
+
     @Test func lyricsRowOnlyTakesHeightWhenThereAreLyrics() async throws {
         let viewModel = TestSupport.makeViewModel()
         let base = viewModel.contentHeight(for: .media)

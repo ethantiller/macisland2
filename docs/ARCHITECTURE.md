@@ -491,6 +491,13 @@ loaded by `/usr/bin/perl`, which Apple *does* entitle. `MediaRemoteAdapter` runs
 snapshots, then diffs) into `NowPlayingState`; commands go through `send`, `seek`, `shuffle`, and `repeat`. For Music and Spotify,
 transport goes through AppleScript instead, addressed to the app itself. See [SCRIPTS.md](SCRIPTS.md#build-adaptersh).
 
+**The lyric row.** The peek and the Media tab are 24 pt (`lyricsRowHeight`) taller while `LyricsModel.lines` is not empty, and only
+then: `mediaContentHeight(peek:)` and `NowPlayingView` both read that one value, so the height and the row can't disagree. *Has
+lyrics* means a lookup came back with at least one line that has words (an all-empty response is treated as none). Lines that have not
+started yet still count, so the row is blank through an intro and instrumental gaps rather than the island jumping with every line. A
+lookup in flight has no row; it lands with `Theme.Motion.resize`, and the next track clears it the same way. Home's Music widget never
+has the row.
+
 ---
 
 ## First run
