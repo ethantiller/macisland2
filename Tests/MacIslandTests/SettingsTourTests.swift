@@ -145,7 +145,8 @@ struct SettingsTourTests {
         #expect(below.arrowOffset == 140)
         #expect(place(target, .above).placement == .above)
         #expect(place(target, .trailing).placement == .trailing)
-        #expect(place(target, .leading).placement == .leading)
+        // Leading needs 280 to the target's left, which the first target doesn't have.
+        #expect(place(CGRect(x: 500, y: 200, width: 100, height: 30), .leading).placement == .leading)
     }
 
     @Test func flipsWhenThereIsNoRoom() {
