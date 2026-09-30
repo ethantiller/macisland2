@@ -61,7 +61,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             openSettings: context.openSettings, onEnd: { [weak self] ending in self?.end(ending) })
 
         let panel = OnboardingPanel()
-        let host = NSHostingView(rootView: OnboardingRoot(model: model, island: island))
+        let host = NSHostingView(rootView: OnboardingRoot(model: model, island: island, onFolded: { [weak self] in self?.giveKeyboardBack() }))
         host.sizingOptions = []
         panel.contentView = host
         // The whole guide is one size: its content never changes height between steps.
