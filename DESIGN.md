@@ -39,7 +39,7 @@ There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/R
 | Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
-| Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Low Power, Clean Keyboard |
+| Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Low Power, Clean Keyboard, Lock Screen |
 | Notes | Quick Notes, Snippets, Prompter |
 
 ### Color: a tint means something is live, one meaning per color
@@ -155,13 +155,13 @@ and may not draw `.glassEffect`. Check those in the running app.
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.
-- **Tools.** Every tool fits in the 8-slot row; the grid is two rows of five. Clean Keys swallows every key
-  for 30 seconds (the mouse still works) and needs Accessibility access.
+- **Tools.** Nine tools and Less fill the grid, two rows of five; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
+  for 30 seconds (the mouse still works) and needs Accessibility access, and so does Lock Screen (Control-Command-Q).
 
 ## Reach: the palette, the menu bar, and windows
 
 - **Command palette (⌃⌥K).** A floating glass panel hung below the notch, centered on it, 520 wide. Rows: modules, tools,
-  timers ("25m", "1h30m", "timer 45"), apps, Shortcuts, snippets, "remind …", `clip …`, web searches, and translation. Empty, it lists the
+  timers ("25m", "1h30m", "timer 45"), apps, Shortcuts, snippets, "remind …", `clip …`, web searches, translation, and answers (a definition, a unit or currency conversion, a sum). Empty, it lists the
   modules. A web search is always the last row. Search with a keyword (`yt swift`) or the default engine; there are nine
   built-in engines and any number of custom ones (Settings, with `%s` where the search goes). `tr hello` translates into the
   system language and `tr es hello` picks the language, through the system Translation framework. Arrows move, Return runs,

@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 240 tests, under a second
+./scripts/test.sh                                                     # 268 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -139,11 +139,11 @@ The full story, with state machines, data flow, and the lessons learned, is in
 ## Privacy and permissions
 
 Nothing leaves the Mac except: the **city name** you type in Settings (to Open-Meteo, for weather), and the **track's
-name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off). Clipboard history stays in memory.
+name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off), and a **currency code** (to api.frankfurter.dev, only when you type a currency conversion in the palette). Clipboard history stays in memory.
 Web searches open in your browser.
 
 macOS asks for access only when a feature first needs it: Calendar and Reminders, Bluetooth, Focus status, the Downloads
-folder, Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys). The app is signed
+folder, Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys and Lock Screen). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
 Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 

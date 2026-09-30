@@ -200,7 +200,7 @@ struct PinnedRowTests {
 
     @Test func aShortListIsFilledToTheRowLength() {
         let settings = makeSettings(limit: .eight)
-        #expect(AppSettings.filled([.muteMic], to: 8).count == ToolID.allCases.count)
+        #expect(AppSettings.filled([.muteMic], to: 8).count == min(8, ToolID.allCases.count))
         #expect(AppSettings.filled([.muteMic], to: 4).count == 4)
         #expect(AppSettings.filled([.muteMic], to: 4).first == .muteMic)
         // With eight slots and fewer tools, everything shows and pinning has nothing to change.

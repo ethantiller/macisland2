@@ -224,7 +224,7 @@ undated ones. Tap the circle to check one off. Asks for Reminders access the fir
 
 ![Tools](images/08c-expanded-tools-eight.png)
 
-Eight tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of five.
+Nine tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of five.
 Right-click a tool to pin it. The row is always full: unpinning fills the gap with another tool.
 
 | Tool | Does |
@@ -237,6 +237,7 @@ Right-click a tool to pin it. The row is always full: unpinning fills the gap wi
 | **Screenshot** | Area capture to the clipboard |
 | **Focus** | Turns a Focus on or off through *your* Shortcuts named `Focus On` and `Focus Off` (a banner explains if missing) |
 | **Clean Keys** | Swallows every key for 30 seconds so the keyboard can be wiped; the mouse still works. Needs Accessibility |
+| **Lock Screen** | Locks the screen (posts Control-Command-Q). Needs Accessibility, like Clean Keys |
 
 ### Notes
 
@@ -270,10 +271,32 @@ lists the modules. A web search is always the last row.
 | Anything else | The last row: *Search Google for "…"* (your default engine) |
 | `tr hello` | *Translate to* your system language |
 | `tr es hello` | *Translate to Spanish*; the result row copies on Return |
+| `define serendipity`, `def x` | The word and its first sense; Return opens the Dictionary app |
+| `5 km in mi`, `72f to c` | `3.11 mi`: length, mass, volume, temperature, speed, area, duration, and data. Return copies |
+| `100 usd in eur`, `€50 to $` | `€92.10`, with the ECB rate and its date. Return copies |
+| `2*(3+4)` | `= 14`. `+ - * / ^`, brackets, `×` and `÷`. Return copies |
 
 Nine engines are built in: Google `g`, DuckDuckGo `ddg`, Bing `b`, YouTube `yt`, Wikipedia `w`, GitHub `gh`, Apple Maps `m`,
 Stack Overflow `so`, Amazon `a`. Add your own in Settings with `%s` where the search goes. Translation uses the system
 Translation framework and may ask macOS to download a language.
+
+Currency rates come from Frankfurter (European Central Bank data, free, no key). They are fetched only when you type a currency
+query, and kept for 12 hours per currency; the row says *Converting…* until the rate arrives.
+
+### The `macisland://` link
+
+Other apps, scripts, and Shortcuts can drive MacIsland with a link (`open "macisland://timer?minutes=5"`).
+
+| Link | Does |
+| --- | --- |
+| `timer?minutes=5` | Starts a timer (1 to 1440 minutes) |
+| `stopwatch`, `pomodoro` | Starts one if it is not running |
+| `open?module=notes` | Opens that module (`home`, `media`, `shelf`, `clock`, `reminders`, `tools`, `notes`) |
+| `palette` | Opens the command palette |
+| `shelf/add?path=/full/path` | Adds an existing file or folder to the Shelf; never reads its contents |
+| `banner?title=&detail=&symbol=` | A neutral banner with no actions. The title is cut at 60 characters, the detail at 80, and a symbol must be an SF Symbol name. One banner every 2 seconds at most |
+
+Anything else is ignored.
 
 ---
 

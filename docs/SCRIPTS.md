@@ -56,7 +56,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 240 tests, about a second.
+lines; 268 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -114,7 +114,7 @@ Formats in place with `swift format format`, using [`.swift-format`](#config-fil
 | File | Contains |
 | --- | --- |
 | `Package.swift` | Tools version 6.2, `platforms: [.macOS(.v26)]`, an executable target `MacIsland` (`Sources/MacIsland`) and a test target `MacIslandTests` (`Tests/MacIslandTests`), both in **Swift 5 language mode**. No dependencies |
-| `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events |
+| `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events, and the `macisland` URL scheme |
 | `.swift-format` | 4-space indent, 120-column lines, at most one blank line, existing line breaks respected; rules that would fight this codebase's style (force unwraps, naming, doc comments) are off; imports must be ordered |
 | `.gitignore` | `.build/`, `.swiftpm/`, `build/`, Xcode user data, `.DS_Store`, secrets files, and `.claude` |
 | `CLAUDE.md` | Instructions Claude Code loads in this repo: read the design doc first, tokens and components only, where things live, the commands |
@@ -133,6 +133,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | File | Contains |
 | --- | --- |
 | `MacIslandApp.swift` | The `@main` `App` (menu-bar capsule, Settings, module menu bars), `AppDelegate` (builds `IslandFeatures`, wires every monitor to the view model, the hotkeys, the panel), `ModuleMenuBars`, `MenuBarModuleView` |
+| `URLCommand.swift` | `URLCommand` (the `macisland://` parser and its limits) and `URLCommandRunner` (runs them, rate-limits banners) |
 | `FloatingPanels.swift` | `FloatingPanels` (torn-off windows, one per module, Keep on Desktop), `DetachedPanelState`, `DetachedModuleView` (the glass window's chrome) |
 
 ### `Island/` (panel, input, state, drawing)
@@ -230,7 +231,9 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `Launch/AppIndex.swift` | Scans app folders for the palette |
 | `Launch/ShortcutsCLI.swift` | `shortcuts list` and `shortcuts run` |
 | `Launch/LaunchModel.swift` | Holds the app index and the Shortcuts list for the palette |
-| `Palette/PaletteModel.swift` | Builds and ranks the rows; translation states |
+| `Palette/PaletteModel.swift` | Builds and ranks the rows; translation states; answer rows (define, units, currency, calculate) and `clip` rows |
+| `Palette/Answers.swift` | `DictionaryLookup`, `DictionaryText`, `UnitConversion`, `Calculator`, `CurrencyRequest` |
+| `Palette/ExchangeRates.swift` | The Frankfurter rates, cached 12 hours per base |
 | `Palette/PaletteSearch.swift` | Match scoring, the timer parser, the translation parser |
 | `Palette/SearchEngine.swift` | The nine engines, custom ones, URL building, keyword matching |
 | `Palette/PaletteView.swift` | The panel's content on Liquid Glass |
@@ -264,7 +267,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 16 files, about 3,000 lines, **240 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 17 files, about 3,400 lines, **268 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -281,6 +284,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `Phase5Tests.swift` | Search engines, ranking, parsers, apps, Shortcuts, the palette model, menu bar and windows, the player layout, transport routing |
 | `ShelfToolsTests.swift` | File kinds and targets, Copy Text, document, PDF, image, audio, and video conversions |
 | `ClipboardTests.swift` | History search, plain-text copy, Save as Snippet, the `clip` palette rows |
+| `AnswersTests.swift` | Definitions, units, the calculator, currency parsing and rates, the answer rows, `macisland://` links, Lock Screen |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
 
 ---

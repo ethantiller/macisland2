@@ -52,13 +52,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             notes: NotesModel(),
             keyboardCleaner: KeyboardCleaner(),
         launch: LaunchModel(),
-            stats: SystemStats()
+            stats: SystemStats(),
+            rates: ExchangeRates()
         )
     }
 
     lazy var viewModel = IslandViewModel(features: features)
     lazy var panels = FloatingPanels(viewModel: viewModel)
     lazy var palette = PaletteController(viewModel: viewModel)
+    lazy var urlCommands = URLCommandRunner(viewModel: viewModel) { [palette] in palette.show() }
     private let paletteHotkey = GlobalHotkey(id: 2)
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
@@ -98,6 +100,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.layout() }
         }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        urlCommands.handle(urls)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

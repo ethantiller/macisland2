@@ -483,13 +483,14 @@ struct CleanKeyboardTests {
     }
 
     @Test func toolsGridHoldsEveryToolInTwoRowsOfFive() {
-        #expect(ToolID.allCases.count == 8)
+        #expect(ToolID.allCases.count == 9)
         #expect(ToolID.allCases.count + 1 <= 2 * 5)
         let defaults = UserDefaults(suiteName: "MacIslandTools8")!
         defaults.removePersistentDomain(forName: "MacIslandTools8")
         let settings = AppSettings(defaults: defaults)
         settings.pinLimit = .eight
-        #expect(settings.rowShowsEveryTool && settings.visiblePinned.count == 8)
+        // Nine tools no longer fit the widest row, so the row keeps its More button.
+        #expect(!settings.rowShowsEveryTool && settings.visiblePinned.count == 8)
     }
 }
 

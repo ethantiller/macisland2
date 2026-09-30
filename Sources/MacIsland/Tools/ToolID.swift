@@ -8,6 +8,7 @@ enum ToolID: String, CaseIterable, Identifiable {
     case screenshot
     case focus
     case cleanKeyboard
+    case lockScreen
 
     var id: String { rawValue }
 

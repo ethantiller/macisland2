@@ -10,6 +10,22 @@ enum SystemActions {
         return error == nil
     }
 
+    /// Locks the screen the way the keyboard does: Control-Command-Q. Needs Accessibility access to post the
+    /// keys; returns `false` (posting nothing) without it.
+    static func lockScreen(
+        hasAccess: Bool = KeyboardCleaner.hasAccess,
+        post: (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
+    ) -> Bool {
+        guard hasAccess else { return false }
+        let source = CGEventSource(stateID: .hidSystemState)
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: 12, keyDown: isDown) else { return false }
+            event.flags = [.maskControl, .maskCommand]
+            post(event)
+        }
+        return true
+    }
+
     static func openAutomationSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
             NSWorkspace.shared.open(url)

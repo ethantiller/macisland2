@@ -1,3 +1,4 @@
+import ApplicationServices
 import SwiftUI
 
 /// One button's worth of tool: what it's called, how it looks, and what it does.
@@ -65,6 +66,27 @@ struct ToolCatalog {
             ToolItem(id: id, title: "Clean Keys", systemImage: "keyboard", isOn: viewModel.keyboardCleaner.isLocked) {
                 toggleKeyboardLock()
             }
+        case .lockScreen:
+            ToolItem(id: id, title: "Lock Screen", systemImage: "lock.fill") { lockScreen() }
+        }
+    }
+
+    /// Locks the screen with the system shortcut, after asking for Accessibility access the first time.
+    private func lockScreen() {
+        if !SystemActions.lockScreen() {
+            // Shows the system prompt once; after that only the banner opens the pane.
+            _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "hand.raised.fill",
+                    tint: Theme.Tint.attention,
+                    title: "Accessibility Access Needed",
+                    detail: "Allow it to lock the screen",
+                    action: .init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }
+                ),
+                for: .seconds(8),
+                respectingFocus: false
+            )
         }
     }
 

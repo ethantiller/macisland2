@@ -349,6 +349,7 @@ again; `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
 | --- | --- | --- |
 | `geocoding-api.open-meteo.com`, `api.open-meteo.com` | Weather | The city name; then coordinates |
 | `lrclib.net` | Synced lyrics | Track name, artist, album, length (off in Settings) |
+| `api.frankfurter.dev` | Currency answers in the palette | A currency code (the base), only when a currency query is typed; cached for 12 hours |
 
 Web searches are opened in your default browser. There is no analytics and no account.
 
@@ -361,6 +362,7 @@ Web searches are opened in your default browser. There is no analytics and no ac
 | `/usr/sbin/screencapture` | The Screenshot tool |
 | `/usr/bin/shortcuts` (`list`, `run`) | Shortcuts in the palette |
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
+| `CGEvent` posting | Lock Screen (Control-Command-Q), which needs Accessibility |
 | `NSAppleScript` | Music and Spotify control, Low Power Mode (`pmset` with an admin prompt); the dark-mode script in `SystemActions` is unused |
 
 ### Now Playing
@@ -374,7 +376,7 @@ transport goes through AppleScript instead, addressed to the app itself. See [SC
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **240 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **268 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

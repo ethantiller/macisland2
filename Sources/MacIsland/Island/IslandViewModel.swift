@@ -139,6 +139,7 @@ struct IslandFeatures {
     let keyboardCleaner: KeyboardCleaner
     let launch: LaunchModel
     let stats: SystemStats
+    let rates: ExchangeRates
 }
 
 @MainActor
@@ -508,6 +509,12 @@ final class IslandViewModel {
             features.clipboard.copyText(rgb)
             flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
         }
+    }
+
+    /// Copies a palette answer (a conversion, a sum) and says so.
+    func copyAnswer(_ text: String) {
+        features.clipboard.copyText(text)
+        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
     }
 
     /// Puts a text card back on the pasteboard as plain text only (no other types).

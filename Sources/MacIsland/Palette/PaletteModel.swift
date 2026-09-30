@@ -34,6 +34,10 @@ final class PaletteModel {
     static let maxResults = 8
 
     private let viewModel: IslandViewModel
+    private let dictionary: DictionaryLookup
+    /// Bases whose rates are being fetched, and those that failed, so typing doesn't refetch.
+    private var loadingRates: Set<String> = []
+    private var failedRates: Set<String> = []
 
     var query = "" {
         didSet { if query != oldValue { update() } }
@@ -47,8 +51,9 @@ final class PaletteModel {
     @ObservationIgnored var onClose: (() -> Void)?
     @ObservationIgnored var onOpenSettings: (() -> Void)?
 
-    init(viewModel: IslandViewModel) {
+    init(viewModel: IslandViewModel, dictionary: DictionaryLookup = SystemDictionary()) {
         self.viewModel = viewModel
+        self.dictionary = dictionary
         update()
     }
 
@@ -124,6 +129,8 @@ final class PaletteModel {
         if let request = TranslationRequest.parse(text) {
             items.append(translationItem(for: request))
         }
+
+        items += answerItems(for: text)
         return items
     }
 
@@ -306,5 +313,89 @@ final class PaletteModel {
         PaletteItem(
             id: "module-\(module.rawValue)", title: "Open \(module.title)", subtitle: nil, icon: .symbol(module.systemImage)
         ) { [viewModel] in viewModel.show(module) }
+    }
+}
+
+// MARK: Answers
+
+extension PaletteModel {
+    /// `define x`, `def x`: the word after the keyword.
+    nonisolated static func definitionTerm(from text: String) -> String? {
+        let lowered = text.lowercased()
+        for keyword in ["define ", "def "] where lowered.hasPrefix(keyword) {
+            let term = String(text.dropFirst(keyword.count)).trimmingCharacters(in: .whitespaces)
+            return term.isEmpty ? nil : term
+        }
+        return nil
+    }
+
+    /// Rows that answer the text itself: a definition, a unit or currency conversion, a sum.
+    func answerItems(for text: String) -> [PaletteItem] {
+        if let term = Self.definitionTerm(from: text) {
+            let sense = dictionary.definition(of: term).flatMap(DictionaryText.firstSense)
+            return [PaletteItem(
+                id: "define", title: term, subtitle: sense ?? "Look Up in Dictionary", icon: .symbol("character.book.closed")
+            ) {
+                let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? term
+                if let url = URL(string: "dict://" + encoded) { NSWorkspace.shared.open(url) }
+            }]
+        }
+        if let request = UnitConversion.parse(text) {
+            let answer = UnitConversion.format(request, locale: .current)
+            return [answerItem(id: "units", answer: answer, subtitle: "Units", symbol: "ruler")]
+        }
+        if let request = CurrencyRequest.parse(text) {
+            return [currencyItem(for: request)]
+        }
+        if let value = Calculator.evaluate(text) {
+            let answer = Calculator.format(value)
+            return [answerItem(id: "calculate", title: "= " + answer, answer: answer, subtitle: "Calculator", symbol: "plus.forwardslash.minus")]
+        }
+        return []
+    }
+
+    private func answerItem(id: String, title: String? = nil, answer: String, subtitle: String, symbol: String) -> PaletteItem {
+        PaletteItem(id: id, title: title ?? answer, subtitle: subtitle, icon: .symbol(symbol)) { [viewModel] in
+            viewModel.copyAnswer(answer)
+        }
+    }
+
+    /// The converted amount from the cached rate. Until the rate arrives the row says it is working, then it
+    /// becomes the answer, like the translation row.
+    private func currencyItem(for request: CurrencyRequest) -> PaletteItem {
+        let rates = viewModel.rates
+        if let rate = rates.rate(from: request.from, to: request.to) {
+            let answer = CurrencyRequest.format(request.amount * rate.value, code: request.to, locale: .current)
+            let day = rate.date.formatted(.dateTime.month(.abbreviated).day())
+            return answerItem(id: "currency", answer: answer, subtitle: "Currency \u{00B7} ECB rate, \(day)", symbol: "dollarsign.arrow.circlepath")
+        }
+        if failedRates.contains(request.from) {
+            return PaletteItem(
+                id: "currency", title: "Couldn\u{2019}t get the rate. Try again", subtitle: "Currency",
+                icon: .symbol("dollarsign.arrow.circlepath"), keepsOpen: true
+            ) { [weak self] in
+                self?.failedRates.remove(request.from)
+                self?.loadRates(for: request.from)
+                self?.update()
+            }
+        }
+        loadRates(for: request.from)
+        return PaletteItem(
+            id: "currency", title: "Converting\u{2026}", subtitle: "\(request.from) to \(request.to)",
+            icon: .symbol("dollarsign.arrow.circlepath"), keepsOpen: true
+        ) {}
+    }
+
+    private func loadRates(for base: String) {
+        guard !loadingRates.contains(base) else { return }
+        loadingRates.insert(base)
+        let rates = viewModel.rates
+        Task { [weak self] in
+            await rates.load(base: base)
+            guard let self else { return }
+            loadingRates.remove(base)
+            if !rates.hasRates(for: base) { failedRates.insert(base) }
+            update()
+        }
     }
 }

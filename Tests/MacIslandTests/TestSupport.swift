@@ -5,7 +5,7 @@ import AppKit
 /// `IslandFeatures` only changes this file.
 @MainActor
 enum TestSupport {
-    static func makeViewModel() -> IslandViewModel {
+    static func makeViewModel(rates: ExchangeRates? = nil) -> IslandViewModel {
         UserDefaults(suiteName: "MacIslandTests")!.removePersistentDomain(forName: "MacIslandTests")
         let shelf = ShelfModel()
         let work = WorkTracker()
@@ -40,7 +40,8 @@ enum TestSupport {
             notes: NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
             keyboardCleaner: KeyboardCleaner(),
             launch: LaunchModel(appDirectories: []),
-            stats: SystemStats()
+            stats: SystemStats(),
+            rates: rates ?? ExchangeRates(fetch: { _ in ([:], Date()) })
         ))
         viewModel.geometry = geometry
         return viewModel
