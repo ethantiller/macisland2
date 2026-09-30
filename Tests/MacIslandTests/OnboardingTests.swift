@@ -145,6 +145,10 @@ struct OnboardingTests {
         settings.movePinned(settings.visiblePinned[4], before: settings.visiblePinned[0])
         settings.quietDuringFocus = true
         settings.fullChargeLevel = 90
+        settings.pomodoroFocus = 50
+        settings.pomodoroShortBreak = 10
+        settings.pomodoroLongBreak = 30
+        settings.pomodoroSessions = 6
         settings.setMuted(.hotspot, true)
         settings.saveCustomWidget(
             CustomWidget(
