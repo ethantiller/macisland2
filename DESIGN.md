@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | Island | Attached to the hardware notch | Opaque `#000000`. Never glass. |
 | Virtual pill | Displays without a notch | `.glassEffect(.regular)`, forced dark. Hidden while nothing is live; the hover zone stays. |
-| Floating | Modules shown in the menu bar, torn-off panels | `.glassEffect(.regular)` in the system appearance, with a window shadow. |
+| Floating | Modules shown in the menu bar, torn-off panels, the first-run guide | `.glassEffect(.regular)` in the system appearance, with a window shadow. |
 
 Glass never goes inside the island, and glass is never stacked on glass.
 
@@ -30,7 +30,7 @@ Glass never goes inside the island, and glass is never stacked on glass.
 Peek and a banner with buttons share a width of 380, so one becomes the other by changing height only; an alert banner (nothing to press) is narrower, 290.
 
 ### Modules and tabs
-There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/ROADMAP.md#ideas) for now.) The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and everything is reachable from the palette. Settings open in a standard Settings window; the gear opens that window.
+There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/ROADMAP.md#ideas) for now.) The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and every module is reachable from its tab, the pencil, a drop, or a link. Settings open in a standard Settings window; the gear opens that window.
 
 | Module | Holds |
 | --- | --- |
@@ -62,7 +62,7 @@ Rules:
 **Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, working, transfer, music. At most 2 activities show at once.
 
 ### Type
-Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player.
+Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.
 
 ### Metrics
 | Metric | Value |
@@ -76,6 +76,10 @@ Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing n
 | `ScreenGeometry.panelSize` | 560 × 276 (`panelHeight`, derived; at least as wide as the widest presentation) |
 | Home's grid | `homeColumns` 6 of `homeColumnWidth` 72 with `rowSpacing` 8 between (a span of n columns is 80n − 8 wide: 72, 152, 232, 312, 392, 472); rows of `homeRowHeight` 64 with `homeRowGap` 10 between, 1 to `homeMaxRows` 3 (m rows are 74m − 10 tall: 64, 138, 212) |
 | `homeContentWidth` / `homeMaxContentHeight` | 472 / 212 (520 less two sides of flare and margin; three rows) |
+| `guideWidth` / `guideDetailHeight` | 588 (the 560 band plus `floatPadding` each side) / 150 (the tallest step detail, so the guide never changes height) |
+| `stepDot` / `stepDotCurrent` / `keyCapHeight` / `keyCapRadius` | 6 / 18 / 22 / 6 |
+| `tourCalloutWidth` / `tourArrow` / `tourGap` / `tourRingInset` / `tourRingWidth` / `tourEdgeInset` | 280 / 16 × 8 / 6 / 4 / 2 / 12 |
+| `previewBandHeight` | `panelHeight` + 4: the band of desk the Settings preview and the guide's stage draw the island on |
 | `panelHeight` | 276 = the worst-case notch 38 + the top gap 8 + 212 + the margin 18, so a layout that fits on one Mac fits on any |
 
 Radii (32 / 10 / inner 14; Home's widgets use the inner 14 and nested elements 8), the 18 pt margin, and the 28 pt hit targets are unchanged. Bottom corners are **continuous** curvature.
@@ -85,11 +89,11 @@ Radii (32 / 10 / inner 14; Home's widgets use the inner 14 and nested elements 8
 | --- | --- | --- |
 | `open` | `.spring(response: 0.42, dampingFraction: 0.78)` | Compact → peek or expanded; alerts and banners arriving |
 | `close` | `.spring(response: 0.34, dampingFraction: 1)` | Folding back in. No overshoot into the hardware. |
-| `resize` | `.spring(response: 0.36, dampingFraction: 0.88)` | Tab, mode, or height changes inside an open island |
+| `resize` | `.spring(response: 0.36, dampingFraction: 0.88)` | Tab, mode, or height changes inside an open island; the guide's step dots and buttons, and the tour's ring and callout moving to the next stop |
 | `slide` | `.spring(response: 0.6, dampingFraction: 0.92)` | A whole view giving way to another (the Settings preview between the island and the menu bar) |
 | `track` | `.interactiveSpring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.1)` | Pointer-driven: swell, swipes, drag target |
-| `float` | `.spring(response: 0.34, dampingFraction: 0.84)` | Floating glass appearing |
-| `content` | `BlurFade`: blur 8 → 0, opacity 0 → 1, scale 0.94 → 1 anchored at the top | Content swaps while the shape morphs |
+| `float` | `.spring(response: 0.34, dampingFraction: 0.84)` | Floating glass appearing (torn-off panels, the first-run guide), and a tour callout arriving |
+| `content` | `BlurFade`: blur 8 → 0, opacity 0 → 1, scale 0.94 → 1 anchored at the top | Content swaps while the shape morphs; the guide's words changing from step to step |
 
 Reduce Motion turns every token into a short ease, removes the swell, and swaps `content` for `.opacity`.
 
@@ -118,7 +122,7 @@ Reduce Motion turns every token into a short ease, removes the swell, and swaps 
 
 Reuse before writing anything new: `IconButton`, `ChipButton` (`isProminent` for the main of two), `SegmentedChoice` (not the system segmented
 picker on the island), `IslandSlider`, `ProgressRing`, `ChargingBadge`, `ArtworkView`, `AirDropGlyph`, `Glyph` (a symbol in a
-fixed square so different widths share one center), `IslandButtonStyle`. Tools use `ControlButton`.
+fixed square so different widths share one center), `IslandButtonStyle`, `StepDots` (progress through a few steps) and `KeyCap`/`KeyCaps` (a shortcut drawn as keys). Tools use `ControlButton`.
 
 The Settings window has its own dropdown, not the system pop-up button: `SettingsDropdown` (a `Picker` for a Form row) and `StyledDropdown` with `DropdownItem`s for anything else (`Settings/Dropdown.swift`).
 
@@ -183,6 +187,16 @@ does not get a setting. A widget's size on Home's grid is arrangement, like its 
   resizable floating window. **Keep on Desktop** drops that window to just above the desktop icons.
 - **Surfaces.** `Theme.Palette` follows the surface it is drawn on: white opacities on the island, the system's primary
   color on floating glass, set with `\.islandSurface`. Glass is never used inside the island, and never on glass.
+
+## First run
+
+The first launch of a fresh install shows a **guide**, and the first time Settings opens shows a **tour**. Neither runs for someone
+updating from a build they already used, and both can be replayed from Settings → General → Guide (or `macisland://guide` and
+`macisland://tour`).
+
+- **The guide** is a Floating surface hung below the island: glass in the system appearance with a window shadow, one fixed size, arriving with `float`. Its **stage** is the Settings preview's band (the real island drawn from sample data at 1:1, black and opaque on the wallpaper), so glass is never stacked on glass. It has ten short steps; the gesture steps end in a practice line that turns green (beside a check glyph) when the real island does what was asked. A practice check never blocks Continue and never advances on its own. The guide binds neither Esc nor the arrows, which belong to the island while it is practised on. It asks for Calendars, Reminders, and Bluetooth, each optional; everything else is still asked on first use. **Skip** is temporary and is removed before release.
+- **The tour** is a black callout with an arrow, like the island, with a 1 pt `widgetEdge` hairline so it still separates from a dark window. A ring in the system accent color goes around the real control it points at: Settings chrome, like the Home editor's handles, and never drawn on the island. Nothing is dimmed. Only the callout takes clicks, so the control can be tried.
+- Neither uses a native control: no `.bordered` or `.link` buttons, `Picker`, `Menu`, `Toggle`, or segmented control. Every button is `ChipButton`, `IconButton`, or `FieldButton`.
 
 ## The music player
 

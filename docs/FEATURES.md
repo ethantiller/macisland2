@@ -310,6 +310,8 @@ Other apps, scripts, and Shortcuts can drive MacIsland with a link (`open "macis
 | `stopwatch`, `pomodoro` | Starts one if it is not running |
 | `open?module=notes` | Opens that module (`home`, `media`, `shelf`, `clock`, `reminders`, `tools`, `notes`) |
 | `shelf/add?path=/full/path` | Adds an existing file or folder to the Shelf; never reads its contents |
+| `guide` | Shows the first-run guide again (debug builds also take `guide?reset=1`, which first makes the install a fresh one) |
+| `tour` | Opens Settings on its tour |
 | `banner?title=&detail=&symbol=` | A neutral banner with no actions. The title is cut at 60 characters, the detail at 80, and a symbol must be an SF Symbol name. One banner every 2 seconds at most |
 
 Anything else is ignored.
@@ -337,14 +339,20 @@ shows and where is a setting, how it looks is not.
 
 | Pane | Preview | Choices |
 | --- | --- | --- |
-| General | Compact | Launch at Login; **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcut** (Open the Island, ⌃⌥Space by default, recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
+| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcut** (Open the Island, ⌃⌥Space by default, recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
 | Tabs | Expanded (the tab you select), or Menu Bar | The tabs, dragged and switched (Left of the Notch, Right of the Notch, and the Not Shown tray); or, in the **Menu Bar** view, only a switch per module for the menu bar (the view is a menu-bar strip with an icon for each module that has one, and clicking an icon, or a module in the list (on or off), shows its window, with a dashed ghost icon and a note when it isn't in the menu bar yet; going between Expanded and Menu Bar is one continuous motion: the island shrinks toward the notch and slides out to the left while the menu bar slides in from the right and its window opens from the strip, and the reverse coming back; the tab settings are hidden there, and the menu bar settings are hidden in every other view). **Click a row, or a tab in the preview, to see that tab.** The tabs that are not shown sit in a **Not Shown tray directly under the preview**, so you can see them and the tab strip together. **Drag a tab from the tray onto a tab in the strip to replace it** (the replaced tab lands in the tray); **drag a tab onto another tab to swap them**; **drag a tab onto the tray to hide it**; or **click a tab in the tray to add it**. The hint under the preview names both tabs while you hold one over another ("Release to swap Media and Reminders."). A tab can only replace a tab: there is no dropping into the side of the notch. The list rows below also reorder by dragging |
 | Home | Expanded Home, in edit mode | The widget editor (below); Up Next (Calendar Events, Due Reminders, a button that opens Internet Accounts); Weather city (only the name is sent to Open-Meteo) |
 | Shelf | Compact, with the drop target | **When You Drag a File** (Show Shelf and AirDrop, Show Shelf Only, Show AirDrop Only, or Do Nothing); Add New Screenshots to the Shelf; Remove Files from the Shelf (Never, After a Day, After a Week; only the reference goes, never the file); Clipboard History (Off, 10, 25, or 50 items) |
 | Media | Compact | Show Music Beside the Notch (off: music stays in Home and the Media tab); Synced Lyrics |
 | Tools | Expanded Tools | How many tools in the row: 4, 6, or 8; **Row Order** (drag, or right-click Move Up and Move Down) |
 | Notifications | Banner or alert (the selected event's real one) | Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
-| Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state, read without asking, with Open System Settings |
+| Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state (Calendars, Reminders, Camera, Microphone, Speech Recognition, Screen Recording, Accessibility, Bluetooth), read without asking, with Open System Settings |
+
+**The Settings tour.** The first time Settings opens, a black callout with an arrow points at a real control, with a ring in the system accent
+color around it, and walks through all eight panes in fifteen stops (Find Any Setting, Your Island Live, Open It From Anywhere, and so on).
+It follows the control when the window resizes or the pane scrolls; Next, Back, End Tour, and Return move through it, choosing a pane in
+the sidebar jumps to that pane's first stop, and closing the window ends it. It never starts over the guide or when Settings was opened
+for **Edit Home…**. Picture: `docs/images/43-tour-03-shortcut.png`.
 
 **Widgets you make.** *Add Widgets → New Widget…* makes a widget from a **Shortcut** (its result, or a button that runs it), a
 **Web Value** (one HTTPS address, and a JSON path like `data.0.price` or the first line of text), a **Folder** (its item count and
@@ -357,6 +365,41 @@ this Mac and are left out of exported files. Right-click a tile to edit or delet
 **Import** a layout as a `.macislandhome.json` file (Import asks first), and **Reset to Everyday** (asks first). All of Settings' choices are the same styled dropdowns, not the system pop-up buttons. Options:
 Quick Tools follows the Tools row or tools you pick; Timers & Shelf takes two timer lengths and can hide Pomodoro and Shelf;
 Note picks a note. Right-click any widget on the real island and choose **Edit Home…** to open Settings on it.
+
+---
+
+## First run
+
+The first launch of a fresh install shows the **guide**: a floating glass window hung below the island, with the real island as its
+stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
+
+| # | Step | What it shows |
+| --- | --- | --- |
+| 1 | Welcome to MacIsland | The compact island with music |
+| 2 | Rest the Pointer to Peek | The peek, and a practice line |
+| 3 | Open It | Expanded Home, your shortcut as key caps, and a practice line |
+| 4 | Change Tabs | Expanded Media, the arrows as key caps, and a practice line |
+| 5 | Fold It Away | The compact island, Esc, and a practice line |
+| 6 | Seven Modules | A chip per module; the stage shows the one you choose |
+| 7 | Drop Files on It | The drop target your setting chose, and a practice line |
+| 8 | Keep a Module Close | The menu bar sliding in |
+| 9 | Allow What You'll Use | Calendars, Reminders, and Bluetooth rows (Allow, Allowed, or Open Settings), and a note on what is asked later. Left out when all three are already allowed |
+| 10 | Make It Yours | Open at Login, Open Settings, Done |
+
+The **practice lines** ("Try it: ...") watch the real island and turn green, beside a check, when you do it; they never block
+Continue. The words follow your setup: with no open shortcut the key caps and the keyboard sentences go, the drop step follows
+"When You Drag a File", and a Mac without a notch says "the top center of the screen". **Esc and the arrows are not bound in the
+guide**: they belong to the island.
+
+Granting Calendars turns on Calendar Events in Up Next, and Reminders turns on Due Reminders. Bluetooth starts the headphones
+monitor. Camera, Microphone and Speech, Screen Recording, Accessibility, and Focus are still asked the first time you use what
+needs them. On a fresh install the headphones and Downloads monitors wait until the guide ends.
+
+The ⊗, Done, Open Settings, and Skip each count the guide as seen; quitting with it open does not. **Skip** is temporary: it ends the
+guide at once and then asks every permission not yet asked, one after another. Someone who updates from a build they already used
+sees neither the guide nor the tour. **Replay** them from Settings → General → Guide, or with `macisland://guide` and `macisland://tour`.
+
+Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-guide-09-access.png`.
 
 ---
 

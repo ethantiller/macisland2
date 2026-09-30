@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 514 tests, under a second
+./scripts/test.sh                                                     # 617 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -47,6 +47,7 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | ← / → , or a two-finger horizontal swipe | Previous or next tab |
 | Esc, or move the pointer away for 300 ms | Fold back in |
 | Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |
+| First launch | A short **guide** shows the gestures and modules with the real island, and asks for Calendars, Reminders, and Bluetooth (each optional). Replay it, or the Settings tour, from Settings → General → Guide |
 
 ## A tour
 
@@ -143,14 +144,14 @@ Web searches open in your browser. **Widgets you make** can also send one HTTPS 
 widget), or run a Shortcut or a program you chose (a command widget); both run only while Home is showing, and Settings → Privacy
 lists every host and everything MacIsland runs.
 
-macOS asks for access only when a feature first needs it: Calendar and Reminders, Bluetooth, Focus status, the Downloads
+The first-run guide asks for **Calendars, Reminders, and Bluetooth** up front (each optional, and it can be skipped), because they power things that arrive on their own. macOS asks for everything else only when a feature first needs it: Focus status, the Downloads
 folder (and Desktop or Documents, for a folder widget there), Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys), Camera (Mirror), Microphone (Voice Notes), and Screen Recording (Record Screen). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
 Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 
 ## Status
 
-The island, its seven modules, Home widgets, a Settings window with a live preview, and menu-bar and torn-off windows are built. The
+The island, its seven modules, Home widgets, a Settings window with a live preview, menu-bar and torn-off windows, and a first-run guide and Settings tour are built. The
 everyday features (file tools and converters, clipboard, Outlook and Teams, ambient banners, capture) are built too: see
 [docs/ROADMAP.md](docs/ROADMAP.md#next). What is done, the decisions along the way, what still needs a hand test, and what was
 ruled out are in [docs/ROADMAP.md](docs/ROADMAP.md).

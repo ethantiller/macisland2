@@ -28,6 +28,9 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Fail on any style finding | `./scripts/lint.sh --strict` |
 | Format the code in place | `./scripts/format.sh` (see the warning below) |
 | Rebuild the Now Playing adapter | `./scripts/build-adapter.sh` |
+| Show the first-run guide again | `open macisland://guide` |
+| Open Settings on its tour | `open macisland://tour` |
+| See the guide as a fresh install would (debug builds) | `open 'macisland://guide?reset=1'` |
 | Forget the app's macOS permissions | `tccutil reset All com.ethantiller.MacIsland` |
 | Measure idle CPU | `ps -o cputime= -p $(pgrep -x MacIsland)`, ten seconds apart |
 | Read a crash report | `ls -t ~/Library/Logs/DiagnosticReports \| grep MacIsland` |
@@ -61,7 +64,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 514 tests, about a second.
+lines; 617 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -132,7 +135,7 @@ There is no CI, no linter config other than `.swift-format`, and no dependency m
 
 ## Source map
 
-Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One folder per feature: a model plus its view.
+Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One folder per feature: a model plus its view.
 
 ### `App/`
 
@@ -141,6 +144,20 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `MacIslandApp.swift` | The `@main` `App` (menu-bar capsule, Settings, module menu bars), `AppDelegate` (builds `IslandFeatures`, wires every monitor to the view model, the hotkeys, the panel), `ModuleMenuBars`, `MenuBarModuleView` |
 | `URLCommand.swift` | `URLCommand` (the `macisland://` parser and its limits) and `URLCommandRunner` (runs them, rate-limits banners) |
 | `FloatingPanels.swift` | `FloatingPanels` (torn-off windows, one per module, Keep on Desktop), `DetachedPanelState`, `DetachedModuleView` (the glass window's chrome) |
+
+| `OnboardingWindowController.swift` | `OnboardingPanel` (the guide's window), `OnboardingContext` (what the guide needs from the app), `OnboardingWindowController` (shows, positions, and closes it) |
+| `SettingsWindowController.swift` | The Settings window: an `NSWindow` hosting `SettingsView`, made when opened and gone when closed, with its frame remembered |
+
+### `Onboarding/` (the first-run guide)
+
+| File | Contains |
+| --- | --- |
+| `OnboardingState.swift` | `OnboardingState` (which guide and tour versions were seen; `onboarding.*` keys), `InstallEvidence` (existing or fresh) |
+| `OnboardingFlow.swift` | `GuideStepID`, `PracticeGoal`, `GuideStep`, `OnboardingFlow`, `GuideSetup`, `GuideCopy` (every sentence) |
+| `OnboardingModel.swift` | `OnboardingModel` (walks the steps, practice, Skip, Done, Close, Open Settings) and `GuideEnding` |
+| `OnboardingView.swift` | The guide's content (`OnboardingView`), the window's root on glass (`OnboardingRoot`), the access rows and practice line |
+| `AccessRequests.swift` | `AccessKind`, `AccessProviding`, `LiveAccess`, `AccessModel` |
+| `BluetoothAccess.swift` | Asks for Bluetooth through `CBCentralManager` and returns the answer |
 
 ### `Island/` (panel, input, state, drawing)
 
@@ -275,12 +292,15 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ### `Settings/`
 
+Note for `swift run`: without an app bundle there is no bundle identifier, so defaults live in another domain, and an existing developer install looks fresh there (the guide shows). Harmless.
+
 | File | Contains |
 | --- | --- |
 | `AppSettings.swift` | Every setting, its storage, the tab sides, menu-bar modules, search engines, pinned tools |
 | `SettingsView.swift` | The Settings window: a sidebar of panes over a live preview and the pane's form |
 | `SettingsPane.swift` | The panes, and what the preview shows for each |
-| `IslandPreview.swift` | `IslandPreviewModel` (a second view model on sample data) and `IslandPreview` (the real `IslandView` on a desk band) |
+| `IslandPreview.swift` | `IslandPreviewModel` (a second view model on sample data), `IslandPreview` (the picker, arrows, tray, and hints around the band), and `PreviewBand` (the real `IslandView` on a desk band, which the first-run guide uses alone as its stage) |
+| `SettingsTour.swift` | The Settings tour: `TourStop.all`, `SettingsTour`, `TourAnchors` and `.tourAnchor(_:)`, `CalloutPlacement`, `TourCallout`, `TourRing`, `SettingsTourOverlay`, and the Return key monitor |
 | `PreviewFeatures.swift` | `IslandFeatures` from sample data, the samples, and the inert doubles |
 | `CustomWidgetSheet.swift`, `PrivacyPane.swift`, `PrivacyAccess.swift` | Making a custom widget, and the Privacy pane (what leaves, what runs, permission states) |
 | `MenuBarPreview.swift` | The preview's Menu Bar view: a menu-bar strip and the chosen module's window |
@@ -299,7 +319,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 36 files, about 7,900 lines, **514 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **617 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -334,7 +354,10 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
+| `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
+| `SettingsTourTests.swift` | The tour's stops, running, anchors, placement, and visibility |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
+| `OnboardingSnapshots.swift` | Opt-in: the guide's ten steps and the tour's fifteen stops, light and dark (`40-guide-*`, `43-tour-*`) |
 
 ---
 

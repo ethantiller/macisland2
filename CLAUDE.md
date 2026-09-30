@@ -30,7 +30,8 @@ with changes, and run `./scripts/docs-images.sh` after a UI change.
 - `App/`: entry point, menu bar item, wiring.
 - `Island/`: panel, geometry, hover and click-through tracking, view model, theme, shared components.
 - One folder per feature (`NowPlaying/`, `Shelf/`, `Timer/`, `Tools/`, `System/`, `Agenda/`, `Home/`, `Weather/`, `Notes/`, `Widgets/`): a model plus its view.
-- `Settings/`: the Settings window (a SwiftUI `Settings` scene) and `AppSettings`.
+- `Settings/`: the Settings window (an `NSWindow` made by `App/SettingsWindowController.swift`), its tour, and `AppSettings`.
+- `Onboarding/`: the first-run guide (state, steps and copy, model, view, permission requests); its window is `App/OnboardingWindowController.swift`.
 - `Vendor/mediaremote-adapter`: Now Playing access via `/usr/bin/perl` (Apple restricts MediaRemote since macOS 15.4).
 
 ## Working style

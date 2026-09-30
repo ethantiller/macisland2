@@ -61,7 +61,7 @@ Layers, from the bottom:
 
 ## Startup
 
-`MacIslandApp` is a SwiftUI `App` with an `NSApplicationDelegateAdaptor`. It declares three scenes:
+`MacIslandApp` is a SwiftUI `App` with an `NSApplicationDelegateAdaptor`. It declares the capsule and the module menu bars as scenes (the Settings window is an `NSWindow` made by `SettingsWindowController`, not a scene). It was once three scenes:
 
 | Scene | What |
 | --- | --- |
@@ -69,7 +69,8 @@ Layers, from the bottom:
 | `Settings` | The Settings window |
 | `ModuleMenuBars` | One optional `MenuBarExtra` per module, inserted only when chosen in Settings |
 
-`AppDelegate` builds everything in `applicationDidFinishLaunching`:
+`AppDelegate` owns `OnboardingState` as its **first stored property**, so it tells an existing install from a fresh one before anything
+in the launch can write a setting (see [First run](#first-run)). It builds everything in `applicationDidFinishLaunching`:
 
 1. Sets the activation policy to `.accessory` (no Dock icon). Installs a SIGTERM handler so `pkill` quits cleanly and stops
    the adapter subprocess.
@@ -79,6 +80,10 @@ Layers, from the bottom:
 4. Creates the `MouseTracker`, and wires keyboard handling (Esc and arrows in the panel; the global hotkeys).
 5. `connectReach()` wires torn-off windows (`onOpenWindow`) and opening Settings.
 6. Observes screen changes to re-lay-out.
+7. `connectOnboarding()` gives the guide's window what it needs, wires the `guide` and `tour` links, and shows the guide if this
+   install hasn't seen it. On a fresh install whose guide is pending, `connectEvents()` held back the headphones and Downloads
+   monitors (they can show a system prompt at launch); they start when the guide ends, and the headphones monitor also when
+   Bluetooth is allowed in it. Both `start()`s are safe to call twice.
 
 `AppDelegate.makeFeatures()` is the one place that builds the real `IslandFeatures`. `TestSupport.makeViewModel()` is its twin
 for tests, and `PreviewFeatures.make(live:scratch:)` is its twin for the Settings preview: **a new feature touches all three**.
@@ -418,6 +423,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Full-charge level | UserDefaults | `fullChargeLevel` |
 | Tools in the row, and the pinned order | UserDefaults | `pinLimit`, `pinnedTools` |
 | Shelf files | UserDefaults | `shelf.paths` (paths only; the files stay where they are) |
+| First-run state | UserDefaults | `onboarding.install` (`fresh` or `existing`, written once), `onboarding.guide`, `onboarding.settingsTour` (the version last seen). Not in `AppSettings`, so never in the settings file and untouched by Reset All |
 | Pomodoro history | UserDefaults | `pomodoro.history` (JSON: sessions per day) |
 | Notes and snippets | JSON file | `~/Library/Application Support/MacIsland/notes.json` |
 | Voice Notes | .m4a files | `~/Library/Application Support/MacIsland/Voice Notes/` (kept; the text goes in a note) |
@@ -431,7 +437,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 
 ### Permissions
 
-macOS asks when a feature first needs access. `Support/Info.plist` holds the reasons.
+macOS asks when a feature first needs access, except that **the first-run guide also asks for Calendars and Reminders (through `AgendaMonitor.requestAccess(to:)`, the request its switches already make) and Bluetooth (through `BluetoothAccess`, a `CBCentralManager` that hears the answer; IOBluetooth's implicit prompt does not give one)**. A denied permission can't be asked again, so the guide offers System Settings instead. `Support/Info.plist` holds the reasons.
 
 | Access | Asked for by | `Info.plist` key |
 | --- | --- | --- |
@@ -442,7 +448,7 @@ macOS asks when a feature first needs access. `Support/Info.plist` holds the rea
 | Downloads folder | Download progress, and a folder widget on it | `NSDownloadsFolderUsageDescription` |
 | Desktop, Documents folders | A folder widget on one of them | `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` |
 | Automation (Apple Events) | Music and Spotify: volume, Favorite, play/pause | `NSAppleEventsUsageDescription` |
-| Accessibility | Clean Keys (an event tap) | (system prompt; no key) |
+| Accessibility | Clean Keys (an event tap); listed in Settings → Privacy | (system prompt; no key) |
 | Camera | Mirror | `NSCameraUsageDescription` |
 | Microphone | Voice Note | `NSMicrophoneUsageDescription` |
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
@@ -487,9 +493,37 @@ transport goes through AppleScript instead, addressed to the app itself. See [SC
 
 ---
 
+## First run
+
+**Telling an install's age.** `OnboardingState` (`Onboarding/`) classifies the install once, on the first launch that has the code, and writes
+`onboarding.install`: *existing* if `InstallEvidence` finds a key only a used install has (every `AppSettings` key, `shelf.paths`,
+`shelf.added`, `pomodoro.history`, the Settings window's size) or the notes file, else *fresh*. It is written once and then trusted:
+a fresh user who quits mid-guide leaves `notes.json` behind (every clean quit writes it), so deriving it again would call them existing.
+`InstallEvidence.keys` is listed by hand (`AppSettings.Key` is private), and `evidenceKeysCoverEverySetting` fails when a setting is
+stored under a key that isn't in it. An existing install gets the guide and the tour marked seen. A version number on each (`guideVersion`,
+`tourVersion`) and a `since` on each step or stop let a later release show only what is new.
+
+**The guide.** `OnboardingFlow` holds the ten steps as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
+shortcut, the notch, the tabs, the drag target), all tested. `OnboardingModel` walks them, keeps the practice checks, and runs each way
+out. The window is an `OnboardingPanel`, a `FloatingGlassPanel` without a resize edge, hung below the island's full extent so the island
+can open all the way while it is practised on. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
+`IslandPreviewModel`, which stops when the guide closes. **Practice** is observed, not polled: the view reports the live island's
+state, tab, and file-drag flag to the model, and `PracticeGoal.isMet(from:to:)` decides. When the live island folds back in while the app is
+active, the guide takes the keyboard back (⌃⌥Space gave it to the island) so Return continues. The guide never binds Esc or the arrows.
+
+**The tour.** `SettingsTour` is pure state over `TourStop.all`. Each stop's target is anchored by `.tourAnchor(_:)`, which reports the view's
+frame through `onGeometryChange` into `TourAnchors` (an `@Observable` keyed by `TourTarget`, in one named space shared by the sidebar and the
+pane; its setter ignores unchanged frames), the way the Home editor learns where its band is. `CalloutPlacement.place` (pure) picks the side,
+flips when there is no room, clamps inside the window, and keeps the arrow off the rounded corners. The overlay sits over the window's
+content, so it is above the sidebar, the preview, and the pane; only the callout takes clicks. A target scrolled out of view (or the search
+field while the sidebar is hidden) docks the callout at the bottom of the pane with Show Me. Return is Next through a local key monitor that
+lets the key through while text is edited or a shortcut is recorded (`ShortcutCapture.isActive`).
+
+---
+
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **514 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **617 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -529,4 +563,8 @@ Things that cost time. Read before changing the related code.
 | **AirDrop** | Incoming can't be intercepted (the Accept/Decline notification belongs to `sharingd`; nothing is observable until the file starts arriving in Downloads, where `TransferMonitor` shows it). Sending is picker-only. See [ROADMAP.md](ROADMAP.md#dropped-for-good). |
 | **Snapshots and drags** | Drag and drop states can't be simulated in `ImageRenderer`; check them in the running app. |
 | **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()` and `holdOpen()`; hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
+| **First-run evidence** | A new setting stored in `UserDefaults` needs its key in `InstallEvidence.keys`, or an updater who only ever changed it looks like a fresh install and is shown the guide. `evidenceKeysCoverEverySetting` guards it. |
+| **No `.defaultAction` in Settings** | A default button takes Return from the focused search field and the weather field, so the tour's Return is a key monitor. Esc is not bound either: Settings already uses it to clear search, cancel the recorder, and call off a drag. |
+| **Esc and arrows in the guide** | They reach the island only when its panel is key (after ⌃⌥Space), so the guide binds neither; its copy says when they work. |
+| **Tour anchors** | Whether `onGeometryChange` keeps reporting while a macOS `Form` scrolls was not verified when this was written. If the ring doesn't follow a scrolled row, replace the body of `.tourAnchor` with an `NSViewRepresentable` probe that reports `convert(bounds, to: nil)` on `frameDidChangeNotification` and the enclosing scroll view's `boundsDidChangeNotification`, keeping its API, and record which one is used here. |
 | **No Python here** | Scripted edits in this environment used `perl`; the repo itself has no Python. |
