@@ -30,9 +30,12 @@ enum RecorderOutcome: Equatable {
 @MainActor
 final class ShortcutCapture {
     private var monitor: Any?
+    /// A recorder is listening for keys. The Settings tour leaves Return alone then.
+    private(set) static var isActive = false
 
     func start(_ handler: @escaping (RecorderOutcome) -> Void) {
         stop()
+        Self.isActive = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let outcome = RecorderOutcome.of(
                 keyCode: event.keyCode, flags: event.modifierFlags, characters: event.charactersIgnoringModifiers)
@@ -44,6 +47,7 @@ final class ShortcutCapture {
     func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        Self.isActive = false
     }
 
     isolated deinit { stop() }

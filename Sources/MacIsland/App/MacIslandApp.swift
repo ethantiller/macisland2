@@ -405,6 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// seen it.
     private func connectOnboarding() {
         let onboarding = onboarding
+        SettingsWindowController.shared.onboarding = onboarding
         OnboardingWindowController.shared.context = OnboardingContext(
             features: features, island: viewModel, state: onboarding,
             access: LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess),

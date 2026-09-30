@@ -10,7 +10,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     /// Set by the app at launch.
     var features: IslandFeatures?
-    private var window: NSWindow?
+    /// Where the Settings tour stands. Set by the app at launch.
+    var onboarding: OnboardingState?
+    /// The Settings window while it is open.
+    private(set) var window: NSWindow?
 
     private static let frameName = "MacIslandSettings"
 
@@ -24,7 +27,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             return
         }
         guard let features else { return }
-        let host = NSHostingView(rootView: SettingsView(settings: features.settings, features: features))
+        let host = NSHostingView(rootView: SettingsView(settings: features.settings, features: features, onboarding: onboarding))
         // SwiftUI says how small the window may get (from the view's minimum size) and nothing else about its size: a window that
         // followed the content's ideal size would fight every drag of its edge.
         host.sizingOptions = [.minSize]

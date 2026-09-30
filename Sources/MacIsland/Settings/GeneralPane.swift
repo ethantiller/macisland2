@@ -15,6 +15,7 @@ struct GeneralPane: View {
             }
             Section {
                 ShortcutRecorder(settings: settings, slot: .open)
+                    .tourAnchor(.shortcut)
             } header: {
                 Text("Shortcut").id(SettingsAnchor.shortcut)
             } footer: {

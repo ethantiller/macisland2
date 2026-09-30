@@ -5,6 +5,8 @@ import SwiftUI
 struct SettingsView: View {
     let settings: AppSettings
     let features: IslandFeatures
+    /// Where the tour stands; nil in a preview or a test, where there is no tour.
+    let onboarding: OnboardingState?
 
     @AppStorage("settings.pane") private var storedPane = SettingsPane.general.rawValue
     /// Hidden, the window is all pane; the pane's own icon, where the hide button was, brings the sidebar back.
@@ -15,13 +17,20 @@ struct SettingsView: View {
     @State private var preview: IslandPreviewModel?
     @State private var editor: HomeEditor
     @State private var tabEditor: TabEditor
+    @State private var anchors = TourAnchors()
+    @State private var tour: SettingsTour
+    @State private var tourKeys = TourKeyMonitor()
+    /// The running tour changed the preview (a stop with its own view), so the pane's own view comes back when it moves on.
+    @State private var tourChangedPreview = false
     @Environment(\.undoManager) private var undoManager
 
-    init(settings: AppSettings, features: IslandFeatures) {
+    init(settings: AppSettings, features: IslandFeatures, onboarding: OnboardingState? = nil) {
         self.settings = settings
         self.features = features
+        self.onboarding = onboarding
         _editor = State(initialValue: HomeEditor(settings: settings))
         _tabEditor = State(initialValue: TabEditor(settings: settings))
+        _tour = State(initialValue: SettingsTour(onFinish: { onboarding?.finishTour() }))
     }
 
     private var pane: SettingsPane { SettingsPane(rawValue: storedPane) ?? .general }
@@ -63,6 +72,12 @@ struct SettingsView: View {
                 detail
             }
             .animation(Self.sidebarAnimation, value: sidebarHidden)
+            // The tour's anchors and its overlay share one space, so the ring is placed in the coordinates the anchors report.
+            .environment(\.tourAnchors, anchors)
+            .coordinateSpace(.named(TourAnchors.space))
+            .overlay {
+                SettingsTourOverlay(tour: tour, anchors: anchors, onShowMe: { scrollTarget = tour.current?.scrollAnchor })
+            }
         }
         .ignoresSafeArea(.container, edges: .top)
         .frame(
@@ -73,18 +88,44 @@ struct SettingsView: View {
             settings.refresh()
             editor.undoManager = undoManager
             editor.watchesMouseUp = true
+            // Opened for a widget ("Edit Home..."): the tour doesn't pull the person away from it.
+            let opensForAWidget = settings.requestedHomeSelection != nil
             takeRequestedSelection()
             let model = IslandPreviewModel(live: features)
             preview = model
             tabEditor.preview = model
             editor.previewModel = model
             showPreview(for: pane)
+            if let onboarding, onboarding.needsTour || onboarding.tourRequested, !opensForAWidget,
+                !OnboardingWindowController.shared.isOpen
+            {
+                beginTour()
+            }
         }
         .onDisappear {
+            if tour.isRunning { tour.end() }
+            tourKeys.stop()
             preview?.stop()
             preview = nil
         }
-        .onChange(of: storedPane) { showPreview(for: pane) }
+        .onChange(of: storedPane) {
+            showPreview(for: pane)
+            // A pane chosen in the sidebar: the tour follows.
+            tour.jump(to: pane)
+        }
+        .onChange(of: tour.index) { old, new in
+            if new != nil {
+                applyStop()
+                if let stop = tour.current {
+                    AccessibilityNotification.Announcement("\(stop.title). \(stop.copy)").post()
+                }
+            } else if old != nil {
+                endTour()
+            }
+        }
+        .onChange(of: onboarding?.tourRequested) { _, requested in
+            if requested == true, !OnboardingWindowController.shared.isOpen { beginTour() }
+        }
         .onChange(of: sidebarHidden) { _, hidden in UserDefaults.standard.set(hidden, forKey: Self.sidebarHiddenKey) }
         .onChange(of: settings.requestedHomeSelection) { takeRequestedSelection() }
     }
@@ -103,6 +144,7 @@ struct SettingsView: View {
             }
             ScrollViewReader { proxy in
                 content
+                    .tourAnchor(.paneViewport)
                     .task(id: scrollTarget) { await scroll(to: scrollTarget, with: proxy) }
             }
         }
@@ -166,5 +208,42 @@ struct SettingsView: View {
         // Menu Bar is a view of the preview only where its icons are chosen.
         preview?.allowsMenuBar = pane == .tabs
         if let context = pane.previewContext { preview?.show(context) }
+        // A stop that shows its own view keeps it while the tour is on that stop's pane.
+        if let stop = tour.current, stop.pane == pane, let context = stop.preview { preview?.show(context) }
+    }
+
+    // MARK: Tour
+
+    /// Shows the sidebar (stop 1 points at its search field), starts at the first stop, and listens for Return.
+    private func beginTour() {
+        onboarding?.tourRequested = false
+        if sidebarHidden { setSidebar(hidden: false) }
+        tour.start()
+        applyStop()
+        tourKeys.start(in: { SettingsWindowController.shared.window }) { tour.next() }
+    }
+
+    /// Takes the window to the current stop: its pane, its view in the preview, and its place in the pane.
+    private func applyStop() {
+        guard let stop = tour.current else { return }
+        if pane != stop.pane { storedPane = stop.pane.rawValue }
+        if let context = stop.preview {
+            preview?.allowsMenuBar = stop.pane == .tabs
+            preview?.show(context)
+            tourChangedPreview = true
+        } else if tourChangedPreview {
+            showPreview(for: stop.pane)
+            tourChangedPreview = false
+        }
+        scrollTarget = stop.scrollAnchor
+    }
+
+    /// The tour ended: the pane's own preview comes back, and Return is Return again.
+    private func endTour() {
+        tourKeys.stop()
+        if tourChangedPreview {
+            tourChangedPreview = false
+            showPreview(for: pane)
+        }
     }
 }
