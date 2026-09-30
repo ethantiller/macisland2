@@ -183,7 +183,7 @@ final class SettingsTour {
 @MainActor
 @Observable
 final class TourAnchors {
-    static let space = "SettingsTour"
+    nonisolated static let space = "SettingsTour"
 
     private(set) var frames: [TourTarget: CGRect] = [:]
 

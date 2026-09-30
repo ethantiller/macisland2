@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A module torn off the island into a window of its own: resizable, without chrome, moved by dragging its background.
 /// Clear, with a shadow, and drawn with Liquid Glass by its content.
-final class FloatingGlassPanel: NSPanel {
+class FloatingGlassPanel: NSPanel {
     init() {
         super.init(
             contentRect: .zero, styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
