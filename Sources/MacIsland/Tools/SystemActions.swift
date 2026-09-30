@@ -2,14 +2,6 @@ import AppKit
 
 @MainActor
 enum SystemActions {
-    /// Needs Automation permission for System Events; macOS asks the first time.
-    static func toggleDarkMode() -> Bool {
-        let source = #"tell application "System Events" to tell appearance preferences to set dark mode to not dark mode"#
-        var error: NSDictionary?
-        NSAppleScript(source: source)?.executeAndReturnError(&error)
-        return error == nil
-    }
-
     /// Locks the screen the way the keyboard does: Control-Command-Q. Needs Accessibility access to post the
     /// keys; returns `false` (posting nothing) without it.
     static func lockScreen(

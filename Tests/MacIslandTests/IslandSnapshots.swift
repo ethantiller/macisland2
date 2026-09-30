@@ -177,9 +177,15 @@ struct IslandSnapshots {
 
         viewModel.showBanner(IslandBanner(
             systemImage: "battery.25percent", tint: Theme.Tint.attention, title: "Low Battery",
-            detail: "20% remaining", action: .init(title: "Low Power Mode") {}
+            detail: "20% remaining", actions: [.init(title: "Low Power Mode") {}]
         ))
         render(viewModel, "12-banner-low-battery")
+
+        viewModel.showBanner(IslandBanner(
+            systemImage: "calendar", tint: Theme.Tint.neutral, title: "Design Review", detail: "In 5 minutes",
+            actions: [.init(title: "Join") {}, .init(title: "Check Camera") {}]
+        ))
+        render(viewModel, "12b-banner-two-actions")
 
         // The banner outranks an alert, so let it go first.
         viewModel.performBannerAction()
@@ -187,6 +193,20 @@ struct IslandSnapshots {
             systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "82%", isCharging: true
         ))
         render(viewModel, "13-compact-charging")
+
+        // Recording, on a fresh island: the compact dot and time, the voice note's peek, and the Mirror.
+        let capture = makeViewModel()
+        await capture.voice.start()
+        render(capture, "14-compact-recording")
+        capture.state = .peek
+        render(capture, "14b-peek-voice")
+        await capture.voice.stop()
+
+        capture.selectedTab = .tools
+        capture.startMirror()
+        try await Task.sleep(for: .milliseconds(100))
+        render(capture, "08e-expanded-mirror")
+        capture.stopMirror()
 
         viewModel.timer.reset()
         viewModel.stopwatch.reset()

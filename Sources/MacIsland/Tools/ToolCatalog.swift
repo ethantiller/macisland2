@@ -5,6 +5,8 @@ import SwiftUI
 struct ToolItem: Identifiable {
     let id: ToolID
     let title: String
+    /// The full name where there is room for it (the palette, VoiceOver); defaults to `title`.
+    var label: String?
     let systemImage: String
     var isOn = false
     var isAvailable = true
@@ -68,6 +70,15 @@ struct ToolCatalog {
             }
         case .lockScreen:
             ToolItem(id: id, title: "Lock Screen", systemImage: "lock.fill") { lockScreen() }
+        case .mirror:
+            ToolItem(id: id, title: "Mirror", systemImage: "person.crop.rectangle", isOn: viewModel.mirror.isOn) {
+                viewModel.toggleMirror()
+            }
+        case .recordScreen:
+            ToolItem(
+                id: id, title: "Record", label: "Record Screen", systemImage: "record.circle",
+                isOn: viewModel.screenRecorder.isRecording
+            ) { viewModel.toggleScreenRecording() }
         }
     }
 
@@ -82,7 +93,7 @@ struct ToolCatalog {
                     tint: Theme.Tint.attention,
                     title: "Accessibility Access Needed",
                     detail: "Allow it to lock the screen",
-                    action: .init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }
+                    actions: [.init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }]
                 ),
                 for: .seconds(8),
                 respectingFocus: false
@@ -101,7 +112,7 @@ struct ToolCatalog {
                     tint: Theme.Tint.neutral,
                     title: "Keyboard Locked",
                     detail: "Unlocks in 30 seconds",
-                    action: .init(title: "Unlock") { cleaner.unlock() }
+                    actions: [.init(title: "Unlock") { cleaner.unlock() }]
                 ),
                 for: .seconds(30),
                 respectingFocus: false
@@ -113,7 +124,7 @@ struct ToolCatalog {
                     tint: Theme.Tint.attention,
                     title: "Accessibility Access Needed",
                     detail: "Allow it to lock the keyboard",
-                    action: .init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }
+                    actions: [.init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }]
                 ),
                 for: .seconds(8),
                 respectingFocus: false
@@ -145,7 +156,7 @@ struct ToolCatalog {
                     tint: Theme.Tint.neutral,
                     title: "Focus Needs Shortcuts",
                     detail: "\(FocusMode.onShortcut) and \(FocusMode.offShortcut)",
-                    action: .init(title: "Open Shortcuts") { FocusMode.openShortcuts() }
+                    actions: [.init(title: "Open Shortcuts") { FocusMode.openShortcuts() }]
                 ),
                 for: .seconds(8),
                 respectingFocus: false

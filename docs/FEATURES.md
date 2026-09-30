@@ -60,17 +60,18 @@ Compact shows the **top two** live activities, ranked. Highest first:
 | --- | --- | --- | --- |
 | 1 | Banner | (a banner is a presentation of its own) | |
 | 2 | **Alert** (always shown alone: its text is the message) | Glyph | Text |
-| 3 | **Microphone in use** | The app's icon | How long |
-| 4 | **Timer** | Ring | Countdown |
-| 5 | **Pomodoro** | Ring | Countdown |
-| 6 | **Stopwatch** | Stopwatch glyph | Elapsed |
-| 7 | **Working** (zipping, converting, running a Shortcut) | Pulsing gear, blue | What it is doing |
-| 8 | **Download in progress** | File icon in a ring | Percent |
-| 9 | **Music** | Album art | Play/pause, or sound bars while playing |
+| 3 | **Recording** (the screen, or a voice note) | Record dot or waveform, blue | How long |
+| 4 | **Microphone in use** (another app) | The app's icon | How long |
+| 5 | **Timer** | Ring | Countdown |
+| 6 | **Pomodoro** | Ring | Countdown |
+| 7 | **Stopwatch** | Stopwatch glyph | Elapsed |
+| 8 | **Working** (zipping, converting, running a Shortcut) | Pulsing gear, blue | What it is doing |
+| 9 | **Download in progress** | File icon in a ring | Percent |
+| 10 | **Music** | Album art | Play/pause, or sound bars while playing |
 
 ![A pair](images/09b-compact-pair-timer-media.png)
 
-In a pair, each side shows only its activity's glyph, ring, or artwork. Music's play/pause button is left out of a pair.
+In a pair, each side shows only its activity's glyph, ring, or artwork. Music's play/pause button is left out of a pair. A screen recording is one big stop button: click the compact island to stop it, and hovering does not open it. A voice note peeks with the time, a level meter, and **Stop**.
 
 ### Color
 
@@ -88,8 +89,8 @@ A tint means something is live, one meaning per color. Everything else is white 
 
 ## Alerts and banners
 
-An **alert** is a short message beside the notch. A **banner** drops below it with a title, a detail line, and at most one
-action. Alerts that need you (a timer finishing, a Pomodoro phase ending) stay until you open the island.
+An **alert** is a short message beside the notch. A **banner** drops below it with a title, a detail line, and at most two
+actions (with two, the first is filled). Alerts that need you (a timer finishing, a Pomodoro phase ending) stay until you open the island.
 
 | Event | What you see |
 | --- | --- |
@@ -99,7 +100,7 @@ action. Alerts that need you (a timer finishing, a Pomodoro phase ending) stay u
 | Headphones connect (Bluetooth) | Banner with the name and left, right, and case battery |
 | An external drive mounts | Banner with the name, size, and **Eject** (then "Ejected", or the reason it failed) |
 | A screenshot is saved | Green "Shelf" alert; the file is added to the Shelf |
-| A meeting is 5 minutes away | Banner, with **Join** if it has a Zoom, Meet, Teams, or Webex link |
+| A meeting is 5 minutes away | Banner, with **Join** and **Check Camera** if it has a Zoom, Meet, Teams, or Webex link |
 | A reminder comes due | Banner, with **Done** |
 | Timer or Pomodoro finishes | Alert that stays until seen; opens the Clock tab |
 | A download finishes | Green "Saved" alert |
@@ -236,7 +237,7 @@ undated ones. Tap the circle to check one off. Asks for Reminders access the fir
 
 ![Tools](images/08c-expanded-tools-eight.png)
 
-Nine tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of five.
+Eleven tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of six.
 Right-click a tool to pin it. The row is always full: unpinning fills the gap with another tool.
 
 | Tool | Does |
@@ -250,6 +251,8 @@ Right-click a tool to pin it. The row is always full: unpinning fills the gap wi
 | **Focus** | Turns a Focus on or off through *your* Shortcuts named `Focus On` and `Focus Off` (a banner explains if missing) |
 | **Clean Keys** | Swallows every key for 30 seconds so the keyboard can be wiped; the mouse still works. Needs Accessibility |
 | **Lock Screen** | Locks the screen (posts Control-Command-Q). Needs Accessibility, like Clean Keys |
+| **Mirror** | Replaces the tools with your camera (16:9, mirrored, no frames kept), Ring Light and its brightness beside it, and **Done**. The island stays open; folding it, changing tab, or Done turns the camera off. Asks for Camera access the first time, and says so, with **Open Settings**, if it is off |
+| **Record** (*Record Screen*) | Folds the island and lets you drag a region (click for the whole display, Esc to cancel), then records it, without MacIsland's own windows, to a movie in your Movies folder (30 minutes at most). The blue record dot and time sit beside the notch; click it to stop. The movie lands on the Shelf. Asks for Screen Recording access, with a red banner and **Open Settings** if it is off |
 
 ### Notes
 
@@ -260,6 +263,7 @@ Notes, Snippets, and a Prompter, stored as JSON in Application Support.
 - **Notes**: a list and an editor. A note is named by its first line.
 - **Snippets**: named text you copy in one tap (also findable in the palette).
 - **Prompter**: the selected note, scrolling under the camera at a speed you set, with fade at the edges.
+- **Voice Note** (the mic in the header, or `voice note` in the palette): records audio and turns it into text on this Mac (macOS speech recognition; the language model is downloaded once). Stopping makes a note called "Voice Note, 3:45 PM" that holds the words, and puts the audio (an .m4a kept in Application Support) on the Shelf. The blue waveform and time sit beside the notch; hovering shows a level meter and **Stop**. Ten minutes at most. If Mute Mic is on, a banner offers **Unmute** first.
 
 ---
 

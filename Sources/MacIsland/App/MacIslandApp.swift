@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static func makeFeatures() -> IslandFeatures {
         let shelf = ShelfModel()
         let work = WorkTracker()
+        let notes = NotesModel()
         return IslandFeatures(
             nowPlaying: NowPlayingModel(),
             outputs: AudioOutputs(),
@@ -44,17 +45,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             agenda: AgendaMonitor(),
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            batteries: DeviceBatteries(),
             pomodoro: PomodoroModel(),
             work: work,
             weather: WeatherModel(),
             fileTools: FileTools(shelf: shelf, work: work),
-            notes: NotesModel(),
+            notes: notes,
             keyboardCleaner: KeyboardCleaner(),
         launch: LaunchModel(),
-            stats: SystemStats(),
             rates: ExchangeRates(),
-            bluetooth: BluetoothDevices(provider: IOBluetoothProvider(), work: work)
+            bluetooth: BluetoothDevices(provider: IOBluetoothProvider(), work: work),
+            mirror: CameraMirror(provider: AVCameraProvider()),
+            screenRecorder: ScreenRecorder(recorder: SCKScreenRecorder(), shelf: shelf),
+            voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf)
         )
     }
 
@@ -152,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         tint: Theme.Tint.attention,
                         title: "Low Battery",
                         detail: "\(percent)% remaining",
-                        action: lowPower.isOn ? nil : .init(title: "Low Power Mode") { lowPower.toggle() }
+                        actions: lowPower.isOn ? [] : [.init(title: "Low Power Mode") { lowPower.toggle() }]
                     ),
                     for: .seconds(6),
                     followUp: IslandAlert(
@@ -208,6 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectLyrics()
         connectStorage()
         connectDevices()
+        connectCapture()
 
         batteryMonitor.start()
         accessoryMonitor.start()
@@ -217,6 +220,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.clipboard.start()
         volumeMonitor.start()
         screenshotWatcher.start()
+    }
+
+    /// Screen recordings and voice notes: what they leave behind, and what to do when they can't start.
+    private func connectCapture() {
+        let viewModel = viewModel
+        let features = features
+
+        features.screenRecorder.onFinish = { _ in
+            viewModel.flash(IslandAlert(systemImage: "record.circle.fill", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+        }
+        features.screenRecorder.onNeedsAccess = {
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "record.circle",
+                    tint: Theme.Tint.attention,
+                    title: "Screen Recording Access Needed",
+                    detail: "Allow it to record the screen",
+                    actions: [.init(title: "Open Settings") { ScreenRecorder.openScreenRecordingSettings() }]
+                ),
+                for: .seconds(8),
+                respectingFocus: false
+            )
+        }
+        features.screenRecorder.onFail = { reason in
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "record.circle", tint: Theme.Tint.attention, title: "Couldn\u{2019}t Record", detail: reason
+                ),
+                for: .seconds(6),
+                respectingFocus: false
+            )
+        }
+
+        features.voice.onSaved = {
+            viewModel.flash(IslandAlert(systemImage: "waveform", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+        }
+        features.voice.onFail = { error in
+            let denied = (error as? VoiceError) == .microphoneDenied
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "mic.slash.fill",
+                    tint: Theme.Tint.attention,
+                    title: "Couldn\u{2019}t Record",
+                    detail: error.localizedDescription,
+                    actions: denied ? [.init(title: "Open Settings") { VoiceRecorder.openMicrophoneSettings() }] : []
+                ),
+                for: .seconds(8),
+                respectingFocus: false
+            )
+        }
     }
 
     /// Low disk space, and Bluetooth devices that would not connect.
@@ -229,7 +282,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     tint: Theme.Tint.attention,
                     title: "Low Disk Space",
                     detail: DiskSpace.description(free: free),
-                    action: .init(title: "Open Storage") { DiskSpace.openStorageSettings() }
+                    actions: [.init(title: "Open Storage") { DiskSpace.openStorageSettings() }]
                 ),
                 for: .seconds(6),
                 followUp: IslandAlert(
@@ -285,13 +338,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     tint: Theme.Tint.neutral,
                     title: volume.name,
                     detail: volume.detail,
-                    action: .init(title: "Eject") {
+                    actions: [.init(title: "Eject") {
                         // Off the main thread, and reported after the banner has dismissed itself.
                         Task.detached {
                             let reason = VolumeMonitor.eject(volume)
                             await MainActor.run { Self.reportEject(of: volume, failure: reason, on: viewModel) }
                         }
-                    }
+                    }]
                 ),
                 for: .seconds(8)
             )
@@ -347,16 +400,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let features = features
 
         features.agenda.onAnnounce = { item in
-            let action = AgendaAction(item: item, agenda: features.agenda)
-            let isEvent = item.kind == .event
             viewModel.showBanner(
-                IslandBanner(
-                    systemImage: isEvent ? "calendar" : "checklist",
-                    tint: Theme.Tint.neutral,
-                    title: item.title,
-                    detail: isEvent ? AgendaRules.timeText(for: item, now: Date()) : "Due now",
-                    action: action.map { action in .init(title: action.title, perform: action.perform) }
-                ),
+                AgendaAction.announcement(for: item, agenda: features.agenda) { viewModel.startMirror() },
                 for: .seconds(8)
             )
         }

@@ -116,9 +116,12 @@ enum Theme {
         /// Reminders: the add field, then four rows of the list.
         static let remindersHeight: CGFloat = 28 + 8 + 4 * 30
         static let toolsRowHeight: CGFloat = 54
-        /// Two rows of four.
+        /// Two rows of six.
         static let toolsGridHeight: CGFloat = 2 * toolsRowHeight + 10
         static let ringLightControlsHeight: CGFloat = 30
+        /// The Mirror: a 16:9 preview, and the width that gives it.
+        static let mirrorHeight: CGFloat = 180
+        static let mirrorWidth: CGFloat = 320
         /// The Keep Awake duration chips, and the gap above them.
         /// Pomodoro's streak line and 7-day chart under the ring, and the gap above them.
         static let pomodoroStatsHeight: CGFloat = 58

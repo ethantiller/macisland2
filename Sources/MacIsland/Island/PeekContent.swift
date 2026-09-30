@@ -11,6 +11,8 @@ struct PeekContent: View {
                 NowPlayingView(nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth, isPeek: true)
             case .timer, .pomodoro, .stopwatch:
                 ClockPeekView(viewModel: viewModel)
+            case .recording(.voice):
+                VoicePeekView(viewModel: viewModel)
             default:
                 IdlePeekView(viewModel: viewModel)
             }
@@ -49,5 +51,48 @@ struct IdlePeekView: View {
             }
             .frame(height: Theme.Metrics.homeQuickHeight)
         }
+    }
+}
+
+/// Hover while recording a voice note: how long, how loud, and Stop. The meter is read only while this is showing.
+struct VoicePeekView: View {
+    let viewModel: IslandViewModel
+
+    private var voice: VoiceRecorder { viewModel.voice }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Glyph(systemName: "waveform", tint: Theme.Tint.working)
+                .symbolEffect(.pulse)
+            if let since = voice.startedAt {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(formatTime(context.date.timeIntervalSince(since)))
+                        .font(Theme.Typography.largeNumeral)
+                        .foregroundStyle(Theme.Palette.primary)
+                }
+            }
+            TimelineView(.animation(minimumInterval: 0.1)) { _ in
+                LevelMeterBar(level: Double(voice.level))
+            }
+            .frame(height: 6)
+            ChipButton(title: "Stop", systemImage: "stop.fill", isProminent: true) { viewModel.toggleVoiceNote() }
+        }
+        .frame(maxHeight: .infinity)
+    }
+}
+
+/// A thin bar that fills with the input level.
+private struct LevelMeterBar: View {
+    let level: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.Palette.fill)
+                Capsule().fill(Theme.Tint.working)
+                    .frame(width: max(6, proxy.size.width * min(max(level, 0), 1)))
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

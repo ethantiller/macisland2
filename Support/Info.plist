@@ -41,6 +41,12 @@
     <string>MacIsland can stay quiet while a Focus is on and shows whether one is active.</string>
     <key>NSDownloadsFolderUsageDescription</key>
     <string>MacIsland shows the progress of files arriving in Downloads, including AirDrop.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>MacIsland shows your camera so you can check how you look before a call.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>MacIsland records voice notes and turns them into text on this Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>MacIsland turns your voice notes into text on this Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>MacIsland can change the volume and Favorite in Music and Spotify from the notch.</string>
     <key>NSHighResolutionCapable</key>

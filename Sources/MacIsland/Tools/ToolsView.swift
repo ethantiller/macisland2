@@ -4,24 +4,28 @@ struct ToolsView: View {
     let viewModel: IslandViewModel
 
     private var settings: AppSettings { viewModel.settings }
-    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 5)
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 6)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if viewModel.toolsExpanded {
-                grid
+            if viewModel.mirror.isOn {
+                MirrorView(viewModel: viewModel)
             } else {
-                row
-            }
+                if viewModel.toolsExpanded {
+                    grid
+                } else {
+                    row
+                }
 
-            if viewModel.ringLight.isOn {
-                RingLightControls(light: viewModel.ringLight)
-                    .transition(.opacity)
-            }
+                if viewModel.ringLight.isOn {
+                    RingLightControls(light: viewModel.ringLight)
+                        .transition(.opacity)
+                }
 
-            if viewModel.keepAwake.isOn {
-                KeepAwakeChips(keepAwake: viewModel.keepAwake)
-                    .transition(.opacity)
+                if viewModel.keepAwake.isOn {
+                    KeepAwakeChips(keepAwake: viewModel.keepAwake)
+                        .transition(.opacity)
+                }
             }
         }
         .onAppear { viewModel.micMute.refresh() }
@@ -55,7 +59,9 @@ struct ToolsView: View {
 
     private func toolButton(_ id: ToolID) -> some View {
         let tool = ToolCatalog(viewModel: viewModel).item(for: id)
-        return ControlButton(title: tool.title, systemImage: tool.systemImage, isOn: tool.isOn, action: tool.action)
+        return ControlButton(
+            title: tool.title, systemImage: tool.systemImage, isOn: tool.isOn, accessibilityLabel: tool.label, action: tool.action
+        )
             .disabled(!tool.isAvailable)
             .opacity(tool.isAvailable ? 1 : 0.4)
             .contextMenu {
@@ -70,10 +76,11 @@ struct ToolsView: View {
 }
 
 /// Round Control Center-style button. On state is a white fill with a black glyph.
-private struct ControlButton: View {
+struct ControlButton: View {
     let title: String
     let systemImage: String
     var isOn = false
+    var accessibilityLabel: String?
     let action: () -> Void
 
     @State private var isHovering = false
@@ -101,7 +108,7 @@ private struct ControlButton: View {
         }
         .buttonStyle(IslandButtonStyle())
         .onHover { isHovering = $0 }
-        .accessibilityLabel(title)
+        .accessibilityLabel(accessibilityLabel ?? title)
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

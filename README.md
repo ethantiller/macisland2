@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 294 tests, under a second
+./scripts/test.sh                                                     # 321 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -143,7 +143,7 @@ name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turn
 Web searches open in your browser.
 
 macOS asks for access only when a feature first needs it: Calendar and Reminders, Bluetooth, Focus status, the Downloads
-folder, Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys and Lock Screen). The app is signed
+folder, Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys and Lock Screen), Camera (Mirror), Microphone (Voice Notes), and Screen Recording (Record Screen). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
 Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 

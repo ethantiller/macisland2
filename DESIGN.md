@@ -23,7 +23,7 @@ Glass never goes inside the island, and glass is never stacked on glass.
 | Presentation | Trigger | Shows | Size |
 | --- | --- | --- | --- |
 | Compact | Something is live | One activity split around the notch, or two as a minimal pair: leading is the top rank, trailing the second. | Notch + 2 × side |
-| Banner | An event worth noticing once | Glyph, title, one detail line, at most 2 actions (1 prominent; today's banners carry one) | 380 × (notch + 56) |
+| Banner | An event worth noticing once | Glyph, title, one detail line, at most 2 actions (with two, the first is prominent) | 380 × (notch + 56) |
 | Peek | Pointer rests on the island. It swells immediately and opens after 120 ms. | The top activity at full size, no tabs. With nothing live it shows the day and the everyday tools. | 380 × content |
 | Expanded | Click, two-finger swipe down, or ⌃⌥Space | Tab strip and the selected module | 520 × content |
 
@@ -39,7 +39,7 @@ There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/R
 | Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
-| Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Low Power, Clean Keyboard, Lock Screen |
+| Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Low Power, Clean Keyboard, Lock Screen, Mirror, Record Screen |
 | Notes | Quick Notes, Snippets, Prompter |
 
 ### Color: a tint means something is live, one meaning per color
@@ -47,7 +47,7 @@ There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/R
 | --- | --- | --- |
 | Artwork accent | `NowPlayingModel.accent` | Music |
 | Orange | `Tint.clock` | Time: timer, stopwatch, Pomodoro |
-| Blue | `Tint.working` | In progress: downloads, zip/convert, running a Shortcut |
+| Blue | `Tint.working` | In progress: downloads, zip/convert, running a Shortcut, recording |
 | Green | `Tint.positive` | Done or connected |
 | Red | `Tint.attention` | Needs you: low battery, missing permission, a failure |
 | White | `Palette.*` | Everything else |
@@ -59,7 +59,7 @@ Rules:
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, microphone, timer/Pomodoro, stopwatch, working, transfer, music. At most 2 activities show at once.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, working, transfer, music. At most 2 activities show at once.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player.
@@ -72,6 +72,7 @@ Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing n
 | `maxTabs` / `maxRightTabs` | 5 / 1 |
 | `swell` | 8 × 2 |
 | `floatRadius` / `floatPadding` / `floatGap` | 24 / 14 / 8 (24 − 14 = `cardRadius` 10, so corners are concentric) |
+| `mirrorWidth` / `mirrorHeight` | 320 / 180 (16:9; 180 is the Mirror's whole content height, which keeps the island under the 260 panel) |
 | `ScreenGeometry.panelSize` | 560 × 260 (at least as wide as the widest presentation) |
 
 Radii (32 / 10 / inner 14; Home's widgets use the inner 14 and nested elements 8), the 18 pt margin, and the 28 pt hit targets are unchanged. Bottom corners are **continuous** curvature.
@@ -112,7 +113,7 @@ Reduce Motion turns every token into a short ease, removes the swell, and swaps 
 
 ## Components (`Island/Components.swift`)
 
-Reuse before writing anything new: `IconButton`, `ChipButton`, `SegmentedChoice` (not the system segmented
+Reuse before writing anything new: `IconButton`, `ChipButton` (`isProminent` for the main of two), `SegmentedChoice` (not the system segmented
 picker on the island), `IslandSlider`, `ProgressRing`, `ChargingBadge`, `ArtworkView`, `AirDropGlyph`, `Glyph` (a symbol in a
 fixed square so different widths share one center), `IslandButtonStyle`. Tools use `ControlButton`.
 
@@ -155,8 +156,9 @@ and may not draw `.glassEffect`. Check those in the running app.
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.
-- **Tools.** Nine tools and Less fill the grid, two rows of five; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
+- **Tools.** Eleven tools and Less fill the grid, two rows of six; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
   for 30 seconds (the mouse still works) and needs Accessibility access, and so does Lock Screen (Control-Command-Q).
+  The Mirror replaces the row or grid with a 16:9 camera view (clipped to `widgetRadius`) and a column of Ring Light and **Done**.
 
 ## Reach: the palette, the menu bar, and windows
 

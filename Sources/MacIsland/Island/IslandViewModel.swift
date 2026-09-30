@@ -81,7 +81,7 @@ struct IslandAlert: Equatable {
     var isCharging = false
 }
 
-/// A wider, momentary announcement below the notch, with at most one action.
+/// A wider, momentary announcement below the notch, with at most two actions. With two, the first is the main one.
 struct IslandBanner: Equatable {
     struct Action {
         let title: String
@@ -93,15 +93,22 @@ struct IslandBanner: Equatable {
     var tint: Color
     var title: String
     var detail: String?
-    var action: Action?
+    /// At most two; the first is prominent when there are two.
+    var actions: [Action] = []
 
     static func == (lhs: IslandBanner, rhs: IslandBanner) -> Bool { lhs.id == rhs.id }
 }
 
 /// What the collapsed island shows, highest priority first.
+/// What is being recorded. MacIsland records the screen and voice notes.
+enum RecordingKind: Equatable {
+    case screen, voice
+}
+
 enum CompactActivity: Equatable {
     case banner(IslandBanner)
     case alert(IslandAlert)
+    case recording(RecordingKind)
     case microphone
     case timer
     case pomodoro
@@ -130,7 +137,6 @@ struct IslandFeatures {
     let agenda: AgendaMonitor
     let focus: FocusMode
     let clipboard: ClipboardHistory
-    let batteries: DeviceBatteries
     let pomodoro: PomodoroModel
     let work: WorkTracker
     let weather: WeatherModel
@@ -138,9 +144,11 @@ struct IslandFeatures {
     let notes: NotesModel
     let keyboardCleaner: KeyboardCleaner
     let launch: LaunchModel
-    let stats: SystemStats
     let rates: ExchangeRates
     let bluetooth: BluetoothDevices
+    let mirror: CameraMirror
+    let screenRecorder: ScreenRecorder
+    let voice: VoiceRecorder
 }
 
 @MainActor
@@ -156,7 +164,9 @@ final class IslandViewModel {
 
     let features: IslandFeatures
     var geometry = ScreenGeometry.current()
-    var selectedTab: IslandModule = .home
+    var selectedTab: IslandModule = .home {
+        didSet { if selectedTab != .tools { features.mirror.stop() } }
+    }
     var clockMode: ClockMode = .timer
     var notesMode = NotesMode.notes
     var state: State = .compact {
@@ -164,6 +174,7 @@ final class IslandViewModel {
             if state == .compact {
                 toolsExpanded = false
                 calendarExpanded = false
+                features.mirror.stop()
             }
         }
     }
@@ -187,6 +198,8 @@ final class IslandViewModel {
 
     /// Opens a module in its own window. Set by the app, which owns the windows.
     @ObservationIgnored var onOpenWindow: ((IslandModule) -> Void)?
+    /// Lets the person choose what to record. Tests replace it.
+    @ObservationIgnored var pickRegion: (@escaping (RegionSelection) -> Void) -> Void = { RegionPicker.shared.present(completion: $0) }
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var alertTask: Task<Void, Never>?
     @ObservationIgnored private var bannerTask: Task<Void, Never>?
@@ -208,7 +221,11 @@ final class IslandViewModel {
         if let banner { return [.banner(banner)] }
         var list: [CompactActivity] = []
         if let alert { list.append(.alert(alert)) }
-        if features.privacy.isMicrophoneInUse { list.append(.microphone) }
+        if features.screenRecorder.isRecording { list.append(.recording(.screen)) }
+        if features.voice.isRecording { list.append(.recording(.voice)) }
+        // MacIsland's own voice note is already shown as a recording, not as another app on the microphone.
+        let recordingItself = features.voice.isRecording && features.privacy.microphoneAppBundleID == nil
+        if features.privacy.isMicrophoneInUse, !recordingItself { list.append(.microphone) }
         if features.timer.isActive { list.append(.timer) }
         if features.pomodoro.isActive { list.append(.pomodoro) }
         if features.stopwatch.isActive { list.append(.stopwatch) }
@@ -269,7 +286,7 @@ final class IslandViewModel {
         case .alert: return 64
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .transfer: return 52
-        case .working: return 64
+        case .working, .recording: return 64
         case .media: return geometry.notchSize.height + 8
         }
     }
@@ -293,6 +310,7 @@ final class IslandViewModel {
         switch compactActivity {
         case .timer, .pomodoro, .stopwatch: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)
+        case .recording: Theme.Metrics.glanceHeight
         default: Theme.Metrics.idlePeekHeight
         }
     }
@@ -325,9 +343,12 @@ final class IslandViewModel {
         case .shelf: Theme.Metrics.shelfHeight
         case .clock:
             Theme.Metrics.clockRing + (clockMode == .pomodoro ? Theme.Metrics.pomodoroStatsHeight : 0)
-        case .tools: (toolsExpanded ? Theme.Metrics.toolsGridHeight : Theme.Metrics.toolsRowHeight)
-            + (features.ringLight.isOn ? Theme.Metrics.ringLightControlsHeight : 0)
-            + (features.keepAwake.isOn ? Theme.Metrics.keepAwakeChipsHeight : 0)
+        case .tools:
+            features.mirror.isOn
+                ? Theme.Metrics.mirrorHeight
+                : (toolsExpanded ? Theme.Metrics.toolsGridHeight : Theme.Metrics.toolsRowHeight)
+                    + (features.ringLight.isOn ? Theme.Metrics.ringLightControlsHeight : 0)
+                    + (features.keepAwake.isOn ? Theme.Metrics.keepAwakeChipsHeight : 0)
         case .notes: Theme.Metrics.notesHeight
         case .reminders: Theme.Metrics.remindersHeight
         case .agents: Theme.Metrics.glanceHeight
@@ -367,6 +388,8 @@ final class IslandViewModel {
 
     /// The compact play/pause control. Hovering it doesn't open the island, so it can be clicked.
     var compactControlRect: CGRect? {
+        // A screen recording is one big stop button.
+        if presentation == .compact, compactActivity == .recording(.screen), compactPair == nil { return hitRect }
         guard presentation == .compact, compactActivity == .media, compactPair == nil else { return nil }
         let rect = hitRect
         let start = geometry.screenFrame.midX + geometry.notchSize.width / 2
@@ -432,6 +455,83 @@ final class IslandViewModel {
         withAnimation(Theme.Motion.resize) { notesMode = mode }
     }
 
+    // MARK: Capture
+
+    /// Shows the camera in the Tools tab, and keeps the island open while it is there.
+    func startMirror() {
+        guard !features.mirror.isOn else { return }
+        selectedTab = .tools
+        holdOpen()
+        open()
+        Task { await features.mirror.toggle() }
+    }
+
+    func stopMirror() {
+        features.mirror.stop()
+        isPinnedOpen = false
+    }
+
+    func toggleMirror() {
+        features.mirror.isOn ? stopMirror() : startMirror()
+    }
+
+    /// Stops a recording in progress; otherwise folds the island away and lets the person choose what to record.
+    func toggleScreenRecording() {
+        if features.screenRecorder.isRecording {
+            stopScreenRecording()
+            return
+        }
+        closePinned()
+        pickRegion { [weak self] selection in
+            guard let self else { return }
+            switch selection {
+            case .cancelled: break
+            case .display: Task { await self.features.screenRecorder.start(region: nil) }
+            case .region(let rect): Task { await self.features.screenRecorder.start(region: rect) }
+            }
+        }
+    }
+
+    func stopScreenRecording() {
+        Task { await features.screenRecorder.stop() }
+    }
+
+    /// Starts or stops a voice note. A muted microphone would record silence, so it offers to unmute first.
+    func toggleVoiceNote() {
+        let voice = features.voice
+        if voice.isRecording {
+            Task { await voice.stop() }
+            return
+        }
+        if features.micMute.isMuted {
+            showBanner(
+                IslandBanner(
+                    systemImage: "mic.slash.fill",
+                    tint: Theme.Tint.neutral,
+                    title: "Mic Is Muted",
+                    detail: "Unmute it to record a voice note",
+                    actions: [.init(title: "Unmute") { [weak self] in
+                        self?.features.micMute.toggle()
+                        Task { await voice.start() }
+                    }]
+                ),
+                for: .seconds(8),
+                respectingFocus: false
+            )
+            return
+        }
+        Task { await voice.start() }
+    }
+
+    /// Tapping the compact island opens it, except while recording the screen, where it stops.
+    func tapCompact() {
+        if compactActivity == .recording(.screen), compactPair == nil {
+            stopScreenRecording()
+        } else {
+            open()
+        }
+    }
+
     func holdOpen() {
         hoverTask?.cancel()
         isPinnedOpen = true
@@ -461,7 +561,7 @@ final class IslandViewModel {
                         tint: Theme.Tint.attention,
                         title: "Reminders Access Is Off",
                         detail: "Allow it to add reminders",
-                        action: .init(title: "Allow Access") { AgendaMonitor.openRemindersSettings() }
+                        actions: [.init(title: "Allow Access") { AgendaMonitor.openRemindersSettings() }]
                     ),
                     for: .seconds(6),
                     respectingFocus: false
@@ -681,8 +781,8 @@ final class IslandViewModel {
         if !isHovering { scheduleBannerDismissal(after: duration) }
     }
 
-    func performBannerAction() {
-        banner?.action?.perform()
+    func performBannerAction(at index: Int = 0) {
+        if let banner, banner.actions.indices.contains(index) { banner.actions[index].perform() }
         bannerFollowUp = nil
         dismissBanner()
     }

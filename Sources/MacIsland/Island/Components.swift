@@ -60,6 +60,8 @@ struct ChipButton: View {
     var systemImage: String?
     var isSelected = false
     var accessibilityLabel: String?
+    /// The main choice of two: filled like a selected chip, without claiming to be selected.
+    var isProminent = false
     /// Stretch to share a row equally with other chips.
     var fillsWidth = false
     let action: () -> Void
@@ -77,11 +79,11 @@ struct ChipButton: View {
             }
             .frame(maxWidth: fillsWidth ? .infinity : nil)
             .font(Theme.Typography.bodyEmphasized)
-            .foregroundStyle(isSelected ? Theme.Palette.inverse : Theme.Palette.primary)
+            .foregroundStyle(isSelected || isProminent ? Theme.Palette.inverse : Theme.Palette.primary)
             .padding(.horizontal, 10)
             .frame(minHeight: 24)
             .background(
-                isSelected ? Theme.Palette.primary : (isHovering ? Theme.Palette.fillHover : Theme.Palette.fill),
+                isSelected || isProminent ? Theme.Palette.primary : (isHovering ? Theme.Palette.fillHover : Theme.Palette.fill),
                 in: Capsule()
             )
             .contentShape(Capsule())

@@ -188,6 +188,15 @@ by `MarkdownText` first), `AVAssetExportSession` and `AVAssetImageGenerator` for
 PDF a document makes) run on the main actor; everything else runs detached. `TextRecognizing` puts Vision behind a protocol so
 tests use a stub.
 
+**Capture.** `CameraMirror`, `ScreenRecorder`, and `VoiceRecorder` each sit in front of a protocol (`CameraSessionProviding`,
+`ScreenRecording`, `Transcribing`), so tests never open a camera, record a screen, or listen. Nothing runs until a person starts
+it. The camera is a preview layer on a private serial queue, so no frames reach the app; the view model stops it when the island
+folds or the tab changes (`state` and `selectedTab` observers). Screen recording is ScreenCaptureKit's `SCRecordingOutput` writing
+a movie, with MacIsland's own app excluded from the filter; `RegionPicker` is a full-screen `.screenSaver` panel. A voice note is
+an `AVAudioEngine` tap feeding both an .m4a and the on-device `SpeechAnalyzer`. `CompactActivity.recording(kind)` shows any of
+them; a screen recording is excluded from hover like the compact play button, and clicking it stops it. Banners carry up to two
+actions (`IslandBanner.actions`).
+
 ---
 
 ## Drawing: container, surfaces, motion
@@ -319,6 +328,8 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Shelf files | UserDefaults | `shelf.paths` (paths only; the files stay where they are) |
 | Pomodoro history | UserDefaults | `pomodoro.history` (JSON: sessions per day) |
 | Notes and snippets | JSON file | `~/Library/Application Support/MacIsland/notes.json` |
+| Voice Notes | .m4a files | `~/Library/Application Support/MacIsland/Voice Notes/` (kept; the text goes in a note) |
+| Screen recordings | .mov files | `~/Movies/Screen Recording <date>.mov` (kept; also on the Shelf) |
 | Clipboard history | Memory only | Never written to disk |
 | Lyrics cache | Memory only | Per track, per launch |
 
@@ -338,7 +349,11 @@ macOS asks when a feature first needs access. `Support/Info.plist` holds the rea
 | Focus status | Quiet in Focus, Focus tool | `NSFocusStatusUsageDescription` |
 | Downloads folder | Download progress | `NSDownloadsFolderUsageDescription` |
 | Automation (Apple Events) | Music and Spotify: volume, Favorite, play/pause | `NSAppleEventsUsageDescription` |
-| Accessibility | Clean Keys (an event tap) | (system prompt; no key) |
+| Accessibility | Clean Keys (an event tap), Lock Screen (posts a key) | (system prompt; no key) |
+| Camera | Mirror | `NSCameraUsageDescription` |
+| Microphone | Voice Note | `NSMicrophoneUsageDescription` |
+| Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
+| Screen Recording | Record Screen | (system prompt via `CGRequestScreenCaptureAccess`; no key) |
 
 `LSUIElement` is true (no Dock icon). The app is **ad-hoc signed**, so each rebuild is a new identity to macOS and permissions ask
 again; `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
@@ -363,7 +378,7 @@ Web searches are opened in your default browser. There is no analytics and no ac
 | `/usr/bin/shortcuts` (`list`, `run`) | Shortcuts in the palette |
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
 | `CGEvent` posting | Lock Screen (Control-Command-Q), which needs Accessibility |
-| `NSAppleScript` | Music and Spotify control, Low Power Mode (`pmset` with an admin prompt); the dark-mode script in `SystemActions` is unused |
+| `NSAppleScript` | Music and Spotify control, Low Power Mode (`pmset` with an admin prompt) |
 
 ### Now Playing
 
@@ -376,7 +391,7 @@ transport goes through AppleScript instead, addressed to the app itself. See [SC
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **294 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **321 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

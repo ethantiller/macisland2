@@ -257,10 +257,10 @@ final class PaletteModel {
             let tool = catalog.item(for: id)
             list.append(Candidate(
                 item: PaletteItem(
-                    id: "tool-\(id.rawValue)", title: tool.title, subtitle: tool.isOn ? "Tool \u{00B7} On" : "Tool",
+                    id: "tool-\(id.rawValue)", title: tool.label ?? tool.title, subtitle: tool.isOn ? "Tool \u{00B7} On" : "Tool",
                     icon: .symbol(tool.systemImage)
                 ) { tool.action() },
-                names: [tool.title], bias: 30
+                names: [tool.title, tool.label ?? tool.title], bias: 30
             ))
         }
 
@@ -271,6 +271,13 @@ final class PaletteModel {
                 viewModel.open()
             },
             names: ["new note", "note"], bias: 20
+        ))
+        let recording = viewModel.voice.isRecording
+        list.append(Candidate(
+            item: PaletteItem(
+                id: "voice-note", title: recording ? "Stop Voice Note" : "Record Voice Note", subtitle: "Notes", icon: .symbol(recording ? "stop.fill" : "mic")
+            ) { [viewModel] in viewModel.toggleVoiceNote() },
+            names: ["voice note", "record voice note", "record audio", "dictate"], bias: 20
         ))
         list.append(Candidate(
             item: PaletteItem(id: "settings", title: "Settings", subtitle: "MacIsland", icon: .symbol("gearshape")) {

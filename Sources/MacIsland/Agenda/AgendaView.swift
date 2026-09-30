@@ -72,3 +72,25 @@ struct AgendaAction {
         }
     }
 }
+
+extension AgendaAction {
+    /// The banner five minutes before a meeting or when a reminder is due. A meeting with a call link gets **Join** and,
+    /// second, **Check Camera**, so there is a look at yourself before the call.
+    @MainActor
+    static func announcement(
+        for item: AgendaItem, agenda: AgendaMonitor, now: Date = Date(), checkCamera: @escaping @MainActor () -> Void
+    ) -> IslandBanner {
+        let isEvent = item.kind == .event
+        var actions = AgendaAction(item: item, agenda: agenda).map { [IslandBanner.Action(title: $0.title, perform: $0.perform)] } ?? []
+        if isEvent, item.joinURL != nil {
+            actions.append(.init(title: "Check Camera", perform: checkCamera))
+        }
+        return IslandBanner(
+            systemImage: isEvent ? "calendar" : "checklist",
+            tint: Theme.Tint.neutral,
+            title: item.title,
+            detail: isEvent ? AgendaRules.timeText(for: item, now: now) : "Due now",
+            actions: actions
+        )
+    }
+}

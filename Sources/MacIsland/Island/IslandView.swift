@@ -33,15 +33,15 @@ struct IslandView: View {
                         .transition(Theme.Motion.content)
                 case .banner:
                     if let banner = viewModel.banner {
-                        BannerContent(banner: banner, notchHeight: notchSize.height, edgeInset: edgeInset) {
-                            viewModel.performBannerAction()
+                        BannerContent(banner: banner, notchHeight: notchSize.height, edgeInset: edgeInset) { index in
+                            viewModel.performBannerAction(at: index)
                         }
                         .transition(Theme.Motion.content)
                     }
                 case .compact:
                     compactLayer
                         .contentShape(Rectangle())
-                        .onTapGesture { viewModel.open() }
+                        .onTapGesture { viewModel.tapCompact() }
                         .transition(.opacity)
                 }
             }
@@ -162,6 +162,8 @@ struct IslandView: View {
     @ViewBuilder
     private func pairSide(_ activity: CompactActivity) -> some View {
         switch activity {
+        case .recording(let kind):
+            RecordingGlyph(kind: kind)
         case .microphone:
             AppIcon(bundleID: viewModel.privacy.microphoneAppBundleID, fallback: "mic.fill")
         case .timer:
@@ -191,6 +193,8 @@ struct IslandView: View {
             } else {
                 Glyph(systemName: alert.systemImage, tint: alert.tint)
             }
+        case .recording(let kind):
+            RecordingGlyph(kind: kind)
         case .microphone:
             AppIcon(bundleID: viewModel.privacy.microphoneAppBundleID, fallback: "mic.fill")
         case .timer:
@@ -220,6 +224,10 @@ struct IslandView: View {
                 .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+        case .recording(let kind):
+            if let since = kind == .screen ? viewModel.screenRecorder.startedAt : viewModel.voice.startedAt {
+                ElapsedText(since: since, tint: Theme.Tint.working)
+            }
         case .microphone:
             if let since = viewModel.privacy.microphoneSince {
                 ElapsedText(since: since)
@@ -356,7 +364,7 @@ private struct BannerContent: View {
     let banner: IslandBanner
     let notchHeight: CGFloat
     let edgeInset: CGFloat
-    let onAction: () -> Void
+    let onAction: (Int) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -379,9 +387,14 @@ private struct BannerContent: View {
             .lineLimit(1)
             .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
-            if let action = banner.action {
-                ChipButton(title: action.title, action: onAction)
+            // With two actions the first is the main one. The buttons keep their full names; the title gives way.
+            HStack(spacing: 6) {
+                ForEach(Array(banner.actions.prefix(2).enumerated()), id: \.offset) { index, action in
+                    ChipButton(title: action.title, isProminent: index == 0 && banner.actions.count > 1) { onAction(index) }
+                }
             }
+            .fixedSize()
+            .layoutPriority(1)
         }
         .padding(.horizontal, edgeInset)
         .padding(.top, notchHeight)
@@ -409,12 +422,13 @@ private struct AppIcon: View {
 
 private struct ElapsedText: View {
     let since: Date
+    var tint: Color?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             Text(formatTime(context.date.timeIntervalSince(since)))
                 .font(Theme.Typography.compactNumeral)
-                .foregroundStyle(Theme.Palette.primary)
+                .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
         }
     }
 }
@@ -485,5 +499,16 @@ private struct WorkingGlyph: View {
     var body: some View {
         Glyph(systemName: "gearshape.2.fill", tint: Theme.Tint.working)
             .symbolEffect(.pulse)
+    }
+}
+
+/// Beside the notch while recording: the screen's record dot, or a waveform for a voice note, in the "in progress" blue.
+private struct RecordingGlyph: View {
+    let kind: RecordingKind
+
+    var body: some View {
+        Glyph(systemName: kind == .screen ? "record.circle.fill" : "waveform", tint: Theme.Tint.working)
+            .symbolEffect(.pulse)
+            .accessibilityLabel(kind == .screen ? "Recording the screen" : "Recording a voice note")
     }
 }

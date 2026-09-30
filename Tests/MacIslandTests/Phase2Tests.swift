@@ -134,21 +134,6 @@ struct KeepAwakeDurationTests {
     }
 }
 
-struct DeviceBatteryTests {
-    @Test func keepsValidLevelsOncePerDevice() {
-        let devices = DeviceBatteries.parse([
-            ["Product": "Magic Mouse", "BatteryPercent": 82],
-            ["Product": "Magic Mouse", "BatteryPercent": 82],
-            ["Product": "Magic Keyboard", "BatteryPercent": 40],
-            ["Product": "Broken", "BatteryPercent": 250],
-            ["Product": "No Battery"],
-            ["BatteryPercent": 10],
-        ])
-        #expect(devices.map(\.name) == ["Magic Keyboard", "Magic Mouse"])
-        #expect(devices.map(\.systemImage) == ["keyboard", "magicmouse"])
-    }
-}
-
 struct DriveAndScreenshotTests {
     @Test func onlyExternalEjectableLocalDrivesAreAnnounced() {
         #expect(VolumeMonitor.isEjectableDrive(isLocal: true, isBrowsable: true, isInternal: false, isEjectable: true))

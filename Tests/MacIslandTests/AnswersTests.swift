@@ -269,7 +269,7 @@ struct URLCommandTests {
         now += 1.5
         runner.run(.banner(title: "Third", detail: nil, symbol: "not.a.real.symbol.name"))
         #expect(viewModel.banner?.title == "Third" && viewModel.banner?.systemImage == "bell.fill")
-        #expect(viewModel.banner?.action == nil)
+        #expect(viewModel.banner?.actions.isEmpty == true)
     }
 
     @Test func commandsDriveTheApp() {
@@ -306,7 +306,5 @@ struct LockScreenTests {
         #expect(ToolID.allCases.contains(.lockScreen))
         let tool = ToolCatalog(viewModel: TestSupport.makeViewModel()).item(for: .lockScreen)
         #expect(tool.title == "Lock Screen" && tool.systemImage == "lock.fill")
-        // Nine tools and Less fill the 5 x 2 grid.
-        #expect(ToolID.allCases.count + 1 == 10)
     }
 }

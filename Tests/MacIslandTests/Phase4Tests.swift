@@ -212,46 +212,6 @@ struct WeatherTests {
     }
 }
 
-struct SystemStatsTests {
-    @Test func cpuUsageIsBusyOverTotal() {
-        let usage = SystemStats.cpuUsage(
-            previous: .init(busy: 100, total: 1000), current: .init(busy: 300, total: 1400)
-        )
-        #expect(usage == 0.5)
-        #expect(SystemStats.cpuUsage(previous: .init(busy: 5, total: 10), current: .init(busy: 5, total: 10)) == 0)
-    }
-
-    @Test func networkRateIgnoresCountersThatWentBackwards() {
-        #expect(SystemStats.rate(from: 1000, to: 3000, over: 2) == 1000)
-        #expect(SystemStats.rate(from: 3000, to: 1000, over: 2) == 0)
-    }
-
-    @Test func ratesAreReadable() {
-        #expect(SystemStats.formatRate(0) == "0 B/s")
-        #expect(SystemStats.formatRate(1_500) == "1.5 KB/s")
-        #expect(SystemStats.formatRate(250_000) == "250 KB/s")
-        #expect(SystemStats.formatRate(3_200_000) == "3.2 MB/s")
-    }
-
-    @Test func realReadingsAreSane() {
-        let ticks = SystemStats.readCPUTicks()
-        #expect(ticks.total > 0 && ticks.busy <= ticks.total)
-        let memory = SystemStats.readMemoryFraction()
-        #expect(memory > 0 && memory <= 1)
-    }
-
-    @MainActor
-    @Test func sampleNeedsABaselineThenReports() {
-        let stats = SystemStats()
-        stats.sample()
-        #expect(stats.snapshot == nil)
-        stats.sample(now: Date().addingTimeInterval(2))
-        #expect(stats.snapshot != nil)
-        stats.reset()
-        #expect(stats.snapshot == nil)
-    }
-}
-
 // MARK: Shelf
 
 struct SmartActionTests {
@@ -482,14 +442,15 @@ struct CleanKeyboardTests {
         #expect(!cleaner.isLocked)
     }
 
-    @Test func toolsGridHoldsEveryToolInTwoRowsOfFive() {
-        #expect(ToolID.allCases.count == 9)
-        #expect(ToolID.allCases.count + 1 <= 2 * 5)
+    @Test func toolsGridHoldsEveryToolInTwoRowsOfSix() {
+        #expect(ToolID.allCases.count == 11)
+        // Eleven tools and Less make twelve: two rows of six.
+        #expect(ToolID.allCases.count + 1 <= 2 * 6)
         let defaults = UserDefaults(suiteName: "MacIslandTools8")!
         defaults.removePersistentDomain(forName: "MacIslandTools8")
         let settings = AppSettings(defaults: defaults)
         settings.pinLimit = .eight
-        // Nine tools no longer fit the widest row, so the row keeps its More button.
+        // Eleven tools do not fit the widest row, so the row keeps its More button.
         #expect(!settings.rowShowsEveryTool && settings.visiblePinned.count == 8)
     }
 }

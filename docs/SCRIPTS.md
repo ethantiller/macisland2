@@ -56,7 +56,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 294 tests, about a second.
+lines; 321 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -114,7 +114,7 @@ Formats in place with `swift format format`, using [`.swift-format`](#config-fil
 | File | Contains |
 | --- | --- |
 | `Package.swift` | Tools version 6.2, `platforms: [.macOS(.v26)]`, an executable target `MacIsland` (`Sources/MacIsland`) and a test target `MacIslandTests` (`Tests/MacIslandTests`), both in **Swift 5 language mode**. No dependencies |
-| `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events, and the `macisland` URL scheme |
+| `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events, Camera, Microphone, Speech recognition, and the `macisland` URL scheme |
 | `.swift-format` | 4-space indent, 120-column lines, at most one blank line, existing line breaks respected; rules that would fight this codebase's style (force unwraps, naming, doc comments) are off; imports must be ordered |
 | `.gitignore` | `.build/`, `.swiftpm/`, `build/`, Xcode user data, `.DS_Store`, secrets files, and `.claude` |
 | `CLAUDE.md` | Instructions Claude Code loads in this repo: read the design doc first, tokens and components only, where things live, the commands |
@@ -202,16 +202,19 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 | File | Contains |
 | --- | --- |
-| `ToolID.swift` | The eight tools and the default pins |
+| `ToolID.swift` | The eleven tools and the default pins |
 | `ToolCatalog.swift` | What each tool is and does (shared by the Tools tab, Home, the peek, and the palette) |
-| `ToolsView.swift` | The Tools tab: row, grid, Ring Light sliders, Keep Awake chips |
+| `ToolsView.swift` | The Tools tab: row (or the Mirror), grid, Ring Light sliders, Keep Awake chips; `ControlButton` |
+| `CameraMirror.swift` | `CameraMirror`, `CameraSessionProviding`, the AVFoundation provider, and the preview layer view |
+| `MirrorView.swift` | The Mirror: preview, Ring Light, Done |
+| `ScreenRecorder.swift` | `ScreenRecorder` (30-minute cap), the ScreenCaptureKit recorder, and `RegionPicker` |
 | `KeepAwake.swift` | The power assertion, with durations |
 | `LowPowerMode.swift` | Reads Low Power Mode and toggles it (admin prompt) |
 | `RingLight.swift` | The screen-edge glow (a click-through window) |
 | `MicrophoneMute.swift` | Mutes the default input device |
 | `KeyboardCleaner.swift` | The event tap that swallows keys for 30 seconds |
 | `AudioOutputs.swift` | Output devices and the default one |
-| `SystemActions.swift` | Eyedropper, hex strings, clipboard, area screenshot |
+| `SystemActions.swift` | Eyedropper, hex strings, clipboard, area screenshot, Lock Screen |
 
 ### `Agenda/`
 
@@ -226,6 +229,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | File | Contains |
 | --- | --- |
 | `Notes/NotesModel.swift` | Notes and snippets, saved as one JSON file after a pause in typing |
+| `Notes/VoiceRecorder.swift` | `VoiceRecorder` (10-minute cap), `Transcribing`, the level meter, and the on-device Speech transcriber |
 | `Notes/NotesView.swift` | The Notes tab: lists, editors, the Prompter |
 | `Weather/WeatherModel.swift` | Open-Meteo geocoding and forecast (with quarter-hour rain), WMO code names, `WeatherGlance` |
 | `Weather/RainRule.swift` | `RainSample`, `RainRule` (dry now, 0.2 mm within 30 minutes), `RainSpell` (once per spell) |
@@ -245,8 +249,6 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | File | Contains |
 | --- | --- |
 | `System/BatteryMonitor.swift` | Charger, 20% and 10%, and the full-charge level; the battery glyph |
-| `System/DeviceBatteries.swift` | Wireless mouse, keyboard, and trackpad batteries from the IORegistry (built, tested, **not shown anywhere now**) |
-| `System/SystemStats.swift` | CPU, memory, and network readings (built, tested, **not shown anywhere now**) |
 | `System/VolumeMonitor.swift` | External drive mounts, and eject |
 | `System/AudioAccessoryMonitor.swift` | Bluetooth headphones connecting, and their battery |
 | `System/PrivacyMonitor.swift` | Which app is using the microphone |
@@ -270,7 +272,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 18 files, about 3,700 lines, **294 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 18 files, about 3,700 lines, **321 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -280,15 +282,16 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `SettingsTests.swift` | Hotkey, tabs |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
-| `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, device batteries, drives, screenshots |
+| `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |
 | `PlanFeatureTests.swift` | Agenda rules, meeting links, pinned tools, drop tiles |
 | `MediaTests.swift` | LRC, lyrics, transport, shuffle and repeat, players |
-| `Phase4Tests.swift` | Pomodoro, month grid, weather, stats, smart actions, file tools, notes, Clean Keys, reminders, the strip, the tab sides |
+| `Phase4Tests.swift` | Pomodoro, month grid, weather, smart actions, file tools, notes, Clean Keys, reminders, the strip, the tab sides |
 | `Phase5Tests.swift` | Search engines, ranking, parsers, apps, Shortcuts, the palette model, menu bar and windows, the player layout, transport routing |
 | `ShelfToolsTests.swift` | File kinds and targets, Copy Text, document, PDF, image, audio, and video conversions |
 | `ClipboardTests.swift` | History search, plain-text copy, Save as Snippet, the `clip` palette rows |
 | `AnswersTests.swift` | Definitions, units, the calculator, currency parsing and rates, the answer rows, `macisland://` links, Lock Screen |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
+| `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
 
 ---

@@ -7,7 +7,8 @@ import Observation
 @MainActor
 @Observable
 final class MicrophoneMute {
-    private(set) var isMuted = false
+    /// Read from the device; tests set it to stand in for one.
+    var isMuted = false
     private(set) var isAvailable = false
 
     @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?

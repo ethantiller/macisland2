@@ -1,14 +1,19 @@
 import AppKit
+import AVFoundation
 @testable import MacIsland
 
 /// One place that builds a view model from test doubles, so adding a feature to
 /// `IslandFeatures` only changes this file.
 @MainActor
 enum TestSupport {
-    static func makeViewModel(rates: ExchangeRates? = nil, bluetooth: StubBluetooth? = nil) -> IslandViewModel {
+    static func makeViewModel(
+        rates: ExchangeRates? = nil, bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
+        screen: StubScreen? = nil, transcriber: StubTranscriber? = nil
+    ) -> IslandViewModel {
         UserDefaults(suiteName: "MacIslandTests")!.removePersistentDomain(forName: "MacIslandTests")
         let shelf = ShelfModel()
         let work = WorkTracker()
+        let notes = NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         var geometry = ScreenGeometry.current()
         geometry.notchSize = CGSize(width: 179, height: 32)
         geometry.hasNotch = true
@@ -29,7 +34,6 @@ enum TestSupport {
             agenda: AgendaMonitor(),
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            batteries: DeviceBatteries(),
             pomodoro: PomodoroModel(defaults: UserDefaults(suiteName: "MacIslandTests")!),
             work: work,
             weather: WeatherModel(),
@@ -37,12 +41,17 @@ enum TestSupport {
                 shelf: shelf, work: work, recognizer: StubRecognizer(),
                 pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
             ),
-            notes: NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
+            notes: notes,
             keyboardCleaner: KeyboardCleaner(),
             launch: LaunchModel(appDirectories: []),
-            stats: SystemStats(),
             rates: rates ?? ExchangeRates(fetch: { _ in ([:], Date()) }),
-            bluetooth: BluetoothDevices(provider: bluetooth ?? StubBluetooth())
+            bluetooth: BluetoothDevices(provider: bluetooth ?? StubBluetooth()),
+            mirror: CameraMirror(provider: camera ?? StubCamera()),
+            screenRecorder: ScreenRecorder(recorder: screen ?? StubScreen(), shelf: shelf),
+            voice: VoiceRecorder(
+                transcriber: transcriber ?? StubTranscriber(), notes: notes, shelf: shelf,
+                folder: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            )
         ))
         viewModel.geometry = geometry
         return viewModel
@@ -74,5 +83,72 @@ final class StubBluetooth: BluetoothDeviceProviding {
     func disconnect(_ id: String) {
         disconnected.append(id)
         if let index = devices.firstIndex(where: { $0.id == id }) { devices[index].isConnected = false }
+    }
+}
+
+/// A camera that opens nothing.
+@MainActor
+final class StubCamera: CameraSessionProviding {
+    var access: CameraAccess = .granted
+    var allowsWhenAsked = true
+    var failsToStart = false
+    private(set) var starts = 0
+    private(set) var stops = 0
+
+    func requestAccess() async -> Bool {
+        access = allowsWhenAsked ? .granted : .denied
+        return allowsWhenAsked
+    }
+
+    func start() async throws -> AVCaptureSession {
+        if failsToStart { throw CameraError.noCamera }
+        starts += 1
+        return AVCaptureSession()
+    }
+
+    func stop() { stops += 1 }
+}
+
+/// A screen that records nothing, and hands back a fixed movie.
+@MainActor
+final class StubScreen: ScreenRecording {
+    var hasAccess = true
+    var allowsWhenAsked = false
+    var failsToStart = false
+    let movie = FileManager.default.temporaryDirectory.appendingPathComponent("Screen \(UUID().uuidString).mov")
+    private(set) var regions: [CGRect?] = []
+    private(set) var stops = 0
+
+    func requestAccess() -> Bool { allowsWhenAsked }
+
+    func start(region: CGRect?, on display: CGDirectDisplayID) async throws {
+        if failsToStart { throw FileToolError.failed("No display was found.") }
+        regions.append(region)
+    }
+
+    func stop() async throws -> URL {
+        stops += 1
+        return movie
+    }
+}
+
+/// A microphone that hears a fixed sentence.
+@MainActor
+final class StubTranscriber: Transcribing {
+    var transcript = "Buy milk and call the bank."
+    var failsToStart = false
+    var level: Float = 0.4
+    private(set) var file: URL?
+    private(set) var stops = 0
+
+    func start(writingTo file: URL) async throws {
+        if failsToStart { throw VoiceError.microphoneDenied }
+        self.file = file
+        try Data("audio".utf8).write(to: file)
+    }
+
+    func stop() async throws -> String {
+        stops += 1
+        return transcript
     }
 }

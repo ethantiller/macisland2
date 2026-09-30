@@ -22,6 +22,11 @@ struct NotesView: View {
                 SegmentedChoice(options: NotesMode.allCases, selection: mode, title: \.rawValue, onSelect: viewModel.setNotesMode)
                 .frame(width: 250)
                 Spacer(minLength: 0)
+                IconButton(
+                    systemName: viewModel.voice.isRecording ? "stop.fill" : "mic",
+                    label: viewModel.voice.isRecording ? "Stop Voice Note" : "Record Voice Note",
+                    size: 13
+                ) { viewModel.toggleVoiceNote() }
                 switch mode {
                 case .notes: IconButton(systemName: "square.and.pencil", label: "New Note", size: 13) { notes.addNote() }
                 case .snippets: IconButton(systemName: "plus", label: "New Snippet", size: 13) { notes.addSnippet() }
