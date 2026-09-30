@@ -4,7 +4,7 @@ enum GuideStepID: String, CaseIterable {
     case welcome, peek, open, tabs, close, modules, drop, menuBar, access, finish
 }
 
-/// What a practice line waits for on the real island.
+/// What a practice line waits for on the stage island, the one in the guide's window.
 enum PracticeGoal: Equatable {
     case peek, open, changeTab, close, dropFile
 
@@ -13,6 +13,18 @@ enum PracticeGoal: Equatable {
         var state: IslandViewModel.State
         var tab: IslandModule
         var isFileDragActive: Bool
+
+        init(state: IslandViewModel.State, tab: IslandModule, isFileDragActive: Bool) {
+            self.state = state
+            self.tab = tab
+            self.isFileDragActive = isFileDragActive
+        }
+
+        /// The island as it is right now.
+        @MainActor
+        init(_ viewModel: IslandViewModel) {
+            self.init(state: viewModel.state, tab: viewModel.selectedTab, isFileDragActive: viewModel.isFileDragActive)
+        }
     }
 
     func isMet(from old: Island, to new: Island) -> Bool {
@@ -32,22 +44,26 @@ struct GuideStep: Equatable {
     /// The guide version that added it. A re-run for someone who saw version n shows the steps with a newer `since`.
     let since: Int
     let practice: PracticeGoal?
-    /// What the stage shows. Nil for `menuBar`, which slides the band to the menu bar instead.
+    /// What the stage starts as. A practice step starts as the island is before what it teaches, never as it is after, so the person
+    /// does it. Nil for `menuBar`, which slides the band to the menu bar instead.
     let stage: PreviewContext?
+
+    /// Whether the stage answers to the pointer, a click, swipes, a dragged file, and the keys. The menu bar and the banner are
+    /// pictures.
+    var stageIsInteractive: Bool { id != .menuBar && id != .access }
 
     static let all: [GuideStep] = [
         GuideStep(id: .welcome, since: 1, practice: nil, stage: PreviewContext(presentation: .compact)),
-        GuideStep(id: .peek, since: 1, practice: .peek, stage: PreviewContext(presentation: .peek)),
+        GuideStep(id: .peek, since: 1, practice: .peek, stage: PreviewContext(presentation: .compact)),
+        GuideStep(id: .open, since: 1, practice: .open, stage: PreviewContext(presentation: .compact)),
+        // Open, on Home: changing the tab and closing are done to an island that is already open.
         GuideStep(
-            id: .open, since: 1, practice: .open, stage: PreviewContext(presentation: .expanded, tab: .home)),
+            id: .tabs, since: 1, practice: .changeTab, stage: PreviewContext(presentation: .expanded, tab: .home)),
         GuideStep(
-            id: .tabs, since: 1, practice: .changeTab, stage: PreviewContext(presentation: .expanded, tab: .media)),
-        GuideStep(id: .close, since: 1, practice: .close, stage: PreviewContext(presentation: .compact)),
+            id: .close, since: 1, practice: .close, stage: PreviewContext(presentation: .expanded, tab: .home)),
         GuideStep(
             id: .modules, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .home)),
-        GuideStep(
-            id: .drop, since: 1, practice: .dropFile,
-            stage: PreviewContext(presentation: .compact, tab: .shelf, fileDrag: true)),
+        GuideStep(id: .drop, since: 1, practice: .dropFile, stage: PreviewContext(presentation: .compact)),
         GuideStep(id: .menuBar, since: 1, practice: nil, stage: nil),
         GuideStep(
             id: .access, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .meeting)),
@@ -190,13 +206,20 @@ enum GuideCopy {
         return step.practice
     }
 
+    /// What a practice line asks for. The island to do it on is the one above, in the guide's window.
     static func prompt(_ goal: PracticeGoal, setup: GuideSetup) -> String {
         switch goal {
-        case .peek: "Try it: rest the pointer on \(setup.notch)."
-        case .open: "Try it: click \(setup.notch)."
-        case .changeTab: "Try it: open the island, then swipe sideways."
-        case .close: "Try it: open the island, then move the pointer away."
-        case .dropFile: "Try it: drag any file toward \(setup.notch)."
+        case .peek:
+            return "Try it: rest the pointer on the island above."
+        case .open:
+            if let combo = setup.openShortcut { return "Try it: click the island above, or press \(combo.display)." }
+            return "Try it: click the island above."
+        case .changeTab:
+            return "Try it: swipe sideways on the island above, or press \u{2190} or \u{2192}."
+        case .close:
+            return "Try it: move the pointer off the island above, or press Esc."
+        case .dropFile:
+            return "Try it: drag any file over the island above."
         }
     }
 

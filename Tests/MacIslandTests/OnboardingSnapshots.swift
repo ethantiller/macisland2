@@ -59,15 +59,14 @@ struct OnboardingSnapshots {
         let model = OnboardingModel(
             state: state, settings: island.settings, geometry: { island.geometry }, preview: preview,
             access: AccessModel(provider: access, settings: island.settings, onBluetoothAllowed: {}),
-            island: PracticeGoal.Island(state: .compact, tab: .home, isFileDragActive: false), replay: false,
-            startDeferredMonitors: {}, openSettings: {}, onEnd: { _ in })
+            replay: false, startDeferredMonitors: {}, openSettings: {}, onEnd: { _ in })
         return Guide(model: model, island: island)
     }
 
     private func renderGuide(_ guide: Guide, _ name: String) {
         for dark in [false, true] {
             png(
-                onGlass(OnboardingView(model: guide.model, island: guide.island), dark: dark),
+                onGlass(OnboardingView(model: guide.model), dark: dark),
                 dark ? "\(name)-dark" : name)
         }
     }

@@ -465,6 +465,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectKeyboard(panel: IslandPanel) {
         let viewModel = viewModel
         hotkey.onPress = { [weak panel] in
+            // While the first-run guide is up, the shortcut is practised on the island in its window, not on this one.
+            if OnboardingWindowController.shared.handleOpenShortcut() { return }
             viewModel.toggleFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }

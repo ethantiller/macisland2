@@ -98,20 +98,7 @@ final class MouseTracker {
     }
 
     private func perform(_ swipe: Swipe) {
-        guard viewModel.settings.swipesEnabled else { return }
-        switch swipe {
-        case .down where viewModel.presentation != .expanded:
-            viewModel.open()
-        case .up where viewModel.presentation == .expanded:
-            viewModel.closePinned()
-        case .left where viewModel.presentation == .expanded:
-            // The strip follows the fingers: swiping left moves toward the tab on the left.
-            viewModel.selectAdjacentTab(-1)
-        case .right where viewModel.presentation == .expanded:
-            viewModel.selectAdjacentTab(1)
-        default:
-            break
-        }
+        viewModel.perform(swipe)
     }
 
     /// While a file is dragged from another app, that app runs its own drag loop and we

@@ -1,15 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// The first-run guide's content: a header, the stage (the real island, drawn from sample data), the step's words, its detail,
+/// The first-run guide's content: a header, the stage (an island you can use, drawn from sample data), the step's words, its detail,
 /// and the footer. No native controls: every button is `ChipButton` or `IconButton`. Drawn on floating glass by
 /// `OnboardingRoot`, so ink is `Theme.Palette` with `\.islandSurface = .glass`.
 struct OnboardingView: View {
     @Bindable var model: OnboardingModel
-    /// The live island, which the practice checks watch.
-    let island: IslandViewModel
-    /// The live island folded back in: the guide can take the keyboard back from it.
-    var onFolded: () -> Void = {}
+
+    /// The island in this window: what the person practises on, and what the practice checks watch.
+    private var island: IslandViewModel { model.stageIsland }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
@@ -20,19 +19,17 @@ struct OnboardingView: View {
         }
         .frame(width: Theme.Metrics.guideWidth - 2 * Theme.Metrics.floatPadding)
         .onChange(of: model.step.id) { announce() }
-        // The practice checks watch the real island. No timers: each change is reported as it happens.
-        .onChange(of: island.state) { _, state in
+        // The practice checks watch the stage island. No timers: each change is reported as it happens.
+        .onChange(of: island.state) { observeIsland() }
+        .onChange(of: island.selectedTab) { _, tab in
             observeIsland()
-            if state == .compact { onFolded() }
+            model.stageChangedTab(tab)
         }
-        .onChange(of: island.selectedTab) { observeIsland() }
         .onChange(of: island.isFileDragActive) { observeIsland() }
     }
 
     private func observeIsland() {
-        model.observe(
-            PracticeGoal.Island(
-                state: island.state, tab: island.selectedTab, isFileDragActive: island.isFileDragActive))
+        model.observe(PracticeGoal.Island(island))
     }
 
     // MARK: Header and stage
@@ -48,15 +45,17 @@ struct OnboardingView: View {
 
     private var stage: some View {
         PreviewBand(model: model.preview)
+            // The stage is an island you can use: hover, click, swipe, drag a file over it, and the keys.
+            .stageInput(island, isOn: model.step.stageIsInteractive)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(stageLabel)
     }
 
+    /// What the stage shows right now. The island changes as it is used, so this reads it, not the step's starting context.
     private var stageLabel: String {
-        let context = model.preview.context
-        switch context.presentation {
-        case .menuBar: return "The menu bar, with a module\u{2019}s window open."
-        case .expanded: return "The island, open on \(context.tab.title)."
+        if model.preview.context.presentation == .menuBar { return "The menu bar, with a module\u{2019}s window open." }
+        switch island.presentation {
+        case .expanded: return "The island, open on \(island.selectedTab.title)."
         case .compact: return "The island, folded into the notch."
         case .peek: return "The island, peeking."
         case .banner: return "The island, showing a banner."
@@ -257,7 +256,7 @@ private struct AccessRow: View {
     }
 }
 
-/// "Try it: ..." until the real island does it, then a green check. Green means done, and sits beside its glyph. A practice
+/// "Try it: ..." until the island in the window does it, then a green check. Green means done, and sits beside its glyph. A practice
 /// check never blocks Continue and never advances on its own.
 private struct PracticeLine: View {
     let prompt: String
@@ -292,18 +291,20 @@ private struct PracticeLine: View {
 /// The guide as the window shows it: on floating glass, arriving from the notch with the `float` motion.
 struct OnboardingRoot: View {
     let model: OnboardingModel
-    let island: IslandViewModel
-    var onFolded: () -> Void = {}
 
     @State private var arrived = false
 
     var body: some View {
-        OnboardingView(model: model, island: island, onFolded: onFolded)
+        OnboardingView(model: model)
             .floatingGlass()
             // Dragging anywhere that isn't a control moves the window. The panel's `isMovableByWindowBackground` alone did not
-            // move it (found by hand), so the drag is SwiftUI's. A button's own click wins over this, so the controls still work.
-            .contentShape(RoundedRectangle(cornerRadius: Theme.Metrics.floatRadius, style: .continuous))
-            .gesture(WindowDragGesture())
+            // move it (found by hand), so the drag is SwiftUI's. It is a layer behind everything, not a gesture on everything, so
+            // a control in front of it is always hit first and its click never has to compete with the drag.
+            .background {
+                Color.clear
+                    .contentShape(RoundedRectangle(cornerRadius: Theme.Metrics.floatRadius, style: .continuous))
+                    .gesture(WindowDragGesture())
+            }
             .environment(\.islandSurface, .glass)
             // Scale and fade in; opacity only under Reduce Motion. A modifier, not a transition, so the window can be sized
             // from the view's fitting size before it has arrived.

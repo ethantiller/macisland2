@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import Observation
 
@@ -35,7 +36,7 @@ final class OnboardingModel {
 
     init(
         state: OnboardingState, settings: AppSettings, geometry: @escaping () -> ScreenGeometry,
-        preview: IslandPreviewModel, access: AccessModel, island: PracticeGoal.Island, replay: Bool,
+        preview: IslandPreviewModel, access: AccessModel, replay: Bool,
         startDeferredMonitors: @escaping () -> Void, openSettings: @escaping () -> Void,
         onEnd: @escaping (GuideEnding) -> Void
     ) {
@@ -48,10 +49,13 @@ final class OnboardingModel {
         self.startDeferredMonitors = startDeferredMonitors
         openSettingsWindow = openSettings
         self.onEnd = onEnd
-        lastIsland = island
+        lastIsland = PracticeGoal.Island(preview.viewModel)
         flow = OnboardingFlow.make(seen: state.guideSeen, replay: replay, allAccessAllowed: access.allAllowed)
         showStage(animated: false)
     }
+
+    /// The island in the guide's window, which the practice checks watch and the keys drive.
+    var stageIsland: IslandViewModel { preview.viewModel }
 
     /// The person's own setup, which the copy follows.
     var setup: GuideSetup {
@@ -85,6 +89,13 @@ final class OnboardingModel {
         showStage()
     }
 
+    /// The stage island changed its tab on its own (a swipe, an arrow key). The Seven Modules step follows, so its chips and its line
+    /// keep naming what is showing.
+    func stageChangedTab(_ tab: IslandModule) {
+        guard step.id == .modules, tab != chosenModule else { return }
+        chosenModule = tab
+    }
+
     /// Continue, or Done on the last step.
     func advance() {
         if flow.isLast { finish() } else { next() }
@@ -102,6 +113,8 @@ final class OnboardingModel {
         } else if let stage = step.stage {
             preview.show(stage, animated: animated)
         }
+        // Moving between steps is not doing what a step teaches: what the island changed to here is the new starting point.
+        lastIsland = PracticeGoal.Island(stageIsland)
     }
 
     // MARK: Open at Login
@@ -116,13 +129,41 @@ final class OnboardingModel {
 
     // MARK: Practice
 
-    /// The live island changed. Marks the current step's goal met when this change is what it waits for.
+    /// The stage island changed. Marks the current step's goal met when this change is what it waits for.
     func observe(_ island: PracticeGoal.Island) {
         defer { lastIsland = island }
         guard let goal = practice, !practiceMet.contains(step.id), goal.isMet(from: lastIsland, to: island) else {
             return
         }
         practiceMet.insert(step.id)
+    }
+
+    // MARK: Keys
+
+    /// Esc, ←, and → from the guide's window, for the stage island. Returns whether the key was taken.
+    ///
+    /// Esc is always taken: it closes the stage island when that is open and does nothing otherwise, and it never ends the guide,
+    /// which only its own buttons do.
+    func handleKey(_ keyCode: UInt16) -> Bool {
+        switch Int(keyCode) {
+        case kVK_Escape:
+            if step.stageIsInteractive, stageIsland.state != .compact { stageIsland.closePinned() }
+            return true
+        case kVK_LeftArrow, kVK_RightArrow:
+            guard step.stageIsInteractive, stageIsland.state == .expanded else { return false }
+            stageIsland.selectAdjacentTab(Int(keyCode) == kVK_LeftArrow ? -1 : 1)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The open shortcut, while the guide is up: it opens or closes the stage island and pins it, as it does the real island. False
+    /// when this step's stage is a picture, so the shortcut goes to the real island as usual.
+    func toggleStageFromKeyboard() -> Bool {
+        guard step.stageIsInteractive else { return false }
+        stageIsland.toggleFromKeyboard()
+        return true
     }
 
     // MARK: Ending

@@ -64,7 +64,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 617 tests, about a second.
+lines; 628 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -155,6 +155,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `OnboardingFlow.swift` | `GuideStepID`, `PracticeGoal`, `GuideStep`, `OnboardingFlow`, `GuideSetup`, `GuideCopy` (every sentence) |
 | `OnboardingModel.swift` | `OnboardingModel` (walks the steps, practice, Skip, Done, Close, Open Settings) and `GuideEnding` |
 | `OnboardingView.swift` | The guide's content (`OnboardingView`), the window's root on glass (`OnboardingRoot`), the access rows and practice line |
+| `StageInput.swift` | `.stageInput(_:isOn:)`: makes the stage island answer to hover, a click, swipes, and a dragged file |
 | `AccessRequests.swift` | `AccessKind`, `AccessProviding`, `LiveAccess`, `AccessModel` |
 | `BluetoothAccess.swift` | Asks for Bluetooth through `CBCentralManager` and returns the answer |
 
@@ -318,7 +319,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **617 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **628 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |

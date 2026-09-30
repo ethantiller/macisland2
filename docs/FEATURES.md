@@ -370,26 +370,26 @@ Note picks a note. Right-click any widget on the real island and choose **Edit H
 
 ## First run
 
-The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it anywhere that isn't a control), with the real island as its
-stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
+The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it anywhere that isn't a control), with an island you can
+use as its stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
 
 | # | Step | What it shows |
 | --- | --- | --- |
 | 1 | Welcome to MacIsland | The compact island with music |
-| 2 | Rest the Pointer to Peek | The peek, and a practice line |
-| 3 | Open It | Expanded Home, your shortcut as key caps, and a practice line |
-| 4 | Change Tabs | Expanded Media, the arrows as key caps, and a practice line |
-| 5 | Fold It Away | The compact island, Esc, and a practice line |
+| 2 | Rest the Pointer to Peek | A closed island to rest the pointer on, and a practice line |
+| 3 | Open It | A closed island to click, your shortcut as key caps, and a practice line |
+| 4 | Change Tabs | An open island on Home, the arrows as key caps, and a practice line |
+| 5 | Fold It Away | An open island on Home, Esc, and a practice line |
 | 6 | Seven Modules | A chip per module; the stage shows the one you choose |
-| 7 | Drop Files on It | The drop target your setting chose, and a practice line |
+| 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line |
 | 8 | Keep a Module Close | The menu bar sliding in |
 | 9 | Allow What You'll Use | Calendars, Reminders, and Bluetooth rows (Allow, Allowed, or Open Settings), and a note on what is asked later. Left out when all three are already allowed |
 | 10 | Make It Yours | Open at Login, Open Settings, Done |
 
-The **practice lines** ("Try it: ...") watch the real island and turn green, beside a check, when you do it; they never block
+The **practice lines** ("Try it: ...") watch the island in the window and turn green, beside a check, when you do it there (hover, click or swipe it, drag a file over it, or use Esc, the arrows, or your open shortcut, which goes to it while the guide is up); a file dragged over it is never dropped. They never block
 Continue. The words follow your setup: with no open shortcut the key caps and the keyboard sentences go, the drop step follows
-"When You Drag a File", and a Mac without a notch says "the top center of the screen". **Esc and the arrows are not bound in the
-guide**: they belong to the island.
+"When You Drag a File", and a Mac without a notch says "the top center of the screen". **Esc closes the island in the window and never the
+guide**, which ends only by its own buttons.
 
 Granting Calendars turns on Calendar Events in Up Next, and Reminders turns on Due Reminders. Bluetooth starts the headphones
 monitor. Camera, Microphone and Speech, Screen Recording, Accessibility, and Focus are still asked the first time you use what

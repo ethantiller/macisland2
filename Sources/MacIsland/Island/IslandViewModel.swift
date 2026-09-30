@@ -420,8 +420,11 @@ final class IslandViewModel {
         geometry.notchSize.height + Theme.Metrics.contentTopGap + contentHeight + Theme.Metrics.margin
     }
 
+    /// How large the island counts as being under the pointer. A pill that is not drawn still has its hover zone.
+    var hitSize: CGSize { isPillHidden ? geometry.compactSize : size }
+
     /// Area that counts as "over the island", in screen coordinates.
-    var hitRect: CGRect { geometry.islandRect(for: isPillHidden ? geometry.compactSize : size) }
+    var hitRect: CGRect { geometry.islandRect(for: hitSize) }
 
     /// The timer is being set: the dial is on screen and takes horizontal scrolls.
     var isSettingTimer: Bool {
@@ -858,6 +861,34 @@ final class IslandViewModel {
         isPinnedOpen = false
         hoverTask?.cancel()
         withAnimation(Theme.Motion.close) { state = .compact }
+    }
+
+    /// What a two-finger swipe on the island does: down opens, up closes, sideways changes the tab. One place for the real island's
+    /// tracker and the first-run guide's stage, so they can't disagree. Nothing happens with swiping turned off in Settings.
+    func perform(_ swipe: Swipe) {
+        guard features.settings.swipesEnabled else { return }
+        switch swipe {
+        case .down where presentation != .expanded:
+            open()
+        case .up where presentation == .expanded:
+            closePinned()
+        case .left where presentation == .expanded:
+            // The strip follows the fingers: swiping left moves toward the tab on the left.
+            selectAdjacentTab(-1)
+        case .right where presentation == .expanded:
+            selectAdjacentTab(1)
+        default:
+            break
+        }
+    }
+
+    /// Forgets a peek or a close that was waiting on the pointer, and a keyboard pin. For a view model whose state is set from outside
+    /// (the Settings preview, the first-run guide's stage), so a late timer can't undo what was just shown.
+    func resetPointerState() {
+        hoverTask?.cancel()
+        hoverTask = nil
+        isPinnedOpen = false
+        isSwelling = false
     }
 
     /// Left/right arrow: move to the neighboring tab, without wrapping.

@@ -1,20 +1,34 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
-/// The first-run guide's window: floating glass without a resize edge, like a torn-off panel.
+/// The first-run guide's window: floating glass like a torn-off panel, but borderless: no title bar, so nothing of the window's own
+/// sits over the top of the guide (its ⊗ is there), and no resize edge.
 final class OnboardingPanel: FloatingGlassPanel {
-    override init() {
-        super.init()
-        styleMask.remove(.resizable)
-        // The island peeks on hover through mouse-moved events; with the guide key they must still reach the tracker.
+    /// Esc, ←, and → go to the island in the guide's window. Returns whether the key was taken.
+    var keyHandler: ((_ keyCode: UInt16) -> Bool)?
+
+    init() {
+        super.init(styleMask: [.borderless])
+        // The stage island peeks on hover through mouse-moved events.
         acceptsMouseMovedEvents = true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if keyHandler?(event.keyCode) != true { super.keyDown(with: event) }
+    }
+
+    /// Esc is the stage island's. Left alone it reached the panel's own cancel action, which closed the guide (found by hand); the
+    /// guide ends only by its own buttons.
+    override func cancelOperation(_ sender: Any?) {
+        _ = keyHandler?(UInt16(kVK_Escape))
     }
 }
 
 /// What the guide needs from the app.
 struct OnboardingContext {
     let features: IslandFeatures
-    /// The real island, which the practice checks watch and the guide gives the keyboard back to.
+    /// The real island: the guide reads its screen and notch, and leaves it alone.
     let island: IslandViewModel
     let state: OnboardingState
     let access: AccessProviding
@@ -54,16 +68,18 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             provider: context.access, settings: context.features.settings,
             onBluetoothAllowed: context.startAccessoryMonitor)
         let island = context.island
+        // The stage island is the stage's own, which starts at the real island's screen and notch.
+        preview.viewModel.geometry = island.geometry
         let model = OnboardingModel(
             state: context.state, settings: context.features.settings, geometry: { island.geometry },
-            preview: preview, access: access,
-            island: PracticeGoal.Island(
-                state: island.state, tab: island.selectedTab, isFileDragActive: island.isFileDragActive),
-            replay: replay, startDeferredMonitors: context.startDeferredMonitors,
-            openSettings: context.openSettings, onEnd: { [weak self] ending in self?.end(ending) })
+            preview: preview, access: access, replay: replay,
+            startDeferredMonitors: context.startDeferredMonitors, openSettings: context.openSettings,
+            onEnd: { [weak self] ending in self?.end(ending) })
 
         let panel = OnboardingPanel()
-        let host = NSHostingView(rootView: OnboardingRoot(model: model, island: island, onFolded: { [weak self] in self?.giveKeyboardBack() }))
+        panel.keyHandler = { [weak self] keyCode in self?.model?.handleKey(keyCode) ?? false }
+        // The first click acts, even when the guide isn't the window in front (it floats over other apps).
+        let host = FirstMouseHostingView(rootView: OnboardingRoot(model: model))
         host.sizingOptions = []
         panel.contentView = host
         // The whole guide is one size: its content never changes height between steps.
@@ -110,10 +126,13 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         return false
     }
 
-    /// When the island folds back in, the guide gets the keyboard back (⌃⌥Space gave it to the island), so Return continues
-    /// without a click. Only while MacIsland is the active app, so it never takes focus from another one.
-    func giveKeyboardBack() {
-        guard NSApp.isActive, let panel, !panel.isKeyWindow else { return }
-        panel.makeKey()
+    /// The open shortcut pressed while the guide is up: it opens or closes the island in the guide, not the real one, and brings the
+    /// guide forward so Esc and the arrows reach it. False when there is no guide, or this step's stage is a picture: the real island
+    /// answers then, as usual.
+    func handleOpenShortcut() -> Bool {
+        guard let panel, let model, model.toggleStageFromKeyboard() else { return false }
+        NSApp.activate()
+        panel.makeKeyAndOrderFront(nil)
+        return true
     }
 }

@@ -94,6 +94,7 @@ final class IslandPreviewModel {
         let slides = context.presentation == .menuBar || self.context.presentation == .menuBar
         let apply = { [self] in
             self.context = context
+            viewModel.resetPointerState()
             menuBarProgress = context.presentation == .menuBar ? 1 : 0
             switch context.presentation {
             case .compact:
@@ -350,7 +351,7 @@ struct PreviewBand: View {
 
 /// A two-finger horizontal swipe over the preview, as on the island itself. A local scroll monitor, so it hears the
 /// gesture whatever is on top (the preview is look-only). One swipe acts once.
-private struct PreviewSwipe: NSViewRepresentable {
+struct PreviewSwipe: NSViewRepresentable {
     let onSwipe: (Swipe) -> Void
 
     func makeNSView(context: Context) -> MonitorView {

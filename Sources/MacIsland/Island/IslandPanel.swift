@@ -36,6 +36,6 @@ final class IslandPanel: NSPanel {
 }
 
 /// Lets the first click on a button or slider act immediately instead of just focusing the panel.
-private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Testing
 
 @testable import MacIsland
@@ -124,8 +125,6 @@ struct OnboardingFlowTests {
         let none = setup(hasNotch: false)
         #expect(GuideCopy.body(.peek, setup: none).contains("the top center of the screen"))
         #expect(!GuideCopy.body(.peek, setup: none).contains("the notch"))
-        #expect(GuideCopy.prompt(.open, setup: none) == "Try it: click the top center of the screen.")
-        #expect(GuideCopy.prompt(.open, setup: setup()) == "Try it: click the notch.")
     }
 
     @Test func aModuleOutsideTheTabsAddsItsOtherWayIn() {
@@ -211,8 +210,7 @@ struct OnboardingModelTests {
         let accessModel = AccessModel(provider: access, settings: reference.settings, onBluetoothAllowed: {})
         let model = OnboardingModel(
             state: state, settings: reference.settings, geometry: { reference.geometry }, preview: preview,
-            access: accessModel,
-            island: PracticeGoal.Island(state: .compact, tab: .home, isFileDragActive: false), replay: replay,
+            access: accessModel, replay: replay,
             startDeferredMonitors: { starts.count += 1 }, openSettings: { opened.count += 1 },
             onEnd: { ends.list.append($0) })
         return Rig(
@@ -234,17 +232,36 @@ struct OnboardingModelTests {
         #expect(rig.model.primaryTitle == "Get Started")
     }
 
-    @Test func eachStepShowsItsStage() {
+    @Test func aPracticeStepStartsBeforeTheAnswer() {
         let rig = makeRig()
         defer { rig.model.stop() }
+        let stage = rig.model.stageIsland
+        // Peeking and opening are done to a closed island.
         rig.model.next()
-        #expect(rig.model.preview.context.presentation == .peek)
+        #expect(rig.model.step.id == .peek && stage.state == .compact)
         rig.model.next()
-        #expect(rig.model.preview.context == PreviewContext(presentation: .expanded, tab: .home))
+        #expect(rig.model.step.id == .open && stage.state == .compact)
+        // Changing the tab and closing are done to an open one, on Home.
         rig.model.next()
-        #expect(rig.model.preview.context.tab == .media)
+        #expect(rig.model.step.id == .tabs && stage.state == .expanded && stage.selectedTab == .home)
+        rig.model.next()
+        #expect(rig.model.step.id == .close && stage.state == .expanded && stage.selectedTab == .home)
+        // Dragging a file is done to a closed island, with no drop target showing yet.
+        while rig.model.step.id != .drop { rig.model.next() }
+        #expect(stage.state == .compact && !stage.isFileDragActive)
+    }
+
+    @Test func goingBackIsNotDoingTheExercise() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .close { rig.model.next() }
+        // Swipe to another tab on the Fold It Away step, then go back to Change Tabs: Home comes back, which is not a swipe.
+        rig.model.stageIsland.selectAdjacentTab(1)
+        rig.model.observe(PracticeGoal.Island(rig.model.stageIsland))
         rig.model.back()
-        #expect(rig.model.preview.context.tab == .home)
+        rig.model.observe(PracticeGoal.Island(rig.model.stageIsland))
+        #expect(rig.model.step.id == .tabs)
+        #expect(!rig.model.isPracticeMet)
     }
 
     @Test func theModulesStageFollowsTheChosenChip() {
@@ -294,6 +311,122 @@ struct OnboardingModelTests {
         rig.model.next()
         rig.model.back()
         #expect(rig.model.isPracticeMet)
+    }
+
+    // MARK: The stage island answers like the real one
+
+    @Test func restingThePointerOnTheStageIslandPeeksIt() async {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()  // Rest the Pointer to Peek
+        let stage = rig.model.stageIsland
+        #expect(stage.state == .compact)
+        stage.setHovering(true)
+        for _ in 0..<100 where stage.state != .peek { try? await Task.sleep(for: .milliseconds(20)) }
+        #expect(stage.state == .peek)
+        #expect(PracticeGoal.peek.isMet(from: island(.compact), to: PracticeGoal.Island(stage)))
+    }
+
+    @Test func aSwipeOnTheStageDoesWhatItDoesOnTheRealIsland() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()
+        let stage = rig.model.stageIsland
+        stage.perform(.down)
+        #expect(stage.state == .expanded)
+        stage.perform(.right)
+        #expect(stage.selectedTab == .media)
+        stage.perform(.left)
+        #expect(stage.selectedTab == .home)
+        stage.perform(.up)
+        #expect(stage.state == .compact)
+    }
+
+    @Test func swipingTurnedOffInSettingsLeavesTheStageAlone() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        // The stage shares the live settings, so the choice reaches it as it reaches the island.
+        rig.reference.settings.swipesEnabled = false
+        rig.model.next()
+        rig.model.stageIsland.perform(.down)
+        #expect(rig.model.stageIsland.state == .compact)
+    }
+
+    @Test func escClosesTheStageIslandAndNeverTheGuide() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .close { rig.model.next() }
+        let stage = rig.model.stageIsland
+        #expect(stage.state == .expanded)
+        #expect(rig.model.handleKey(UInt16(kVK_Escape)))
+        #expect(stage.state == .compact)
+        // With nothing open Esc is still taken, so it never reaches the window's own close.
+        #expect(rig.model.handleKey(UInt16(kVK_Escape)))
+        #expect(stage.state == .compact)
+        #expect(rig.ends.list.isEmpty)
+    }
+
+    @Test func theArrowKeysChangeTheTabOfAnOpenStageIsland() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .tabs { rig.model.next() }
+        let stage = rig.model.stageIsland
+        #expect(rig.model.handleKey(UInt16(kVK_RightArrow)))
+        #expect(stage.selectedTab == .media)
+        #expect(rig.model.handleKey(UInt16(kVK_LeftArrow)))
+        #expect(stage.selectedTab == .home)
+        stage.closePinned()
+        #expect(!rig.model.handleKey(UInt16(kVK_RightArrow)))
+        #expect(stage.selectedTab == .home)
+    }
+
+    @Test func theOpenShortcutOpensAndPinsTheStageIsland() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()
+        rig.model.next()  // Open It
+        let stage = rig.model.stageIsland
+        #expect(rig.model.toggleStageFromKeyboard())
+        #expect(stage.state == .expanded && stage.isPinnedOpen)
+        #expect(rig.model.toggleStageFromKeyboard())
+        #expect(stage.state == .compact)
+    }
+
+    @Test func aPictureStageLeavesTheKeysToTheRealIsland() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .access { rig.model.next() }
+        #expect(!rig.model.step.stageIsInteractive)
+        #expect(!rig.model.toggleStageFromKeyboard())
+        #expect(!rig.model.handleKey(UInt16(kVK_LeftArrow)))
+    }
+
+    @Test func showingAStageCancelsAPeekThatWasWaitingOnThePointer() async {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        rig.model.next()  // Rest the Pointer to Peek
+        let stage = rig.model.stageIsland
+        stage.setHovering(true)  // schedules a peek in 120 ms
+        rig.model.next()  // Open It shows a closed island again, and forgets the pending peek
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(stage.state == .compact)
+    }
+
+    @Test func theSevenModulesChipsFollowASwipe() {
+        let rig = makeRig()
+        defer { rig.model.stop() }
+        while rig.model.step.id != .modules { rig.model.next() }
+        rig.model.stageIsland.perform(.right)
+        rig.model.stageChangedTab(rig.model.stageIsland.selectedTab)
+        #expect(rig.model.chosenModule == .media)
+    }
+
+    @Test func theStagesHitAreaIsTheIslandsSize() {
+        let stage = TestSupport.makeViewModel()
+        #expect(stage.hitSize == stage.size)
+        stage.state = .expanded
+        #expect(stage.hitSize == stage.size)
+        #expect(stage.hitRect.width == stage.hitSize.width)
     }
 
     @Test func closeRecordsTheGuideAsSeenAndStartsDeferredMonitors() {

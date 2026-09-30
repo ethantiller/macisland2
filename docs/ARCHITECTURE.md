@@ -505,10 +505,17 @@ stored under a key that isn't in it. An existing install gets the guide and the 
 
 **The guide.** `OnboardingFlow` holds the ten steps as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
 shortcut, the notch, the tabs, the drag target), all tested. `OnboardingModel` walks them, keeps the practice checks, and runs each way
-out. The window is an `OnboardingPanel`, a `FloatingGlassPanel` without a resize edge, centered on the island's screen and moved by a `WindowDragGesture` on its glass (the panel's `isMovableByWindowBackground` alone did not move it). The open island, the higher window, draws over the top of the guide while it is practised on; drag the guide aside if it is in the way. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
-`IslandPreviewModel`, which stops when the guide closes. **Practice** is observed, not polled: the view reports the live island's
-state, tab, and file-drag flag to the model, and `PracticeGoal.isMet(from:to:)` decides. When the live island folds back in while the app is
-active, the guide takes the keyboard back (⌃⌥Space gave it to the island) so Return continues. The guide never binds Esc or the arrows.
+out. The window is an `OnboardingPanel`, a borderless `FloatingGlassPanel` (no title bar, so nothing of the window's own sits over its ⊗; the base class takes a style mask, and the torn-off windows keep theirs), centered on the island's screen and moved by a `WindowDragGesture` on a layer behind its content (the panel's `isMovableByWindowBackground` alone did not move it; behind, so a control in front is always hit first). Its hosting view is a `FirstMouseHostingView`, so the first click acts even when the guide is not the window in front. The real island, the higher window, can draw over the top of the guide. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
+`IslandPreviewModel`, which stops when the guide closes. **The stage is an island you can use.** It stays look-only (its own controls would act on this Mac: the microphone, the audio output, the
+keyboard), and `StageInput` lays one layer over it that calls what the real island's `MouseTracker` calls: `setHovering` from `onHover`
+on the island's own rectangle (`IslandViewModel.hitSize`), `open` from a click, `IslandViewModel.perform(_:)` for swipes (shared with
+`MouseTracker`, through `PreviewSwipe`), and `setFileDragActive` from a drag over the stage, which is never dropped. Each practice step
+starts the stage before the answer (`GuideStep.stage`), and `IslandPreviewModel.show` calls `resetPointerState()` so a peek or close
+waiting on the pointer can't undo a step change. The keys come through the panel, not SwiftUI: `OnboardingPanel.keyHandler` takes Esc, ←,
+and → (`OnboardingModel.handleKey`), and overrides `cancelOperation` because Esc otherwise reached the panel's own close. While the guide is
+up the open shortcut goes to the stage (`OnboardingWindowController.handleOpenShortcut`, from the hotkey's handler), except on the steps
+whose stage is a picture. **Practice** is observed, not polled: the view reports the stage island's state, tab, and file-drag flag to the
+model, and `PracticeGoal.isMet(from:to:)` decides; each step change re-baselines it, so going Back is never counted as doing it.
 
 **The tour.** `SettingsTour` is pure state over `TourStop.all`. Each stop's target is anchored by `.tourAnchor(_:)`, which reports the view's
 frame through `onGeometryChange` into `TourAnchors` (an `@Observable` keyed by `TourTarget`, in one named space shared by the sidebar and the
@@ -522,7 +529,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **617 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **628 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -564,6 +571,6 @@ Things that cost time. Read before changing the related code.
 | **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()` and `holdOpen()`; hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
 | **First-run evidence** | A new setting stored in `UserDefaults` needs its key in `InstallEvidence.keys`, or an updater who only ever changed it looks like a fresh install and is shown the guide. `evidenceKeysCoverEverySetting` guards it. |
 | **No `.defaultAction` in Settings** | A default button takes Return from the focused search field and the weather field, so the tour's Return is a key monitor. Esc is not bound either: Settings already uses it to clear search, cancel the recorder, and call off a drag. |
-| **Esc and arrows in the guide** | They reach the island only when its panel is key (after ⌃⌥Space), so the guide binds neither; its copy says when they work. |
+| **Esc and arrows in the guide** | They are the stage island's: the panel takes them (`keyHandler`) and Esc never reaches its close. A titled `NSPanel` answers Esc by closing itself (the guide closed on Esc), so `cancelOperation` is overridden. Don't bind them in SwiftUI: they need focus. |
 | **Tour anchors** | Whether `onGeometryChange` keeps reporting while a macOS `Form` scrolls was not verified when this was written. If the ring doesn't follow a scrolled row, replace the body of `.tourAnchor` with an `NSViewRepresentable` probe that reports `convert(bounds, to: nil)` on `frameDidChangeNotification` and the enclosing scroll view's `boundsDidChangeNotification`, keeping its API, and record which one is used here. |
 | **No Python here** | Scripted edits in this environment used `perl`; the repo itself has no Python. |
