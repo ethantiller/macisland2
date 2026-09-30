@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The first-run guide's content: a header, the stage (the real island, drawn from sample data), the step's words, its detail,

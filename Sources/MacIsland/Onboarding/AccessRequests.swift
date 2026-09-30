@@ -63,9 +63,9 @@ final class LiveAccess: AccessProviding {
 
     func request(_ kind: AccessKind) async -> Bool {
         switch kind {
-        case .calendars: await agenda.requestAccess(to: .event)
-        case .reminders: await agenda.requestAccess(to: .reminder)
-        case .bluetooth: await bluetooth.request()
+        case .calendars: return await agenda.requestAccess(to: .event)
+        case .reminders: return await agenda.requestAccess(to: .reminder)
+        case .bluetooth: return await bluetooth.request()
         }
     }
 }
