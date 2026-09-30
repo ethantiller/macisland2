@@ -297,14 +297,13 @@ struct OnboardingRoot: View {
     var body: some View {
         OnboardingView(model: model)
             .floatingGlass()
-            // Dragging anywhere that isn't a control moves the window. The panel's `isMovableByWindowBackground` alone did not
-            // move it (found by hand), so the drag is SwiftUI's. It is a layer behind everything, not a gesture on everything, so
-            // a control in front of it is always hit first and its click never has to compete with the drag.
-            .background {
-                Color.clear
-                    .contentShape(RoundedRectangle(cornerRadius: Theme.Metrics.floatRadius, style: .continuous))
-                    .gesture(WindowDragGesture())
-            }
+            // The window has a clear background, and macOS passes clicks through clear pixels: the glass may count as clear, which
+            // left the ⊗ clickable only on its thin stroke and the rest of the window deaf (found by hand). This fills the glass's shape
+            // with something too faint to see, so every point of the window gets its clicks. The panel drags it (`OnboardingPanel`).
+            .background(
+                Theme.Palette.hitSurface,
+                in: RoundedRectangle(cornerRadius: Theme.Metrics.floatRadius, style: .continuous)
+            )
             .environment(\.islandSurface, .glass)
             // Scale and fade in; opacity only under Reduce Motion. A modifier, not a transition, so the window can be sized
             // from the view's fitting size before it has arrived.

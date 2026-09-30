@@ -505,7 +505,7 @@ stored under a key that isn't in it. An existing install gets the guide and the 
 
 **The guide.** `OnboardingFlow` holds the ten steps as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
 shortcut, the notch, the tabs, the drag target), all tested. `OnboardingModel` walks them, keeps the practice checks, and runs each way
-out. The window is an `OnboardingPanel`, a borderless `FloatingGlassPanel` (no title bar, so nothing of the window's own sits over its ⊗; the base class takes a style mask, and the torn-off windows keep theirs), centered on the island's screen and moved by a `WindowDragGesture` on a layer behind its content (the panel's `isMovableByWindowBackground` alone did not move it; behind, so a control in front is always hit first). Its hosting view is a `FirstMouseHostingView`, so the first click acts even when the guide is not the window in front. The real island, the higher window, can draw over the top of the guide. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
+out. The window is an `OnboardingPanel`, a borderless `FloatingGlassPanel` (no title bar, so nothing of the window's own sits over its ⊗; the base class takes a style mask, and the torn-off windows keep theirs), centered on the island's screen. It is dragged by its rim and its header (`OnboardingPanel.sendEvent` calls AppKit's `performDrag`; neither `isMovableByWindowBackground` nor a `WindowDragGesture` moved it). A window with a clear background passes clicks through its clear pixels, and the glass may count as clear, which left the ⊗ clickable only on its stroke: the glass has a 2% black fill under it (`Theme.Palette.hitSurface`). Its hosting view is a `FirstMouseHostingView`, so the first click acts even when the guide is not the window in front. The real island, the higher window, can draw over the top of the guide. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
 `IslandPreviewModel`, which stops when the guide closes. **The stage is an island you can use.** It stays look-only (its own controls would act on this Mac: the microphone, the audio output, the
 keyboard), and `StageInput` lays one layer over it that calls what the real island's `MouseTracker` calls: `setHovering` from `onHover`
 on the island's own rectangle (`IslandViewModel.hitSize`), `open` from a click, `IslandViewModel.perform(_:)` for swipes (shared with
@@ -529,7 +529,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **628 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **630 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

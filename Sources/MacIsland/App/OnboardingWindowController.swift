@@ -18,6 +18,30 @@ final class OnboardingPanel: FloatingGlassPanel {
         if keyHandler?(event.keyCode) != true { super.keyDown(with: event) }
     }
 
+    /// Pressing the rim or the header starts a window drag. AppKit does the drag (`performDrag`), so it does not depend on what
+    /// SwiftUI makes of the press: neither `isMovableByWindowBackground` nor a `WindowDragGesture` moved this window (found by hand).
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, let size = contentView?.bounds.size,
+            Self.isDragArea(event.locationInWindow, in: size)
+        {
+            performDrag(with: event)
+            return
+        }
+        super.sendEvent(event)
+    }
+
+    /// Where a press drags the window: the glass's rim on every side, and the header row (the step dots) up to the ⊗. Nothing but
+    /// the dots sits there, and the ⊗ keeps its own click. `point` is in window coordinates, which start at the bottom left.
+    static func isDragArea(_ point: NSPoint, in size: CGSize) -> Bool {
+        let rim = Theme.Metrics.floatPadding
+        let fromTop = size.height - point.y
+        let fromRight = size.width - point.x
+        if point.x < rim || fromRight < rim || point.y < rim || fromTop < rim { return true }
+        let headerBottom = rim + Theme.Metrics.hitTarget
+        let closeButtonEdge = rim + Theme.Metrics.hitTarget + Theme.Metrics.rowSpacing
+        return fromTop < headerBottom && fromRight > closeButtonEdge
+    }
+
     /// Esc is the stage island's. Left alone it reached the panel's own cancel action, which closed the guide (found by hand); the
     /// guide ends only by its own buttons.
     override func cancelOperation(_ sender: Any?) {

@@ -20,6 +20,9 @@ enum Theme {
         static let widget = SurfaceInk(opacity: 0.06)
         /// The hairline around a widget's box.
         static let widgetEdge = SurfaceInk(opacity: 0.07)
+        /// Almost nothing, and not nothing. A window with a clear background passes clicks through its clear pixels, so a floating window
+        /// with controls on glass lays this under the glass to be clickable and draggable everywhere on it. Too faint to see.
+        static let hitSurface = Color.black.opacity(0.02)
         /// What sits on a `primary` fill: black on the island, the window's own color on glass.
         static let inverse = SurfaceInk(role: .inverse)
         /// Nothing: for the "off" side of a ternary that would otherwise be `.clear`.

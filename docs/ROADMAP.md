@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (628 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (630 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -387,6 +387,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Hover swell, then peek at 120 ms; leaving closes without dipping into the notch
 - [ ] Two-finger swipes: down opens, up closes, left and right change tabs (direction follows your fingers)
 - [ ] The music art and sound bars **fly** into the peek and the Media tab instead of appearing
+- [ ] With a timer running, swipe from the Clock tab to any other tab: the big time leaves at once (it used to stay for a moment), the new tab blurs in, and the time shows beside the notch. If it still lingers, say so
 - [ ] Reduce Motion: no swell, everything eases; Reduce Transparency: the glass pill (no-notch display) turns opaque
 - [ ] Idle CPU (see [gotchas](ARCHITECTURE.md#gotchas-and-lessons)) settles near 0.1 to 0.3%
 
@@ -412,10 +413,10 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 **First run** (`open macisland://guide`; debug builds: `open 'macisland://guide?reset=1'` to see it as a fresh install)
 - [ ] `defaults read com.ethantiller.MacIsland onboarding.install` prints `existing` on your Mac, and neither the guide nor the tour appeared after the update
-- [ ] The guide opens in the middle of the screen, with the compact island and music on its stage, and can be dragged by its background (not by a button); Return continues; ⊗ closes and `onboarding.guide` becomes 1
+- [ ] The guide opens in the middle of the screen, with the compact island and music on its stage, and can be dragged by its header or its edge; Return continues; ⊗ closes and `onboarding.guide` becomes 1
 - [ ] On the island in the guide's window: rest the pointer (it swells, then peeks, and the peek step turns green), click it (open), swipe two fingers down (open), sideways (tabs), up (close), move the pointer off (close), drag a Finder file over it (the drop step turns green, and dropping does nothing); each practice step starts before its answer
 - [ ] ⌃⌥Space opens and closes the island **in the guide** (not the real one) while it is up, and Esc and ← → drive it; **Esc never closes the guide**; the real island still peeks when hovered
-- [ ] The ⊗ closes the guide (note whether the first click works when another window is in front), and so do Done, Open Settings, and Skip
+- [ ] The ⊗ closes the guide wherever in its circle you click (the window's clear pixels used to pass clicks through; the glass now has a near-invisible fill under it), and so do Done, Open Settings, and Skip. **If clicking the ⊗ or dragging the header still does nothing, the fill was not the cause; say so**
 - [ ] Seven Modules: every chip shows its tab at 1:1. Drag a Finder file toward the notch: the drop step turns green. The menu bar step slides to the menu bar and comes back on Back
 - [ ] Access (after `tccutil reset Calendar`, `Reminders`, and `BluetoothAlways` for `com.ethantiller.MacIsland`): each Allow shows its prompt once, above the guide; Allowed and Off draw as specified; granting Calendars turns on Calendar Events in Settings → Home → Up Next. The step is left out when all three are allowed
 - [ ] On a fresh install, no Bluetooth or Downloads prompt appears before the guide; both work after it ends. Note any prompt that does appear at launch

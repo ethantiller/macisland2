@@ -137,6 +137,11 @@ struct IslandView: View {
 
     private var selectedTabContent: some View {
         ModuleContent(module: viewModel.selectedTab, viewModel: viewModel, dropZone: dropZone)
+            // A tab change swaps the whole module. The old one leaves at once and the new one blurs in. Before, the swap had no
+            // transition of its own, and a running time stayed on screen for a moment after swiping away from the Clock tab (found
+            // by hand; a clock's digits sit in a `TimelineView`, which can hold a removed view for the whole animation).
+            .id(viewModel.selectedTab)
+            .transition(.asymmetric(insertion: Theme.Motion.content, removal: .identity))
     }
 
     // MARK: Compact

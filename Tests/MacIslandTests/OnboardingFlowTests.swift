@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 import Testing
 
@@ -494,5 +495,24 @@ struct OnboardingModelTests {
         rig.model.finish()
         #expect(rig.ends.list == [.closed])
         #expect(rig.monitorStarts.count == 1)
+    }
+}
+
+struct GuideWindowTests {
+    private let size = CGSize(width: 588, height: 640)
+
+    @Test func theRimAndTheHeaderDragTheWindow() {
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 5, y: 300), in: size))  // left rim
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 583, y: 300), in: size))  // right rim
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 300, y: 4), in: size))  // bottom rim
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 300, y: 636), in: size))  // top rim
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 100, y: 612), in: size))  // the header, at the step dots
+    }
+
+    @Test func theCloseButtonAndTheContentKeepTheirClicks() {
+        // The close button is 28 wide and sits 14 in from the right and from the top.
+        #expect(!OnboardingPanel.isDragArea(NSPoint(x: 560, y: 612), in: size))
+        #expect(!OnboardingPanel.isDragArea(NSPoint(x: 300, y: 300), in: size))  // the stage and the words
+        #expect(!OnboardingPanel.isDragArea(NSPoint(x: 300, y: 28), in: size))  // the footer's buttons
     }
 }
