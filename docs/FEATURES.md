@@ -282,7 +282,7 @@ Right-click a tool to pin it. The row is always full: unpinning fills the gap wi
 
 | Tool | Does |
 | --- | --- |
-| **Keep Awake** | Stops the display sleeping. Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick |
+| **Keep Awake** | Stops the display sleeping (and also asks macOS not to sleep the system). Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick, and say "A shut lid can still sleep it": closing the lid of a Mac that isn't on power with an external display sleeps it whatever is asked, and MacIsland asks for no password to change that. After a wake, if macOS dropped the hold, the tool shows Off |
 | **Ring Light** | A soft white glow around the screen edge, for video calls; brightness and width sliders |
 | **Mute Mic** | Mutes the default input device |
 | **Pick Color** | The system eyedropper; copies the hex code |

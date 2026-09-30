@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (718 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (724 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -428,6 +428,11 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**Keep Awake lid (written, not run)**
+- [ ] Turn Keep Awake on; `pmset -g assertions` lists two MacIsland assertions (display and system sleep); off releases both
+- [ ] The caption "A shut lid can still sleep it" shows beside the chips. Test on your Mac: on power with no external display, shut the lid for 30 s and open it: did it stay awake (`pmset -g log | tail`)? On battery? With an external display? Report the answers and I'll make the caption exact
+- [ ] Sleep the Mac and wake it: if macOS dropped the hold the tool is Off, never a stuck On
 
 **Volume HUD (written, not run)**
 - [ ] Settings → Notifications → Replace the Volume HUD: turning it on without Accessibility leaves it off, shows the prompt and a banner with **Open Settings**; after allowing it, turning it on again works; the preview shows the HUD

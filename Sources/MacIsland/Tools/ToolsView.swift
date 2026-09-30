@@ -174,9 +174,15 @@ private struct KeepAwakeChips: View {
             .fixedSize()
             .accessibilityLabel("Keep Awake Until")
             Spacer(minLength: 0)
+            // What it doesn't do, in words: a shut lid can still sleep a Mac that isn't on power with a display.
+            Text("A shut lid can still sleep it")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Palette.secondary)
+                .lineLimit(1)
         }
         .frame(height: Theme.Metrics.hitTarget)
         .frame(maxHeight: .infinity, alignment: .bottom)
+        .help(KeepAwake.limits)
     }
 
     private var isUntil: Bool {
