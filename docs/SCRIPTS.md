@@ -144,7 +144,6 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `MacIslandApp.swift` | The `@main` `App` (menu-bar capsule, Settings, module menu bars), `AppDelegate` (builds `IslandFeatures`, wires every monitor to the view model, the hotkeys, the panel), `ModuleMenuBars`, `MenuBarModuleView` |
 | `URLCommand.swift` | `URLCommand` (the `macisland://` parser and its limits) and `URLCommandRunner` (runs them, rate-limits banners) |
 | `FloatingPanels.swift` | `FloatingPanels` (torn-off windows, one per module, Keep on Desktop), `DetachedPanelState`, `DetachedModuleView` (the glass window's chrome) |
-
 | `OnboardingWindowController.swift` | `OnboardingPanel` (the guide's window), `OnboardingContext` (what the guide needs from the app), `OnboardingWindowController` (shows, positions, and closes it) |
 | `SettingsWindowController.swift` | The Settings window: an `NSWindow` hosting `SettingsView`, made when opened and gone when closed, with its frame remembered |
 
