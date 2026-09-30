@@ -535,6 +535,8 @@ Not planned, not promised.
   consent, and tokens in the Keychain. The new Outlook for Mac keeps its own store, which EventKit can't read.
 - Features already **dropped for good**, with the reasons, are [listed below](#dropped-for-good); check there before proposing one.
 
+> **Open questions for the owner (Phase 7, research only, nothing built):** Keep Awake with the lid shut ([plans/keep-awake-lid.md](plans/keep-awake-lid.md)) and Copilot approvals in VS Code ([plans/copilot-approvals.md](plans/copilot-approvals.md)). Each ends in a question.
+
 ### Agents module (unscheduled)
 
 The old plan for an eighth module. `IslandModule.agents` is reserved for it and `isAvailable` is false. Features: Developer API,

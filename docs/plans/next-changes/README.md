@@ -11,7 +11,7 @@ ends with a report and stops, so you can try the app before starting the next on
 | 4 | [The guide's permissions, one at a time](phase-4-guide-permissions.md) | A step per permission with Grant Permission and Not Now, nothing asking at launch, and a way to test it on a dev Mac. | nothing | ☑ |
 | 5 | [Shortcut tools](phase-5-shortcut-tools.md) | Create a tool from one of the user's Shortcuts, with its icon from the Shortcuts app if that can be done honestly. | nothing | ☑ |
 | 6 | [A custom volume HUD](phase-6-volume-hud.md) | Replace the system volume HUD with an island one (and a side-of-screen one if built), behind a setting. | Phase 4 (its permission step pieces, for the Accessibility grant) | ☑ |
-| 7 | [Two things to research, then ask](phase-7-research-then-ask.md) | Keep Awake with the lid shut, and Copilot approvals in VS Code. Research notes only; build nothing until the owner answers. | Phase 4 (for item 9's setup walkthrough, if it is approved later) | ☐ |
+| 7 | [Two things to research, then ask](phase-7-research-then-ask.md) | Keep Awake with the lid shut, and Copilot approvals in VS Code. Research notes only; build nothing until the owner answers. | Phase 4 (for item 9's setup walkthrough, if it is approved later) | ☑ |
 
 **Why this order.** Phase 1 is three small independent fixes. Phase 2 builds the one hold mechanism that keeps the island open for menus,
 panels, and Mirror, because Phase 3's save choice opens a panel and its menus need it. Phase 4 builds the permission step pieces that
