@@ -57,7 +57,7 @@ struct SettingsTourTests {
         let ids = TourStop.all.map(\.id)
         #expect(Set(ids).count == ids.count)
         for stop in TourStop.all {
-            #expect(!stop.title.isEmpty && !stop.copy.isEmpty, stop.id)
+            #expect(!stop.title.isEmpty && !stop.copy.isEmpty, "\(stop.id)")
         }
     }
 
