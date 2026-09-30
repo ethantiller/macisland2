@@ -25,6 +25,7 @@ struct GeneralPane: View {
             }
             Section {
                 Toggle("Peek on Hover", isOn: Bindable(settings).peeksOnHover)
+                    .tourAnchor(.peekOnHover)
                 Toggle("Swipe to Open and Switch Tabs", isOn: Bindable(settings).swipesEnabled)
                 SettingsDropdown(
                     title: "Show the Island On", selection: Bindable(settings).islandDisplay,

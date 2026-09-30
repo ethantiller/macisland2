@@ -9,6 +9,7 @@ struct NotificationsPane: View {
         Form {
             Section {
                 Toggle("Quiet in Focus", isOn: Bindable(settings).quietDuringFocus)
+                    .tourAnchor(.quietInFocus)
             } header: {
                 Text("Interruptions").id(SettingsAnchor.interruptions)
             } footer: {

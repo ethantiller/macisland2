@@ -17,6 +17,7 @@ enum SettingsAnchor {
     static let shortcut = "general.shortcut"
     static let input = "general.input"
     static let yourSettings = "general.settings"
+    static let guide = "general.guide"
     static let menuBar = "tabs.menubar"
     static let widgets = "home.widgets"
     static let layout = "home.layout"

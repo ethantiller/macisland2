@@ -82,6 +82,7 @@ struct PrivacyPane: View {
                             .buttonStyle(.borderless)
                     }
                     .accessibilityElement(children: .combine)
+                    .tourAnchor(item.id == access.first?.id ? .accessList : nil)
                 }
             } header: {
                 Text("Access").id(SettingsAnchor.access)

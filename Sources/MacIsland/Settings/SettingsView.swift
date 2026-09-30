@@ -76,7 +76,9 @@ struct SettingsView: View {
             .environment(\.tourAnchors, anchors)
             .coordinateSpace(.named(TourAnchors.space))
             .overlay {
-                SettingsTourOverlay(tour: tour, anchors: anchors, onShowMe: { scrollTarget = tour.current?.scrollAnchor })
+                SettingsTourOverlay(
+                    tour: tour, anchors: anchors, unavailable: sidebarHidden ? [.search] : [],
+                    onShowMe: { scrollTarget = tour.current?.scrollAnchor })
             }
         }
         .ignoresSafeArea(.container, edges: .top)

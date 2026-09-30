@@ -17,6 +17,42 @@ struct SettingsTourTests {
 
     // MARK: Stops
 
+    @Test func everyPaneHasAStop() {
+        for pane in SettingsPane.allCases {
+            #expect(TourStop.all.contains { $0.pane == pane }, "\(pane)")
+        }
+        #expect(TourStop.all.count == 15)
+    }
+
+    @Test func stopsAreGroupedByPane() {
+        // Each pane's stops are consecutive, except General, which opens and closes the tour.
+        var runs: [SettingsPane] = []
+        for stop in TourStop.all where runs.last != stop.pane { runs.append(stop.pane) }
+        #expect(runs.first == .general && runs.last == .general)
+        let middle = runs.dropFirst().dropLast()
+        #expect(Set(middle).count == middle.count, "a pane comes back: \(runs)")
+        #expect(!middle.contains(.general))
+    }
+
+    @Test func copyIsShort() {
+        for stop in TourStop.all {
+            #expect(stop.copy.count <= 170, "\(stop.id) is \(stop.copy.count) characters")
+            #expect(stop.title.count <= 32, "\(stop.id)")
+        }
+    }
+
+    @Test func aScrollAnchorNamesItsOwnPane() {
+        // The anchors are the sections' own names, each starting with its pane.
+        for stop in TourStop.all {
+            guard let anchor = stop.scrollAnchor else { continue }
+            #expect(anchor.hasPrefix(stop.pane.rawValue + "."), "\(stop.id)")
+        }
+    }
+
+    @Test func onlyTheMenuBarStopChangesThePreview() {
+        #expect(TourStop.all.filter { $0.preview != nil }.map(\.id) == ["menuBar"])
+    }
+
     @Test func everyStopHasWordsAndAUniqueId() {
         let ids = TourStop.all.map(\.id)
         #expect(Set(ids).count == ids.count)
@@ -106,6 +142,38 @@ struct SettingsTourTests {
         tour.next()
         #expect(!state.needsTour)
         #expect(!OnboardingState(defaults: defaults, isExistingInstall: { false }).needsTour)
+    }
+
+    // MARK: Visibility
+
+    @Test func aTargetIsPointedAtWhenItIsInView() {
+        let frame = CGRect(x: 300, y: 200, width: 100, height: 30)
+        let frames: [TourTarget: CGRect] = [.shortcut: frame, .paneViewport: CGRect(x: 200, y: 50, width: 600, height: 500)]
+        #expect(TourVisibility.resolve(.shortcut, frames: frames, unavailable: []) == .pointing(frame))
+    }
+
+    @Test func aTargetScrolledOutOfViewDocksTheCallout() {
+        let frames: [TourTarget: CGRect] = [
+            .shortcut: CGRect(x: 300, y: 900, width: 100, height: 30),
+            .paneViewport: CGRect(x: 200, y: 50, width: 600, height: 500),
+        ]
+        #expect(TourVisibility.resolve(.shortcut, frames: frames, unavailable: []) == .docked)
+    }
+
+    @Test func aTargetOutsideTheScrollingFormIsNeverScrolledOut() {
+        let frame = CGRect(x: 10, y: 10, width: 100, height: 30)
+        let frames: [TourTarget: CGRect] = [.search: frame, .paneViewport: CGRect(x: 200, y: 50, width: 600, height: 500)]
+        #expect(TourVisibility.resolve(.search, frames: frames, unavailable: []) == .pointing(frame))
+    }
+
+    @Test func nothingIsDrawnBeforeTheTargetReportsAFrame() {
+        #expect(TourVisibility.resolve(.shortcut, frames: [:], unavailable: []) == .hidden)
+    }
+
+    @Test func aHiddenSidebarDocksTheSearchStop() {
+        let frames: [TourTarget: CGRect] = [.search: CGRect(x: 10, y: 10, width: 100, height: 30)]
+        #expect(TourVisibility.resolve(.search, frames: frames, unavailable: [.search]) == .docked)
+        #expect(TourVisibility.resolve(.search, frames: [:], unavailable: [.search]) == .docked)
     }
 
     // MARK: Anchors

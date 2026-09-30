@@ -81,6 +81,7 @@ private struct SidebarHeader: View {
             HStack(spacing: Self.spacing) {
                 searchField
                     .frame(width: usable * 0.8)
+                    .tourAnchor(.search)
                 hideButton
                     .frame(width: usable * 0.2)
             }

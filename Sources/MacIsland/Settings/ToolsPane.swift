@@ -12,6 +12,7 @@ struct ToolsPane: View {
                         options: DropdownOption.all(PinLimit.allCases) { "\($0.rawValue)" },
                         selection: Bindable(settings).pinLimit, accessibilityLabel: "Tools in the Row")
                 }
+                .tourAnchor(.toolsRow)
             } header: {
                 Text("Tools").id(SettingsAnchor.toolsRow)
             } footer: {

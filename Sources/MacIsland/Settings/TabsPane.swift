@@ -149,6 +149,7 @@ private struct MenuBarSection: View {
         Section {
             ForEach(IslandModule.allCases.filter(\.isAvailable)) { module in
                 row(module)
+                    .tourAnchor(module == IslandModule.allCases.first(where: \.isAvailable) ? .menuBarRow : nil)
             }
         } header: {
             Text("Menu Bar").id(SettingsAnchor.menuBar)

@@ -22,6 +22,7 @@ struct HomePane: View {
             HomeLayoutEditor(editor: editor)
             Section {
                 Toggle("Calendar Events", isOn: Bindable(settings).showsCalendar)
+                    .tourAnchor(.calendarEvents)
                 Toggle("Due Reminders", isOn: Bindable(settings).showsReminders)
                 Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
             } header: {

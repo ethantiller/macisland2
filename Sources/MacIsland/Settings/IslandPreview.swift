@@ -163,12 +163,15 @@ struct IslandPreview: View {
                 accessibilityLabel: "Preview")
 
             PreviewBand(model: model, editor: editor, tabEditor: tabEditor)
+                .tourAnchor(.previewBand)
                 .overlay(alignment: .bottomLeading) { arrow(-1) }
                 .overlay(alignment: .bottomTrailing) { arrow(1) }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview of the island")
 
-            if let tabEditor, model.context.presentation != .menuBar { NotShownTray(editor: tabEditor) }
+            if let tabEditor, model.context.presentation != .menuBar {
+                NotShownTray(editor: tabEditor).tourAnchor(.notShownTray)
+            }
 
             hints
         }

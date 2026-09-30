@@ -31,10 +31,12 @@ struct WidgetGallery: View {
             if widgets.isEmpty {
                 Text("Every widget is on Home.")
                     .foregroundStyle(.secondary)
+                    .tourAnchor(.addWidgets)
             } else {
                 FlowLayout(spacing: 8) {
                     ForEach(widgets, id: \.self) { chip($0, isShown: $0 == open) }
                 }
+                .tourAnchor(.addWidgets)
                 if let open, let descriptor = catalog(open) { preview(of: open, descriptor) }
             }
             HStack {

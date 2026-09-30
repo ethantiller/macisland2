@@ -15,7 +15,9 @@ struct ShelfPane: View {
                             settings.dragTarget = $0
                             preview?.show(SettingsPane.shelf.previewContext ?? PreviewContext())
                         }),
-                    options: DropdownOption.all(DragTarget.allCases, title: \.title))
+                    options: DropdownOption.all(DragTarget.allCases, title: \.title)
+                )
+                .tourAnchor(.dragTarget)
                 Toggle("Add New Screenshots to the Shelf", isOn: Bindable(settings).addsScreenshots)
                 SettingsDropdown(
                     title: "Remove Files from the Shelf", selection: Bindable(settings).shelfRetention,

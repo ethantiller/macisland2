@@ -7,6 +7,7 @@ struct MediaPane: View {
         Form {
             Section {
                 Toggle("Show Music Beside the Notch", isOn: Bindable(settings).showsMusicCompact)
+                    .tourAnchor(.musicCompact)
             } header: {
                 Text("Music").id(SettingsAnchor.music)
             } footer: {

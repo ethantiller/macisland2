@@ -43,11 +43,86 @@ struct TourStop: Identifiable, Equatable {
     let title: String
     let copy: String
 
+    /// Every pane has at least one stop, and each pane's stops are consecutive except General, which opens and closes the tour.
     static let all: [TourStop] = [
+        TourStop(
+            id: "search", since: 1, pane: .general, target: .search, placement: .trailing, scrollAnchor: nil,
+            preview: nil, title: "Find Any Setting",
+            copy:
+                "Search by name, or by another word for it, like \u{201C}airpods\u{201D}. \u{2318}F works from anywhere in this window."
+        ),
+        TourStop(
+            id: "preview", since: 1, pane: .general, target: .previewBand, placement: .below, scrollAnchor: nil,
+            preview: nil, title: "Your Island, Live",
+            copy:
+                "Each pane shows the real island from sample data, so a change appears where it lands. Click Compact, Peek, Banner, or Expanded above it, or swipe on it."
+        ),
         TourStop(
             id: "shortcut", since: 1, pane: .general, target: .shortcut, placement: .below,
             scrollAnchor: SettingsAnchor.shortcut, preview: nil, title: "Open It From Anywhere",
-            copy: "Click here and press the keys you want to open the island from anywhere.")
+            copy: "Click here and press the keys you want to open the island from anywhere."),
+        TourStop(
+            id: "input", since: 1, pane: .general, target: .peekOnHover, placement: .below,
+            scrollAnchor: SettingsAnchor.input, preview: nil, title: "Hover and Swipe",
+            copy:
+                "If the island opens when you reach for the menu bar, turn off Peek on Hover; a click still opens it. Swiping can be turned off here too."
+        ),
+        TourStop(
+            id: "tabs", since: 1, pane: .tabs, target: .notShownTray, placement: .below, scrollAnchor: nil,
+            preview: nil, title: "Arrange Your Tabs",
+            copy:
+                "Drag a tab onto another to swap them, or drag one from Not Shown to replace a tab. Five fit left of the notch and one right of it."
+        ),
+        TourStop(
+            id: "menuBar", since: 1, pane: .tabs, target: .menuBarRow, placement: .above,
+            scrollAnchor: SettingsAnchor.menuBar, preview: PreviewContext(presentation: .menuBar, menuBarTab: .home),
+            title: "Put a Module in the Menu Bar",
+            copy: "Switch a module on to give it its own icon. Drag its window\u{2019}s header away to pop it out."),
+        TourStop(
+            id: "homeCanvas", since: 1, pane: .home, target: .previewBand, placement: .below, scrollAnchor: nil,
+            preview: nil, title: "Arrange Home",
+            copy:
+                "Drag a widget to move it, or drag its corner to resize it. The island grows and shrinks with its rows."
+        ),
+        TourStop(
+            id: "addWidgets", since: 1, pane: .home, target: .addWidgets, placement: .above,
+            scrollAnchor: SettingsAnchor.widgets, preview: nil, title: "Add Widgets",
+            copy: "Everything not on Home waits here. Drag a widget into the island, or press its plus."),
+        TourStop(
+            id: "upNext", since: 1, pane: .home, target: .calendarEvents, placement: .above,
+            scrollAnchor: SettingsAnchor.upNext, preview: nil, title: "Up Next",
+            copy:
+                "Turn these on to see your next meeting and due reminders on Home, with a banner before they start."),
+        TourStop(
+            id: "dragTarget", since: 1, pane: .shelf, target: .dragTarget, placement: .below,
+            scrollAnchor: SettingsAnchor.files, preview: nil, title: "When You Drag a File",
+            copy:
+                "Choose what the island becomes as a file comes near: the Shelf, AirDrop, both, or nothing."),
+        TourStop(
+            id: "music", since: 1, pane: .media, target: .musicCompact, placement: .below,
+            scrollAnchor: SettingsAnchor.music, preview: nil, title: "Music Beside the Notch",
+            copy: "Turn this off to keep music in Home and the Media tab only."),
+        TourStop(
+            id: "toolsRow", since: 1, pane: .tools, target: .toolsRow, placement: .below,
+            scrollAnchor: SettingsAnchor.toolsRow, preview: nil, title: "Your Tools Row",
+            copy:
+                "Choose how many tools the row shows, then drag them into order below. Home\u{2019}s quick tools are the first four."
+        ),
+        TourStop(
+            id: "interruptions", since: 1, pane: .notifications, target: .quietInFocus, placement: .below,
+            scrollAnchor: SettingsAnchor.interruptions, preview: nil, title: "Choose What Interrupts You",
+            copy:
+                "Click an interruption to see its banner above, and switch off any you don\u{2019}t want. Quiet in Focus holds them while a Focus is on."
+        ),
+        TourStop(
+            id: "privacy", since: 1, pane: .privacy, target: .accessList, placement: .above,
+            scrollAnchor: SettingsAnchor.access, preview: nil, title: "Privacy in One Place",
+            copy:
+                "Everything MacIsland sends, runs, and may use is listed here, and each can be turned off."),
+        TourStop(
+            id: "guide", since: 1, pane: .general, target: .guide, placement: .above,
+            scrollAnchor: SettingsAnchor.guide, preview: nil, title: "See This Again",
+            copy: "Replay the welcome guide or this tour here anytime."),
     ]
 }
 
@@ -131,7 +206,7 @@ extension EnvironmentValues {
 }
 
 private struct TourAnchorModifier: ViewModifier {
-    let target: TourTarget
+    let target: TourTarget?
     @Environment(\.tourAnchors) private var anchors
 
     func body(content: Content) -> some View {
@@ -139,16 +214,17 @@ private struct TourAnchorModifier: ViewModifier {
             .onGeometryChange(for: CGRect.self) {
                 $0.frame(in: .named(TourAnchors.space))
             } action: {
-                anchors?.set(target, $0)
+                if let target { anchors?.set(target, $0) }
             }
             // A pane that is gone never leaves a stale frame behind.
-            .onDisappear { anchors?.set(target, nil) }
+            .onDisappear { if let target { anchors?.set(target, nil) } }
     }
 }
 
 extension View {
-    /// Tells the Settings tour where this view is. Free when no tour is in the environment.
-    func tourAnchor(_ target: TourTarget) -> some View {
+    /// Tells the Settings tour where this view is. Free when no tour is in the environment. Nil anchors nothing, so a view built in
+    /// a `ForEach` can anchor just its first element.
+    func tourAnchor(_ target: TourTarget?) -> some View {
         modifier(TourAnchorModifier(target: target))
     }
 }
@@ -222,6 +298,25 @@ struct CalloutPlacement: Equatable {
     static func isVisible(_ frame: CGRect, in viewport: CGRect?) -> Bool {
         guard let viewport else { return true }
         return viewport.contains(CGPoint(x: frame.midX, y: frame.midY))
+    }
+}
+
+/// How a stop is shown, given where its target is.
+enum TourVisibility: Equatable {
+    /// The ring is on the target and the callout's arrow points at it.
+    case pointing(CGRect)
+    /// The target is scrolled out of view or hidden (the sidebar, for the search field): the callout sits at the bottom of the pane
+    /// with no arrow and no ring.
+    case docked
+    /// The target hasn't reported a frame yet (its pane is still appearing): nothing is drawn for the stop.
+    case hidden
+
+    static func resolve(_ target: TourTarget, frames: [TourTarget: CGRect], unavailable: Set<TourTarget>) -> TourVisibility
+    {
+        if unavailable.contains(target) { return .docked }
+        guard let frame = frames[target] else { return .hidden }
+        if target.scrollsWithPane, !CalloutPlacement.isVisible(frame, in: frames[.paneViewport]) { return .docked }
+        return .pointing(frame)
     }
 }
 
@@ -326,6 +421,8 @@ struct TourRing: View {
 struct SettingsTourOverlay: View {
     let tour: SettingsTour
     let anchors: TourAnchors
+    /// Targets that can't be pointed at right now (the search field while the sidebar is hidden).
+    var unavailable: Set<TourTarget> = []
     /// Scrolls the current stop's target back into view.
     let onShowMe: () -> Void
 
@@ -333,42 +430,48 @@ struct SettingsTourOverlay: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if let stop = tour.current, let index = tour.index,
-                let target = anchors.frames[stop.target]
-            {
+            if let stop = tour.current, let index = tour.index {
                 let bounds = CGRect(origin: .zero, size: geometry.size)
-                let inView =
-                    !stop.target.scrollsWithPane
-                    || CalloutPlacement.isVisible(target, in: anchors.frames[.paneViewport])
-                let placed = CalloutPlacement.place(
-                    target: target, size: calloutSize, in: bounds, preferred: stop.placement,
-                    gap: Theme.Metrics.tourRingInset + Theme.Metrics.tourGap, arrow: Theme.Metrics.tourArrow,
-                    edgeInset: Theme.Metrics.tourEdgeInset, cornerRadius: Theme.Metrics.cardRadius)
-
-                ZStack(alignment: .topLeading) {
-                    if inView {
+                switch TourVisibility.resolve(stop.target, frames: anchors.frames, unavailable: unavailable) {
+                case .hidden:
+                    EmptyView()
+                case .pointing(let target):
+                    let placed = CalloutPlacement.place(
+                        target: target, size: calloutSize, in: bounds, preferred: stop.placement,
+                        gap: Theme.Metrics.tourRingInset + Theme.Metrics.tourGap, arrow: Theme.Metrics.tourArrow,
+                        edgeInset: Theme.Metrics.tourEdgeInset, cornerRadius: Theme.Metrics.cardRadius)
+                    ZStack(alignment: .topLeading) {
                         TourRing(frame: target)
                         arrow(placed)
+                        callout(stop: stop, index: index, showsShowMe: false)
+                            .offset(placed.frame.origin.asOffset)
                     }
-                    callout(stop: stop, index: index, inView: inView)
-                        .onGeometryChange(for: CGSize.self) {
-                            $0.size
-                        } action: {
-                            if calloutSize != $0 { calloutSize = $0 }
-                        }
-                        .offset(inView ? placed.frame.origin.asOffset : dockedOrigin(in: bounds))
+                    .animation(Theme.Motion.resize, value: tour.index)
+                    .transition(Theme.Motion.floatTransition)
+                case .docked:
+                    ZStack(alignment: .topLeading) {
+                        callout(stop: stop, index: index, showsShowMe: true)
+                            .offset(dockedOrigin(in: bounds))
+                    }
+                    .animation(Theme.Motion.resize, value: tour.index)
+                    .transition(Theme.Motion.floatTransition)
                 }
-                .animation(Theme.Motion.resize, value: tour.index)
-                .transition(Theme.Motion.floatTransition)
             }
         }
         .animation(Theme.Motion.float, value: tour.isRunning)
     }
 
-    private func callout(stop: TourStop, index: Int, inView: Bool) -> some View {
+    private func callout(stop: TourStop, index: Int, showsShowMe: Bool) -> some View {
         TourCallout(
-            stop: stop, index: index, count: tour.stops.count, onShowMe: inView ? nil : onShowMe,
-            onBack: { tour.back() }, onNext: { tour.next() }, onEnd: { tour.end() })
+            stop: stop, index: index, count: tour.stops.count, onShowMe: showsShowMe ? onShowMe : nil,
+            onBack: { tour.back() }, onNext: { tour.next() }, onEnd: { tour.end() }
+        )
+        // The callout's height comes from its content, which the placement needs.
+        .onGeometryChange(for: CGSize.self) {
+            $0.size
+        } action: {
+            if calloutSize != $0 { calloutSize = $0 }
+        }
     }
 
     /// Out of view: at the bottom center of the pane's visible part, with no arrow.
