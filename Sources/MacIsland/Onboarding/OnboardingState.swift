@@ -17,9 +17,9 @@ final class OnboardingState {
     }
 
     /// Bump to show the guide again to everyone who saw an older one. Only steps with a newer `since` are shown on a re-run.
-    static let guideVersion = 1
+    nonisolated static let guideVersion = 1
     /// The same for the Settings tour, stop by stop.
-    static let tourVersion = 1
+    nonisolated static let tourVersion = 1
 
     /// How this install was classified. Decided once, on the first launch that has this code, and trusted after.
     private(set) var install: Install
