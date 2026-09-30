@@ -170,6 +170,12 @@ final class IslandViewModel {
     /// Home shows the month calendar instead of the agenda.
     private(set) var calendarExpanded = false
     var shelfMode: ShelfMode = .files
+    /// The Shelf file being previewed with Quick Look.
+    var quickLookURL: URL?
+    /// The Shelf file under the pointer, which Space previews.
+    @ObservationIgnored private(set) var hoveredShelfItem: URL?
+    /// Asks the app to give the island the keyboard (set by the app, which owns the panel).
+    @ObservationIgnored var onWantsKeyboard: (() -> Void)?
     private(set) var alert: IslandAlert?
     private(set) var banner: IslandBanner?
     /// A file from another app is being dragged: the compact island grows into a bigger target.
@@ -468,6 +474,27 @@ final class IslandViewModel {
 
     func setShelfMode(_ mode: ShelfMode) {
         withAnimation(Theme.Motion.resize) { shelfMode = mode }
+    }
+
+    func setHoveredShelfItem(_ url: URL?) {
+        hoveredShelfItem = url
+        if url != nil { onWantsKeyboard?() }
+    }
+
+    /// Quick Look for a Shelf file. The island stays open while the preview is up.
+    func showQuickLook(_ url: URL) {
+        holdOpen()
+        NSApp.activate()
+        quickLookURL = url
+    }
+
+    /// Space over a Shelf file. Returns `false` when there is nothing to preview, so the key passes on.
+    func quickLookHoveredItem() -> Bool {
+        guard state == .expanded, selectedTab == .shelf, shelfMode == .files, let url = hoveredShelfItem,
+            features.shelf.items.contains(url)
+        else { return false }
+        showQuickLook(url)
+        return true
     }
 
     /// Runs a clipboard card's action.

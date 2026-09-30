@@ -33,7 +33,10 @@ enum TestSupport {
             pomodoro: PomodoroModel(defaults: UserDefaults(suiteName: "MacIslandTests")!),
             work: work,
             weather: WeatherModel(),
-            fileTools: FileTools(shelf: shelf, work: work),
+            fileTools: FileTools(
+                shelf: shelf, work: work, recognizer: StubRecognizer(),
+                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+            ),
             notes: NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
             keyboardCleaner: KeyboardCleaner(),
             launch: LaunchModel(appDirectories: []),
@@ -42,4 +45,11 @@ enum TestSupport {
         viewModel.geometry = geometry
         return viewModel
     }
+}
+
+/// Returns a fixed reading instead of running Vision.
+struct StubRecognizer: TextRecognizing {
+    var result = RecognizedText(lines: [], barcodePayloads: [])
+
+    func recognize(_ image: CGImage) async throws -> RecognizedText { result }
 }

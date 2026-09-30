@@ -1,4 +1,5 @@
 import AppKit
+import QuickLook
 import SwiftUI
 
 /// Where a dragged file is about to land, decided by which half of the island it's over.
@@ -40,7 +41,13 @@ struct ShelfView: View {
                 case .clipboard: clipboardList
                 }
             }
+            .quickLookPreview(quickLook, in: shelf.items)
         }
+    }
+
+    /// Quick Look for the Shelf's files, driven by the view model so Space and the menu share it.
+    private var quickLook: Binding<URL?> {
+        Binding(get: { viewModel.quickLookURL }, set: { viewModel.quickLookURL = $0 })
     }
 
     private var header: some View {
@@ -52,6 +59,9 @@ struct ShelfView: View {
             Spacer()
             switch viewModel.shelfMode {
             case .files where !shelf.items.isEmpty:
+                if FileTools.combinable(shelf.items).count > 1 {
+                    ShelfTextButton(title: "Combine into PDF") { viewModel.fileTools.combinePDF(shelf.items) }
+                }
                 if shelf.items.count > 1 {
                     ShelfTextButton(title: "Zip All") { viewModel.fileTools.zip(shelf.items) }
                 }
@@ -72,7 +82,7 @@ struct ShelfView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(shelf.items, id: \.self) { url in
-                        ShelfItemView(url: url, tools: viewModel.fileTools) { shelf.remove(url) }
+                        ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
                     }
                 }
             }
@@ -87,7 +97,10 @@ struct ShelfView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(clipboard.entries) { entry in
-                        ClipboardCard(entry: entry, onAction: viewModel.perform) {
+                        ClipboardCard(
+                            entry: entry, onAction: viewModel.perform,
+                            onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } }
+                        ) {
                             viewModel.copyFromClipboardHistory(entry)
                         } onRemove: {
                             clipboard.remove(entry)
@@ -115,6 +128,7 @@ struct ShelfView: View {
 private struct ClipboardCard: View {
     let entry: ClipboardEntry
     let onAction: (SmartAction) -> Void
+    let onCopyText: (NSImage) -> Void
     let onCopy: () -> Void
     let onRemove: () -> Void
 
@@ -148,6 +162,9 @@ private struct ClipboardCard: View {
 
             if let action {
                 ChipButton(title: action.title) { onAction(action) }
+                    .padding(6)
+            } else if case .image(let image) = entry.content {
+                ChipButton(title: "Copy Text") { onCopyText(image) }
                     .padding(6)
             }
         }
@@ -283,10 +300,12 @@ private struct ShelfTextButton: View {
 
 private struct ShelfItemView: View {
     let url: URL
-    let tools: FileTools
+    let viewModel: IslandViewModel
     let onRemove: () -> Void
 
     @State private var isHovering = false
+
+    private var tools: FileTools { viewModel.fileTools }
 
     var body: some View {
         VStack(spacing: 3) {
@@ -315,27 +334,45 @@ private struct ShelfItemView: View {
             }
         }
         .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
+        .onHover {
+            isHovering = $0
+            viewModel.setHoveredShelfItem($0 ? url : nil)
+        }
         .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
         .onDrag { NSItemProvider(object: url as NSURL) }
         .contextMenu {
+            Button("Quick Look") { viewModel.showQuickLook(url) }
+            ShareLink("Share", item: url)
+            Divider()
+            let kind = FileKind.of(url)
+            if kind == .image || kind == .pdf {
+                Button("Copy Text") { Task { await tools.copyText(from: url) } }
+            }
             Button("Zip") { tools.zip([url]) }
             if FileTools.isZip(url) {
                 Button("Unzip") { tools.unzip(url) }
             }
-            let formats = FileTools.conversions(for: url)
-            if !formats.isEmpty {
+            let targets = ConversionTarget.targets(for: url)
+            if !targets.isEmpty {
                 Menu("Convert To") {
-                    ForEach(formats) { format in
-                        Button(format.rawValue) { tools.convert(url, to: format) }
+                    ForEach(targets) { target in
+                        Button(target.rawValue) { tools.convert(url, to: target) }
                     }
                 }
+            }
+            if kind == .image {
+                Menu("Resize") {
+                    Button("Half Size") { tools.resize(url, maxPixel: nil) }
+                    Button("1920 px") { tools.resize(url, maxPixel: 1920) }
+                    Button("1280 px") { tools.resize(url, maxPixel: 1280) }
+                }
+                Button("Compress") { tools.compress(url) }
             }
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             Divider()
             Button("Remove", action: onRemove)
         }
-        .help("\(url.lastPathComponent)\nDouble-click to open. Drag out to use it. Right-click to zip or convert.")
+        .help("\(url.lastPathComponent)\nDouble-click to open. Drag out to use it. Right-click for more.")
         .accessibilityElement(children: .combine)
         .accessibilityLabel(url.lastPathComponent)
         .accessibilityAddTraits(.isButton)

@@ -56,7 +56,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 216 tests, about a second.
+lines; 234 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -192,7 +192,9 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `ShelfView.swift` | The Files and Clipboard views, drop tiles, item and card views with their menus |
 | `ClipboardHistory.swift` | The pasteboard poller and the ten-item, memory-only history |
 | `SmartAction.swift` | Detects a lone link, address, or `#hex` color and names the action |
-| `FileTools.swift` | Zip, unzip, image conversion (ImageIO, PDFKit), unique names |
+| `FileTools.swift` | Zip, unzip, and the Shelf jobs (convert, combine, resize, compress, Copy Text), unique names |
+| `Converters.swift` | `FileKind`, `ConversionTarget`, and every converter: images, documents, PDF, video, audio, plus `MarkdownText` |
+| `TextRecognizer.swift` | `RecognizedText`, `TextRecognizing`, and the Vision recognizer |
 | `ScreenshotWatcher.swift` | A Spotlight query for new screenshots |
 
 ### `Tools/`
@@ -262,7 +264,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 14 files, about 2,600 lines, **216 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 15 files, about 2,900 lines, **234 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -277,6 +279,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `MediaTests.swift` | LRC, lyrics, transport, shuffle and repeat, players |
 | `Phase4Tests.swift` | Pomodoro, month grid, weather, stats, smart actions, file tools, notes, Clean Keys, reminders, the strip, the tab sides |
 | `Phase5Tests.swift` | Search engines, ranking, parsers, apps, Shortcuts, the palette model, menu bar and windows, the player layout, transport routing |
+| `ShelfToolsTests.swift` | File kinds and targets, Copy Text, document, PDF, image, audio, and video conversions |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
 
 ---

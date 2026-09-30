@@ -1,40 +1,6 @@
 import AppKit
-import ImageIO
 import PDFKit
 import UniformTypeIdentifiers
-
-/// What a Shelf image can be converted to.
-enum ImageFormat: String, CaseIterable, Identifiable {
-    case heic = "HEIC"
-    case png = "PNG"
-    case jpeg = "JPEG"
-    case tiff = "TIFF"
-    case pdf = "PDF"
-
-    var id: Self { self }
-
-    var type: UTType {
-        switch self {
-        case .heic: .heic
-        case .png: .png
-        case .jpeg: .jpeg
-        case .tiff: .tiff
-        case .pdf: .pdf
-        }
-    }
-
-    var fileExtension: String {
-        switch self {
-        case .jpeg: "jpg"
-        default: rawValue.lowercased()
-        }
-    }
-
-    /// HEIC needs hardware support, so ask the system instead of assuming.
-    var isAvailable: Bool {
-        self == .pdf || (CGImageDestinationCopyTypeIdentifiers() as? [String] ?? []).contains(type.identifier)
-    }
-}
 
 enum FileToolError: LocalizedError {
     case unreadable
@@ -48,44 +14,151 @@ enum FileToolError: LocalizedError {
     }
 }
 
-/// Zip, unzip, and convert files on the Shelf. The result lands on the Shelf too.
+/// Zip, unzip, convert, and otherwise work on files on the Shelf. The result lands on the Shelf too.
 @MainActor
 final class FileTools {
+    /// Copy Text reads at most this many PDF pages by image; pages with text of their own are free.
+    static let ocrPageLimit = 10
+
     private let shelf: ShelfModel
     private let work: WorkTracker
+    private let recognizer: TextRecognizing
+    private let pasteboard: NSPasteboard
 
     /// Called with a short past-tense word ("Zipped") or, on failure, the reason.
     var onDone: ((String) -> Void)?
     var onFail: ((String) -> Void)?
+    /// Called with a neutral note ("Copied", "No Text Found").
+    var onNote: ((IslandAlert) -> Void)?
 
-    init(shelf: ShelfModel, work: WorkTracker) {
+    init(
+        shelf: ShelfModel, work: WorkTracker, recognizer: TextRecognizing = VisionTextRecognizer(),
+        pasteboard: NSPasteboard = .general
+    ) {
         self.shelf = shelf
         self.work = work
+        self.recognizer = recognizer
+        self.pasteboard = pasteboard
     }
 
     func zip(_ urls: [URL]) {
         guard let first = urls.first else { return }
         let destination = Self.uniqueURL(for: Self.zipDestination(for: urls), in: first.deletingLastPathComponent())
-        run("Zipping", success: "Zipped") { try Self.zip(urls, to: destination) }
+        runBlocking("Zipping", success: "Zipped") { try Self.zip(urls, to: destination) }
     }
 
     func unzip(_ url: URL) {
         let directory = url.deletingLastPathComponent()
-        run("Unzipping", success: "Unzipped") { try Self.unzip(url, into: directory) }
+        runBlocking("Unzipping", success: "Unzipped") { try Self.unzip(url, into: directory) }
     }
 
-    func convert(_ url: URL, to format: ImageFormat) {
+    func convert(_ url: URL, to target: ConversionTarget) {
+        let destination = Self.uniqueURL(for: Converters.outputName(for: url, to: target), in: url.deletingLastPathComponent())
+        run("Converting", success: "Converted") { try await Converters.convert(url, to: target, destination: destination) }
+    }
+
+    /// The images and PDFs among `urls` become one PDF, "Combined.pdf", beside the first.
+    /// The images and PDFs among `urls`, which Combine into PDF joins.
+    nonisolated static func combinable(_ urls: [URL]) -> [URL] {
+        urls.filter { [.image, .pdf].contains(FileKind.of($0)) }
+    }
+
+    func combinePDF(_ urls: [URL]) {
+        let pages = Self.combinable(urls)
+        guard let first = pages.first else { return }
+        let destination = Self.uniqueURL(for: "Combined.pdf", in: first.deletingLastPathComponent())
+        runBlocking("Combining", success: "Combined") { try Converters.combine(pages, destination: destination) }
+    }
+
+    /// `maxPixel` is the long edge in pixels; `nil` halves the image.
+    func resize(_ url: URL, maxPixel: Int?) {
+        let suffix = maxPixel.map { "\($0) px" } ?? "50%"
+        let ext = url.pathExtension
         let destination = Self.uniqueURL(
-            for: url.deletingPathExtension().lastPathComponent + "." + format.fileExtension,
+            for: url.deletingPathExtension().lastPathComponent + " " + suffix + (ext.isEmpty ? "" : "." + ext),
             in: url.deletingLastPathComponent()
         )
-        run("Converting", success: "Converted") { try Self.convertImage(at: url, to: format, destination: destination) }
+        runBlocking("Resizing", success: "Resized") { try Converters.resize(url, maxPixel: maxPixel, destination: destination) }
     }
 
-    private func run(_ title: String, success: String, _ job: @escaping @Sendable () throws -> URL) {
+    func compress(_ url: URL) {
+        let destination = Self.uniqueURL(
+            for: url.deletingPathExtension().lastPathComponent + " Compressed.jpg", in: url.deletingLastPathComponent()
+        )
+        runBlocking("Compressing", success: "Compressed") { try Converters.compress(url, destination: destination) }
+    }
+
+    // MARK: Copy Text
+
+    /// Reads the text (and QR codes) in an image or PDF and puts it on the pasteboard.
+    func copyText(from url: URL) async {
+        let id = work.begin("Reading Text")
+        defer { work.end(id) }
+        do {
+            switch FileKind.of(url) {
+            case .image:
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                    let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+                else { throw FileToolError.unreadable }
+                finishCopy(try await recognizer.recognize(image).joined)
+            case .pdf:
+                finishCopy(try await pdfText(at: url))
+            default:
+                throw FileToolError.unreadable
+            }
+        } catch {
+            onFail?(error.localizedDescription)
+        }
+    }
+
+    func copyText(from image: NSImage) async {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            onFail?(FileToolError.unreadable.localizedDescription)
+            return
+        }
+        let id = work.begin("Reading Text")
+        defer { work.end(id) }
+        do {
+            finishCopy(try await recognizer.recognize(cgImage).joined)
+        } catch {
+            onFail?(error.localizedDescription)
+        }
+    }
+
+    /// A PDF's own text first; only pages that have none are read as images, up to `ocrPageLimit`.
+    private func pdfText(at url: URL) async throws -> String {
+        guard let document = PDFDocument(url: url) else { throw FileToolError.unreadable }
+        var pages: [String] = []
+        var scanned = 0
+        for index in 0..<document.pageCount {
+            guard let page = document.page(at: index) else { continue }
+            let own = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !own.isEmpty {
+                pages.append(own)
+            } else if scanned < Self.ocrPageLimit, let image = Converters.render(page, scale: 2) {
+                scanned += 1
+                let found = try await recognizer.recognize(image).joined
+                if !found.isEmpty { pages.append(found) }
+            }
+        }
+        return pages.joined(separator: "\n\n")
+    }
+
+    private func finishCopy(_ text: String) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            onNote?(IslandAlert(systemImage: "text.viewfinder", tint: Theme.Tint.neutral, text: "No Text Found"))
+            return
+        }
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        onNote?(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"))
+    }
+
+    private func run(_ title: String, success: String, _ job: @escaping @Sendable () async throws -> URL) {
         let id = work.begin(title)
         Task {
-            let result = await Task.detached { Result { try job() } }.value
+            let result: Result<URL, Error>
+            do { result = .success(try await job()) } catch { result = .failure(error) }
             work.end(id)
             switch result {
             case .success(let url):
@@ -95,6 +168,11 @@ final class FileTools {
                 onFail?(error.localizedDescription)
             }
         }
+    }
+
+    /// Runs blocking work off the main thread.
+    private func runBlocking(_ title: String, success: String, _ job: @escaping @Sendable () throws -> URL) {
+        run(title, success: success) { try await Task.detached { try job() }.value }
     }
 
     // MARK: Work (off the main thread)
@@ -194,33 +272,6 @@ final class FileTools {
             let message = String(data: output, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
             throw FileToolError.failed(message?.isEmpty == false ? message! : "ditto failed.")
         }
-    }
-
-    /// Images through ImageIO; a PDF is made with PDFKit, one page per image.
-    nonisolated static func convertImage(at url: URL, to format: ImageFormat, destination: URL) throws -> URL {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), CGImageSourceGetCount(source) > 0 else {
-            throw FileToolError.unreadable
-        }
-        if format == .pdf {
-            guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else { throw FileToolError.unreadable }
-            let document = PDFDocument()
-            document.insert(page, at: 0)
-            guard document.write(to: destination) else { throw FileToolError.failed("The PDF could not be saved.") }
-            return destination
-        }
-        guard format.isAvailable,
-              let output = CGImageDestinationCreateWithURL(destination as CFURL, format.type.identifier as CFString, 1, nil)
-        else { throw FileToolError.failed("\(format.rawValue) isn’t supported on this Mac.") }
-        // Carries over orientation and metadata, and drops nothing but the container.
-        CGImageDestinationAddImageFromSource(output, source, 0, nil)
-        guard CGImageDestinationFinalize(output) else { throw FileToolError.failed("The image could not be converted.") }
-        return destination
-    }
-
-    /// The formats offered for an item: images only, and not the one it already is.
-    nonisolated static func conversions(for url: URL) -> [ImageFormat] {
-        guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) else { return [] }
-        return ImageFormat.allCases.filter { $0.isAvailable && $0.type != type }
     }
 
     nonisolated static func isZip(_ url: URL) -> Bool {

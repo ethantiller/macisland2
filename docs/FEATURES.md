@@ -173,12 +173,30 @@ A dashboard, in two rows of boxes that share the same left and right edges.
 A **Files / Clipboard** choice.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
-  kept; files stay where they are. Double-click opens, drag out to use, hover for an ✕. **Right-click** an item to *Zip*,
-  *Unzip*, *Convert To* (images: HEIC, PNG, JPEG, TIFF, PDF), or *Show in Finder*. **Zip All** zips everything. Results land
-  on the Shelf. New screenshots are added automatically.
+  kept; files stay where they are. Double-click opens, drag out to use, hover for an ✕. **Space** over an item previews it with
+  Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text* (images and PDFs), *Zip*, *Unzip*,
+  *Convert To*, *Resize* and *Compress* (images), or *Show in Finder*. **Zip All** zips everything; **Combine into PDF** joins
+  two or more images and PDFs. Results land on the Shelf. New screenshots are added automatically.
+  - **Copy Text** reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
+    first; only pages without text are read as images, up to 10. It says *Copied*, or *No Text Found*.
+  - **Convert To** is offered for every kind, and never lists the format the file already is:
+
+    | From | To |
+    | --- | --- |
+    | Images | HEIC, PNG, JPEG, TIFF, PDF |
+    | DOCX, DOC, RTF, RTFD, ODT, TXT, HTML, Markdown | PDF, DOCX, RTF, TXT, HTML, ODT |
+    | PDF | TXT; PNG or JPEG (one file per page, in a "name Pages" folder) |
+    | MOV, MP4, M4V | MP4, M4A (audio only), GIF (the first 15 s, 12 fps, up to 640 px) |
+    | WAV, AIFF, MP3, CAF | M4A |
+
+  - **Word fidelity.** Documents use TextEdit's engine: text, fonts, lists, simple tables, and images survive; headers, footers,
+    footnotes, text boxes, and tracked changes do not.
+  - **Resize** is half size, or 1920 or 1280 px on the long edge (never larger than the original); **Compress** makes a JPEG at
+    quality 0.7.
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
-  link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch).
+  link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
+  image card gets **Copy Text**.
 
 ### Clock
 

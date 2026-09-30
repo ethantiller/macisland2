@@ -364,25 +364,26 @@ struct FileToolsTests {
     @Test func convertsAnImageToOtherFormats() throws {
         let directory = try makeDirectory()
         let png = try makePNG(in: directory)
-        for format in [ImageFormat.jpeg, .tiff, .pdf] {
+        for format in [ConversionTarget.jpeg, .tiff, .pdf] {
             let output = directory.appendingPathComponent("out.\(format.fileExtension)")
-            _ = try FileTools.convertImage(at: png, to: format, destination: output)
+            _ = try Converters.image(at: png, to: format, destination: output)
             #expect(FileManager.default.fileExists(atPath: output.path))
             if format != .pdf {
                 #expect(CGImageSourceCreateWithURL(output as CFURL, nil).flatMap(CGImageSourceGetType) as String? == format.type.identifier)
             }
         }
         #expect(throws: FileToolError.self) {
-            try FileTools.convertImage(at: directory, to: .jpeg, destination: directory.appendingPathComponent("x.jpg"))
+            try Converters.image(at: directory, to: .jpeg, destination: directory.appendingPathComponent("x.jpg"))
         }
     }
 
     @Test func offersOnlyOtherFormatsForImages() throws {
         let directory = try makeDirectory()
         let png = try makePNG(in: directory)
-        let formats = FileTools.conversions(for: png)
+        let formats = ConversionTarget.targets(for: png)
         #expect(!formats.contains(.png) && formats.contains(.jpeg) && formats.contains(.pdf))
-        #expect(FileTools.conversions(for: directory.appendingPathComponent("notes.txt")).isEmpty)
+        #expect(ConversionTarget.targets(for: directory.appendingPathComponent("notes.txt")).contains(.pdf))
+        #expect(ConversionTarget.targets(for: directory.appendingPathComponent("archive.zip")).isEmpty)
     }
 }
 

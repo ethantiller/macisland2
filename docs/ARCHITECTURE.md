@@ -181,6 +181,13 @@ decides what the peek shows. The table is in [FEATURES.md](FEATURES.md#live-acti
 `WorkTracker` is the general "busy" list (zipping, converting, running a Shortcut): call `begin(title)`, later `end(id)`, and a blue
 "working" activity shows while any job runs.
 
+`FileTools` runs Shelf jobs through `run` (async) or `runBlocking` (a `Task.detached`), so a job shows the blue activity, adds its
+result to the Shelf, and reports through `onDone`, `onFail`, or `onNote` (neutral: "Copied", "No Text Found"). `Converters` does
+the work with system frameworks: ImageIO and PDFKit for images and PDFs, `NSAttributedString` for documents (Markdown is laid out
+by `MarkdownText` first), `AVAssetExportSession` and `AVAssetImageGenerator` for media. HTML import and `NSPrintOperation` (the
+PDF a document makes) run on the main actor; everything else runs detached. `TextRecognizing` puts Vision behind a protocol so
+tests use a stub.
+
 ---
 
 ## Drawing: container, surfaces, motion
@@ -367,7 +374,7 @@ transport goes through AppleScript instead, addressed to the app itself. See [SC
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **216 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **234 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -403,4 +410,5 @@ Things that cost time. Read before changing the related code.
 | **Hover during a drag** | While a file is dragged, hovering must not open the island (only the drop target does), but hovering may keep it open. `setDropTargeted` sets `isHovering` so it still closes when the pointer leaves. Drop halves are decided from the drop location (`x > width / 2` is AirDrop), which keeps working while the island resizes. |
 | **AirDrop** | Incoming can't be intercepted (the Accept/Decline notification belongs to `sharingd`; nothing is observable until the file starts arriving in Downloads, where `TransferMonitor` shows it). Sending is picker-only. See [ROADMAP.md](ROADMAP.md#dropped-for-good). |
 | **Snapshots and drags** | Drag and drop states can't be simulated in `ImageRenderer`; check them in the running app. |
+| **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()` and `holdOpen()`; hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
 | **No Python here** | Scripted edits in this environment used `perl`; the repo itself has no Python. |

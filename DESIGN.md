@@ -36,7 +36,7 @@ There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/R
 | --- | --- |
 | Home | A dashboard: today (opens a month calendar), what is next, what is playing, the four everyday tools, timer chips, Shelf |
 | Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics |
-| Shelf | Files (zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions) |
+| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
 | Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Low Power, Clean Keyboard |
@@ -150,8 +150,8 @@ and may not draw `.glassEffect`. Check those in the running app.
 - **Idle peek.** With nothing live, hovering shows the day (date, weather, what is next or this Mac's battery) and the everyday tools with 5m and 25m timers. A running timer, stopwatch, or Pomodoro peeks as its ring and controls only, sized to fit the 380 pt width.
 - **Clock.** Timer, Stopwatch, and Pomodoro share the tab. Pomodoro chains four focus sessions with short
   breaks and a long break, then stops. Its streak and 7-day chart live under the ring.
-- **Shelf.** Right-click an item to zip, unzip, convert (images), or show it in Finder. Zip and convert run as
-  the blue "in progress" activity; the result is added to the Shelf. Clipboard text that is only a link,
+- **Shelf.** Right-click an item to preview, share, copy its text, zip, unzip, convert, resize, compress, or show it in Finder. These
+  run as the blue "in progress" activity; the result is added to the Shelf. Clipboard text that is only a link,
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.

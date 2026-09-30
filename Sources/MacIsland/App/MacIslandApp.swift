@@ -247,6 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.fileTools.onDone = { word in
             viewModel.flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: word))
         }
+        features.fileTools.onNote = { note in viewModel.flash(note, respectingFocus: false) }
         features.fileTools.onFail = { reason in
             viewModel.showBanner(
                 IslandBanner(
@@ -349,11 +350,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.settings.onHotkeyChange = apply
         apply(features.settings.hotkey)
 
+        viewModel.onWantsKeyboard = { [weak panel] in panel?.makeKey() }
         panel.keyHandler = { keyCode in
             switch Int(keyCode) {
             case kVK_Escape: viewModel.closePinned()
             case kVK_LeftArrow: viewModel.selectAdjacentTab(-1)
             case kVK_RightArrow: viewModel.selectAdjacentTab(1)
+            case kVK_Space: return viewModel.quickLookHoveredItem()
             default: return false
             }
             return true
