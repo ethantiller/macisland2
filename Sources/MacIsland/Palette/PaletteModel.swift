@@ -61,6 +61,7 @@ final class PaletteModel {
 
     func reset() {
         query = ""
+        viewModel.bluetooth.refresh()
         translation = .idle
         translationConfiguration = nil
         update()
@@ -284,6 +285,15 @@ final class PaletteModel {
                     [launch = viewModel.launch] in launch.open(app.url)
                 },
                 names: [app.name], bias: 0
+            ))
+        }
+
+        for device in viewModel.bluetooth.notConnected {
+            list.append(Candidate(
+                item: PaletteItem(
+                    id: "bluetooth-\(device.id)", title: "Connect \(device.name)", subtitle: "Bluetooth", icon: .symbol("headphones")
+                ) { [bluetooth = viewModel.bluetooth] in Task { await bluetooth.connect(device) } },
+                names: [device.name, "connect \(device.name)"], bias: 0
             ))
         }
 

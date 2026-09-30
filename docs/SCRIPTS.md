@@ -56,7 +56,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 274 tests, about a second.
+lines; 294 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -227,7 +227,8 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | --- | --- |
 | `Notes/NotesModel.swift` | Notes and snippets, saved as one JSON file after a pause in typing |
 | `Notes/NotesView.swift` | The Notes tab: lists, editors, the Prompter |
-| `Weather/WeatherModel.swift` | Open-Meteo geocoding and forecast, WMO code names, `WeatherGlance` |
+| `Weather/WeatherModel.swift` | Open-Meteo geocoding and forecast (with quarter-hour rain), WMO code names, `WeatherGlance` |
+| `Weather/RainRule.swift` | `RainSample`, `RainRule` (dry now, 0.2 mm within 30 minutes), `RainSpell` (once per spell) |
 | `Launch/AppIndex.swift` | Scans app folders for the palette |
 | `Launch/ShortcutsCLI.swift` | `shortcuts list` and `shortcuts run` |
 | `Launch/LaunchModel.swift` | Holds the app index and the Shortcuts list for the palette |
@@ -251,6 +252,8 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `System/PrivacyMonitor.swift` | Which app is using the microphone |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
 | `System/FocusMode.swift` | Whether a Focus is on; switching through Shortcuts |
+| `System/DiskSpace.swift` | `DiskRule` (warn under 10 GB, re-arm above 15 GB) and `DiskSpace`, checked on events |
+| `System/BluetoothDevices.swift` | Paired audio devices, connecting, and `IOBluetoothProvider` behind `BluetoothDeviceProviding` |
 | `System/WorkTracker.swift` | The "in progress" job list |
 | `Transfers/TransferMonitor.swift` | Progress of files arriving in Downloads |
 
@@ -267,7 +270,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 17 files, about 3,400 lines, **274 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 18 files, about 3,700 lines, **294 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -285,6 +288,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `ShelfToolsTests.swift` | File kinds and targets, Copy Text, document, PDF, image, audio, and video conversions |
 | `ClipboardTests.swift` | History search, plain-text copy, Save as Snippet, the `clip` palette rows |
 | `AnswersTests.swift` | Definitions, units, the calculator, currency parsing and rates, the answer rows, `macisland://` links, Lock Screen |
+| `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
 
 ---

@@ -20,6 +20,10 @@ final class WeatherModel {
     @ObservationIgnored var fetch: (URL) async -> Data? = WeatherModel.fetchFromNetwork
     @ObservationIgnored var usesFahrenheit = Locale.current.measurementSystem == .us
     @ObservationIgnored var refreshInterval: Duration = .seconds(30 * 60)
+    /// Called with when rain is due to start, at most once per rain spell.
+    @ObservationIgnored var onRainSoon: ((Date) -> Void)?
+    @ObservationIgnored var now: () -> Date = Date.init
+    @ObservationIgnored private var spell = RainSpell()
     @ObservationIgnored var typingPause: Duration = .milliseconds(800)
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var place: Place?
@@ -34,6 +38,7 @@ final class WeatherModel {
     func configure(city: String) {
         task?.cancel()
         place = nil
+        spell = RainSpell()
         let name = Self.searchName(from: city)
         guard !name.isEmpty else {
             withAnimation(Theme.Motion.resize) { conditions = nil }
@@ -59,6 +64,14 @@ final class WeatherModel {
         else { return }
         let new = Self.parseConditions(data, place: place)
         withAnimation(Theme.Motion.resize) { conditions = new }
+        announceRainIfDue(Self.parseRain(data))
+    }
+
+    private func announceRainIfDue(_ samples: [RainSample]) {
+        let current = now()
+        let start = RainRule.start(samples: samples, now: current)
+        let wet = RainRule.isWet(samples: samples, now: current)
+        if spell.shouldAnnounce(start: start, wetNow: wet, now: current), let start { onRainSoon?(start) }
     }
 
     // MARK: Requests and parsing
@@ -85,6 +98,8 @@ final class WeatherModel {
             URLQueryItem(name: "latitude", value: String(place.latitude)),
             URLQueryItem(name: "longitude", value: String(place.longitude)),
             URLQueryItem(name: "current", value: "temperature_2m,weather_code,is_day"),
+            URLQueryItem(name: "minutely_15", value: "precipitation"),
+            URLQueryItem(name: "forecast_minutely_15", value: "8"),
             URLQueryItem(name: "temperature_unit", value: fahrenheit ? "fahrenheit" : "celsius"),
             URLQueryItem(name: "timezone", value: "auto"),
         ]
@@ -109,6 +124,21 @@ final class WeatherModel {
         return WeatherConditions(
             temperature: Int(temperature.rounded()), symbol: description.symbol, summary: description.summary, place: place.name
         )
+    }
+
+    /// The quarter-hour precipitation, in the place's own time zone (`utc_offset_seconds` says which).
+    nonisolated static func parseRain(_ data: Data) -> [RainSample] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let block = root["minutely_15"] as? [String: Any],
+              let times = block["time"] as? [String], let amounts = block["precipitation"] as? [Any]
+        else { return [] }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        formatter.timeZone = TimeZone(secondsFromGMT: root["utc_offset_seconds"] as? Int ?? 0)
+        return zip(times, amounts).compactMap { time, amount in
+            formatter.date(from: time).map { RainSample(time: $0, millimeters: (amount as? NSNumber)?.doubleValue ?? 0) }
+        }
     }
 
     /// WMO weather codes, as Open-Meteo reports them.

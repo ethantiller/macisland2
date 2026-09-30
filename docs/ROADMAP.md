@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (274 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (294 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -77,7 +77,7 @@ packages in order, and tick each one when it lands (with its hand checks added t
 | N5 | Rain-soon banner · Low disk space banner · Bluetooth device switcher | none (Bluetooth is already granted) |
 | N6 | Mirror with Check Camera · Record Screen · Voice Note · two-action banners · the Tools grid becomes 2 × 6 · delete dormant code | Camera, Microphone, Screen Recording |
 
-**Progress:** N1 ☑ · N2 ☑ · N3 ☑ · N4 ☑ · N5 ☐ · N6 ☐
+**Progress:** N1 ☑ · N2 ☑ · N3 ☑ · N4 ☑ · N5 ☑ · N6 ☐
 
 ### N1: Shelf and files
 
@@ -404,6 +404,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Resize and Compress an image; Combine into PDF appears with two or more images or PDFs
 - [ ] Right-click a text Clipboard card: Copy as Plain Text and Save as Snippet (the snippet appears in Notes); `clip …` in the palette lists copies
 - [ ] Join on a Teams and a Zoom meeting opens the app (and the browser when the app is missing); a SafeLinks link opens the real meeting; Settings → Up Next → Open Internet Accounts opens the pane
+- [ ] Rain Soon: set a city where rain is due; the banner shows once. Low Disk Space: lower the threshold to test, or fill the disk; **Open Storage** opens the pane
+- [ ] Media output picker: a *Not Connected* group lists paired headphones; AirPods connect from it (blue "Connecting", then the headphones banner); right-click to Disconnect; `connect …` in the palette
 - [ ] Palette: `define serendipity`, `5 km in mi`, `72f to c`, `100 usd in eur` (needs the network), and `2*(3+4)` each give a row that copies on Return
 - [ ] `open "macisland://timer?minutes=1"` starts a timer; `macisland://banner?title=Hi` shows a banner; **Lock Screen** locks (and asks for Accessibility the first time)
 

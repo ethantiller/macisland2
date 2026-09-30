@@ -108,6 +108,8 @@ action. Alerts that need you (a timer finishing, a Pomodoro phase ending) stay u
 | Personal Hotspot connects | Green alert |
 | The Mac unlocks | "Unlocked" with a Touch ID glyph |
 | Zip, convert, or a Shortcut finishes | Green "Zipped", "Converted", "Done"; or a red banner with the reason |
+| Rain is due within 30 minutes (only with a city set) | Banner "Rain Soon", "Starts around 3:45 PM"; once per rain spell, and again only after a dry hour |
+| Free space falls under 10 GB | Red banner "Low Disk Space", "8.2 GB free", with **Open Storage**; a red alert stays until seen. Checked on unlock, on wake, and after a finished job or download, never on a schedule; it warns again only after space passes 15 GB |
 
 **Quiet in Focus** (Settings): while a Focus is on, banners and short alerts are held back. Alerts that stay until seen, and
 feedback to something you just did, still arrive.
@@ -172,7 +174,7 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 - **Music and Spotify are controlled directly**, so play/pause hits *that* app even while a video plays elsewhere. Other
   apps use the system's command.
 - **Favorite** (Apple Music only) is a heart. **App volume** (Music and Spotify) is a slider beside the output chips, behind
-  the AirPlay button. **Audio output**: chips for each output device.
+  the AirPlay button. **Audio output**: chips for each output device, then a *Not Connected* group with your paired Bluetooth headphones and speakers: click one to connect it (blue "Connecting" while it works; the headphones banner confirms, or "Couldn't Connect"). Right-click a connected Bluetooth output to *Disconnect*. The paired list is read only when the picker opens. In the palette, `connect airpods` finds them too.
 - **Synced lyrics** under the scrubber, from LRCLIB, while the track has them. Turn off in Settings.
 - Compact: the artwork and, on the right, a play button that becomes bouncing bars while playing. Click it to play or pause.
 

@@ -8,7 +8,7 @@ struct PeekContent: View {
         Group {
             switch viewModel.compactActivity {
             case .media:
-                NowPlayingView(nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, isPeek: true)
+                NowPlayingView(nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth, isPeek: true)
             case .timer, .pomodoro, .stopwatch:
                 ClockPeekView(viewModel: viewModel)
             default:

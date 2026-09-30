@@ -53,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyboardCleaner: KeyboardCleaner(),
         launch: LaunchModel(),
             stats: SystemStats(),
-            rates: ExchangeRates()
+            rates: ExchangeRates(),
+            bluetooth: BluetoothDevices(provider: IOBluetoothProvider(), work: work)
         )
     }
 
@@ -66,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
     private let accessoryMonitor = AudioAccessoryMonitor()
+    private let diskSpace = DiskSpace()
     private let hotkey = GlobalHotkey()
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
@@ -176,27 +178,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             viewModel.flash(IslandAlert(systemImage: "personalhotspot", tint: Theme.Tint.positive, text: "Hotspot"))
         }
 
-        features.transfers.onFinish = { _ in
+        features.transfers.onFinish = { [diskSpace] _ in
             viewModel.flash(IslandAlert(systemImage: "arrow.down.circle.fill", tint: Theme.Tint.positive, text: "Saved"))
+            diskSpace.check()
         }
 
         DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsUnlocked"),
             object: nil,
             queue: .main
-        ) { _ in
+        ) { [diskSpace] _ in
             MainActor.assumeIsolated {
                 viewModel.flash(
                     IslandAlert(systemImage: "touchid", tint: Theme.Tint.positive, text: "Unlocked"),
                     for: .seconds(2)
                 )
+                diskSpace.check()
             }
+        }
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [diskSpace] _ in
+            MainActor.assumeIsolated { diskSpace.check() }
         }
 
         connectAgenda()
         connectWeather()
         connectLyrics()
         connectStorage()
+        connectDevices()
 
         batteryMonitor.start()
         accessoryMonitor.start()
@@ -208,10 +219,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         screenshotWatcher.start()
     }
 
+    /// Low disk space, and Bluetooth devices that would not connect.
+    private func connectDevices() {
+        let viewModel = viewModel
+        diskSpace.onLow = { free in
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "internaldrive.fill",
+                    tint: Theme.Tint.attention,
+                    title: "Low Disk Space",
+                    detail: DiskSpace.description(free: free),
+                    action: .init(title: "Open Storage") { DiskSpace.openStorageSettings() }
+                ),
+                for: .seconds(6),
+                followUp: IslandAlert(
+                    systemImage: "internaldrive.fill", tint: Theme.Tint.attention,
+                    text: ByteCountFormatter.string(fromByteCount: free, countStyle: .file), staysUntilSeen: true
+                ),
+                respectingFocus: false
+            )
+        }
+        features.bluetooth.onFailure = { _ in
+            viewModel.flash(BluetoothDevices.failureAlert(), respectingFocus: false)
+        }
+    }
+
     /// The weather follows the city in Settings, and stops when it is emptied.
     private func connectWeather() {
         let features = features
         let apply = { features.weather.configure(city: features.settings.weatherCity) }
+        features.weather.onRainSoon = { [viewModel] start in
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "cloud.rain.fill",
+                    tint: Theme.Tint.neutral,
+                    title: "Rain Soon",
+                    detail: "Starts around \(start.formatted(date: .omitted, time: .shortened))"
+                ),
+                for: .seconds(6)
+            )
+        }
         features.settings.onWeatherChange = apply
         apply()
     }
@@ -250,8 +297,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        features.fileTools.onDone = { word in
+        features.fileTools.onDone = { [diskSpace] word in
             viewModel.flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: word))
+            diskSpace.check()
         }
         features.fileTools.onNote = { note in viewModel.flash(note, respectingFocus: false) }
         features.fileTools.onFail = { reason in

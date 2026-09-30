@@ -41,6 +41,7 @@ private struct MediaMatch: ViewModifier {
 struct NowPlayingView: View {
     let nowPlaying: NowPlayingModel
     let outputs: AudioOutputs
+    let bluetooth: BluetoothDevices
     /// The peek is narrower and only needs transport, so shuffle, repeat, and Favorite stay in the Media tab.
     var isPeek = false
 
@@ -58,7 +59,7 @@ struct NowPlayingView: View {
                     if nowPlaying.appVolume != nil {
                         VolumeControl(nowPlaying: nowPlaying)
                     }
-                    OutputPicker(outputs: outputs)
+                    OutputPicker(outputs: outputs, bluetooth: bluetooth)
                 }
                 .frame(height: Theme.Metrics.playerScrubber)
                 .transition(.opacity)
@@ -168,6 +169,8 @@ struct NowPlayingView: View {
                     label: "Audio Output and Volume",
                     isSelected: showsOutputs
                 ) {
+                    // Paired devices are read only when the picker opens.
+                    if !showsOutputs { bluetooth.refresh() }
                     withAnimation(Theme.Motion.resize) { showsOutputs.toggle() }
                 }
             }
@@ -255,6 +258,13 @@ private struct ScrubberRow: View {
 
 private struct OutputPicker: View {
     let outputs: AudioOutputs
+    let bluetooth: BluetoothDevices
+
+    /// The paired Bluetooth device behind an output, so it can be disconnected.
+    private func pairedDevice(for device: AudioOutputs.Device) -> PairedDevice? {
+        guard device.isBluetooth else { return nil }
+        return bluetooth.devices.first { $0.name == device.name && $0.isConnected }
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -267,6 +277,26 @@ private struct OutputPicker: View {
                         accessibilityLabel: "Play Audio on \(device.name)"
                     ) {
                         outputs.select(device)
+                    }
+                    .contextMenu {
+                        if let paired = pairedDevice(for: device) {
+                            Button("Disconnect") { bluetooth.disconnect(paired) }
+                        }
+                    }
+                }
+                if !bluetooth.notConnected.isEmpty {
+                    Text("Not Connected")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Palette.secondary)
+                        .padding(.horizontal, 2)
+                    ForEach(bluetooth.notConnected) { device in
+                        ChipButton(
+                            title: device.name,
+                            systemImage: "headphones",
+                            accessibilityLabel: "Connect \(device.name)"
+                        ) {
+                            Task { await bluetooth.connect(device) }
+                        }
                     }
                 }
             }

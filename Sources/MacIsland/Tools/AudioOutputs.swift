@@ -10,6 +10,10 @@ final class AudioOutputs {
         let name: String
         let transportType: UInt32
 
+        var isBluetooth: Bool {
+            transportType == kAudioDeviceTransportTypeBluetooth || transportType == kAudioDeviceTransportTypeBluetoothLE
+        }
+
         var systemImage: String {
             switch transportType {
             case kAudioDeviceTransportTypeBuiltIn: "laptopcomputer"

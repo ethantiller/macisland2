@@ -5,7 +5,7 @@ import AppKit
 /// `IslandFeatures` only changes this file.
 @MainActor
 enum TestSupport {
-    static func makeViewModel(rates: ExchangeRates? = nil) -> IslandViewModel {
+    static func makeViewModel(rates: ExchangeRates? = nil, bluetooth: StubBluetooth? = nil) -> IslandViewModel {
         UserDefaults(suiteName: "MacIslandTests")!.removePersistentDomain(forName: "MacIslandTests")
         let shelf = ShelfModel()
         let work = WorkTracker()
@@ -41,7 +41,8 @@ enum TestSupport {
             keyboardCleaner: KeyboardCleaner(),
             launch: LaunchModel(appDirectories: []),
             stats: SystemStats(),
-            rates: rates ?? ExchangeRates(fetch: { _ in ([:], Date()) })
+            rates: rates ?? ExchangeRates(fetch: { _ in ([:], Date()) }),
+            bluetooth: BluetoothDevices(provider: bluetooth ?? StubBluetooth())
         ))
         viewModel.geometry = geometry
         return viewModel
@@ -53,4 +54,25 @@ struct StubRecognizer: TextRecognizing {
     var result = RecognizedText(lines: [], barcodePayloads: [])
 
     func recognize(_ image: CGImage) async throws -> RecognizedText { result }
+}
+
+/// A fixed list of paired devices; connecting works unless told otherwise.
+@MainActor
+final class StubBluetooth: BluetoothDeviceProviding {
+    var devices: [PairedDevice] = []
+    var connectSucceeds = true
+    private(set) var disconnected: [String] = []
+
+    func pairedAudioDevices() -> [PairedDevice] { devices }
+
+    func connect(_ id: String) async -> Bool {
+        guard connectSucceeds, let index = devices.firstIndex(where: { $0.id == id }) else { return false }
+        devices[index].isConnected = true
+        return true
+    }
+
+    func disconnect(_ id: String) {
+        disconnected.append(id)
+        if let index = devices.firstIndex(where: { $0.id == id }) { devices[index].isConnected = false }
+    }
 }

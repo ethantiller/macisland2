@@ -140,6 +140,7 @@ struct IslandFeatures {
     let launch: LaunchModel
     let stats: SystemStats
     let rates: ExchangeRates
+    let bluetooth: BluetoothDevices
 }
 
 @MainActor
