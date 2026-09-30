@@ -12,7 +12,7 @@ import SwiftUI
 /// What a stop points at. Each is anchored at one view with `.tourAnchor(_:)`.
 enum TourTarget: Hashable {
     case search, previewBand, shortcut, peekOnHover, notShownTray, menuBarRow, addWidgets, calendarEvents, dragTarget,
-        musicCompact, toolsRow, quietInFocus, accessList, guide
+        musicCompact, pomodoro, toolsRow, quietInFocus, accessList, guide
     /// The visible part of the pane's scrolling form: a target outside it has been scrolled out of view.
     case paneViewport
 
@@ -102,6 +102,12 @@ struct TourStop: Identifiable, Equatable {
             id: "music", since: 1, pane: .media, target: .musicCompact, placement: .below,
             scrollAnchor: SettingsAnchor.music, preview: nil, title: "Music Beside the Notch",
             copy: "Turn this off to keep music in Home and the Media tab only."),
+        TourStop(
+            id: "pomodoro", since: 2, pane: .clock, target: .pomodoro, placement: .below,
+            scrollAnchor: SettingsAnchor.pomodoro, preview: nil, title: "Set Your Pomodoro",
+            copy:
+                "Choose how long a focus session and each break last, and how many sessions come before the long break."
+        ),
         TourStop(
             id: "toolsRow", since: 1, pane: .tools, target: .toolsRow, placement: .below,
             scrollAnchor: SettingsAnchor.toolsRow, preview: nil, title: "Your Tools Row",

@@ -21,7 +21,7 @@ struct SettingsTourTests {
         for pane in SettingsPane.allCases {
             #expect(TourStop.all.contains { $0.pane == pane }, "\(pane)")
         }
-        #expect(TourStop.all.count == 15)
+        #expect(TourStop.all.count == 16)
     }
 
     @Test func stopsAreGroupedByPane() {

@@ -59,10 +59,137 @@ struct PomodoroModelTests {
     }
 
     @Test func focusThenBreakThenFocus() {
-        #expect(PomodoroModel.next(after: .focus, focusFinished: 1) == .shortBreak)
-        #expect(PomodoroModel.next(after: .shortBreak, focusFinished: 1) == .focus)
-        #expect(PomodoroModel.next(after: .focus, focusFinished: 4) == .longBreak)
-        #expect(PomodoroModel.next(after: .longBreak, focusFinished: 4) == nil)
+        #expect(PomodoroModel.next(after: .focus, focusFinished: 1, sessions: 4) == .shortBreak)
+        #expect(PomodoroModel.next(after: .shortBreak, focusFinished: 1, sessions: 4) == .focus)
+        #expect(PomodoroModel.next(after: .focus, focusFinished: 4, sessions: 4) == .longBreak)
+        #expect(PomodoroModel.next(after: .longBreak, focusFinished: 4, sessions: 4) == nil)
+        // The long break comes after as many focus sessions as the plan says.
+        #expect(PomodoroModel.next(after: .focus, focusFinished: 2, sessions: 2) == .longBreak)
+        #expect(PomodoroModel.next(after: .focus, focusFinished: 2, sessions: 3) == .shortBreak)
+    }
+
+    private func makeSettings() -> AppSettings {
+        let suite = "MacIslandPomodoroSettings.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return AppSettings(defaults: defaults)
+    }
+
+    private func makeModel(following settings: AppSettings) -> PomodoroModel {
+        let suite = "MacIslandPomodoroModel.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return PomodoroModel(defaults: defaults, plan: { settings.pomodoroPlan })
+    }
+
+    @Test func theClassicLengthsAreTheDefaults() {
+        let settings = makeSettings()
+        #expect(settings.pomodoroPlan == PomodoroPlan.default)
+        #expect(settings.pomodoroPlan == PomodoroPlan(focus: 25, shortBreak: 5, longBreak: 15, sessions: 4))
+        let model = PomodoroModel(defaults: UserDefaults(suiteName: "MacIslandPomodoro")!)
+        #expect(model.phaseLength == 25 * 60)
+    }
+
+    @Test func everyLengthAndTheCycleComeFromThePlan() {
+        let settings = makeSettings()
+        settings.pomodoroFocus = 50
+        settings.pomodoroShortBreak = 10
+        settings.pomodoroLongBreak = 30
+        settings.pomodoroSessions = 2
+        let model = makeModel(following: settings)
+        #expect(model.phaseLength == 50 * 60 && model.remaining(at: Date()) == 50 * 60)
+
+        model.toggle()
+        #expect(abs(model.remaining(at: Date()) - 50 * 60) < 2)
+        model.advance(completed: true)
+        #expect(model.phase == .shortBreak && model.phaseLength == 10 * 60)
+        model.advance(completed: true)
+        #expect(model.phase == .focus && model.phaseLength == 50 * 60)
+        // The second session is the last: the long break follows it, then the cycle ends.
+        model.advance(completed: true)
+        #expect(model.phase == .longBreak && model.phaseLength == 30 * 60)
+        model.advance(completed: true)
+        #expect(!model.isActive && model.phase == .focus && model.focusInCycle == 0)
+        #expect(model.history.count(on: Date()) == 2)
+    }
+
+    @Test func aRunningPhaseKeepsItsLengthAndTheNextOneTakesTheChange() {
+        let settings = makeSettings()
+        let model = makeModel(following: settings)
+        model.toggle()
+        settings.pomodoroFocus = 50
+        #expect(model.phaseLength == 25 * 60)
+        #expect(model.progress(at: Date()) <= 1 && model.progress(at: Date()) > 0.99)
+
+        // Paused, it is still the same length, and resuming doesn't start it over.
+        model.toggle()
+        settings.pomodoroFocus = 10
+        #expect(!model.isRunning && model.isActive && model.phaseLength == 25 * 60)
+        model.toggle()
+        #expect(model.isRunning && model.phaseLength == 25 * 60)
+
+        // The break is the plan's, and so is the next focus session.
+        settings.pomodoroFocus = 40
+        model.advance(completed: true)
+        #expect(model.phase == .shortBreak && model.phaseLength == 5 * 60)
+        model.advance(completed: true)
+        #expect(model.phase == .focus && model.phaseLength == 40 * 60)
+        model.reset()
+    }
+
+    @Test func anIdleRingFollowsTheSettingAtOnce() {
+        let settings = makeSettings()
+        let model = makeModel(following: settings)
+        #expect(model.remaining(at: Date()) == 25 * 60 && model.progress(at: Date()) == 1)
+        settings.pomodoroFocus = 40
+        #expect(model.remaining(at: Date()) == 40 * 60 && model.progress(at: Date()) == 1)
+        model.reset()
+        #expect(model.phaseLength == 40 * 60)
+    }
+
+    @Test func changingTheSessionsMidCycleCountsThemAgainstTheNewNumber() {
+        let settings = makeSettings()
+        let model = makeModel(following: settings)
+        model.toggle()
+        model.advance(completed: true)
+        model.advance(completed: true)
+        model.advance(completed: true)
+        // Two focus sessions are done, in a break. Four were planned; now two are.
+        #expect(model.phase == .shortBreak && model.focusInCycle == 2)
+        settings.pomodoroSessions = 2
+        model.advance(completed: true)
+        #expect(model.phase == .focus)
+        // The next focus session is the third, past the new number, so the long break follows it.
+        model.advance(completed: true)
+        #expect(model.phase == .longBreak)
+        model.reset()
+    }
+
+    @Test func theLengthsStayInTheirRangesAndAreKept() {
+        let suite = "MacIslandPomodoroRanges.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        settings.pomodoroFocus = 500
+        settings.pomodoroShortBreak = 0
+        settings.pomodoroLongBreak = 1
+        settings.pomodoroSessions = 99
+        #expect(settings.pomodoroFocus == 90 && settings.pomodoroShortBreak == 1)
+        #expect(settings.pomodoroLongBreak == 5 && settings.pomodoroSessions == 8)
+        settings.pomodoroSessions = 1
+        #expect(settings.pomodoroSessions == 2)
+
+        settings.pomodoroFocus = 45
+        settings.pomodoroLongBreak = 20
+        let reloaded = AppSettings(defaults: defaults)
+        #expect(reloaded.pomodoroFocus == 45 && reloaded.pomodoroLongBreak == 20)
+        #expect(reloaded.pomodoroShortBreak == 1 && reloaded.pomodoroSessions == 2)
+
+        // A value stored out of range (an edited plist) is pulled in, and one that was never stored is the default.
+        defaults.set(1000, forKey: "pomodoroFocus")
+        defaults.removeObject(forKey: "pomodoroShortBreak")
+        let repaired = AppSettings(defaults: defaults)
+        #expect(repaired.pomodoroFocus == 90 && repaired.pomodoroShortBreak == 5)
     }
 
     @Test func finishingFocusCreditsItAndChainsIntoABreak() {

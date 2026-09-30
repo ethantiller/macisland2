@@ -255,7 +255,10 @@ Timer, Stopwatch, and Pomodoro share one tab.
 
 ![Setting a timer](images/06c-expanded-timer-setter.png)
 - **Stopwatch**: start, stop, laps (the lap in progress and the last lap), reset. Drift-free.
-- **Pomodoro**: 25-minute focus sessions, 5-minute breaks, and a 15-minute break after the fourth. Sessions **chain**
+- **Pomodoro**: 25-minute focus sessions, 5-minute breaks, and a 15-minute break after the fourth, unless you set other
+  lengths in Settings → Clock (focus 1 to 90 minutes, short break 1 to 30, long break 5 to 60, 2 to 8 sessions before the
+  long break). A phase that is running keeps its length and a change applies from the next one; the ring follows a change
+  at once while nothing runs. Sessions **chain**
   automatically and stop after the long break. A **streak** counts consecutive days with a finished session, and a
   **7-day bar chart** shows sessions per day.
 
@@ -344,12 +347,13 @@ shows and where is a setting, how it looks is not.
 | Home | Expanded Home, in edit mode | The widget editor (below); Up Next (Calendar Events, Due Reminders, a button that opens Internet Accounts); Weather city (only the name is sent to Open-Meteo) |
 | Shelf | Compact, with the drop target | **When You Drag a File** (Show Shelf and AirDrop, Show Shelf Only, Show AirDrop Only, or Do Nothing); Add New Screenshots to the Shelf; Remove Files from the Shelf (Never, After a Day, After a Week; only the reference goes, never the file); Clipboard History (Off, 10, 25, or 50 items) |
 | Media | Compact | Show Music Beside the Notch (off: music stays in Home and the Media tab); Synced Lyrics |
+| Clock | Expanded Clock, on Pomodoro | **Pomodoro**: Focus Length, Short Break, Long Break, and Sessions Before Long Break (defaults 25, 5, 15, and 4; a phase that is running keeps its length) |
 | Tools | Expanded Tools | How many tools in the row: 4, 6, or 8; **Row Order** (drag, or right-click Move Up and Move Down) |
 | Notifications | Banner or alert (the selected event's real one) | Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
 | Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state (Calendars, Reminders, Camera, Microphone, Speech Recognition, Screen Recording, Accessibility, Bluetooth), read without asking, with Open System Settings |
 
 **The Settings tour.** The first time Settings opens, a black callout with an arrow points at a real control, with a ring in the system accent
-color around it, and walks through all eight panes in fifteen stops (Find Any Setting, Your Island Live, Open It From Anywhere, and so on).
+color around it, and walks through all nine panes in sixteen stops (Find Any Setting, Your Island Live, Open It From Anywhere, and so on).
 It follows the control when the window resizes or the pane scrolls; Next, Back, End Tour, and Return move through it, choosing a pane in
 the sidebar jumps to that pane's first stop, and closing the window ends it. It never starts over the guide or when Settings was opened
 for **Edit Home…**. Picture: `docs/images/43-tour-03-shortcut.png`.

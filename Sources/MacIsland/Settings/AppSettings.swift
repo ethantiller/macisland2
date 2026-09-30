@@ -164,6 +164,55 @@ final class AppSettings {
 
     static let fullChargeRange = 80...100
 
+    /// The Pomodoro's lengths, in minutes. A value outside its range is pulled back in.
+    var pomodoroFocus: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroFocus, to: PomodoroPlan.focusRange)
+            if clamped != pomodoroFocus { pomodoroFocus = clamped }
+            defaults.set(pomodoroFocus, forKey: Key.pomodoroFocus)
+        }
+    }
+
+    var pomodoroShortBreak: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroShortBreak, to: PomodoroPlan.shortBreakRange)
+            if clamped != pomodoroShortBreak { pomodoroShortBreak = clamped }
+            defaults.set(pomodoroShortBreak, forKey: Key.pomodoroShortBreak)
+        }
+    }
+
+    var pomodoroLongBreak: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroLongBreak, to: PomodoroPlan.longBreakRange)
+            if clamped != pomodoroLongBreak { pomodoroLongBreak = clamped }
+            defaults.set(pomodoroLongBreak, forKey: Key.pomodoroLongBreak)
+        }
+    }
+
+    /// Focus sessions before the long break.
+    var pomodoroSessions: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroSessions, to: PomodoroPlan.sessionsRange)
+            if clamped != pomodoroSessions { pomodoroSessions = clamped }
+            defaults.set(pomodoroSessions, forKey: Key.pomodoroSessions)
+        }
+    }
+
+    /// The four Pomodoro settings as the model reads them.
+    var pomodoroPlan: PomodoroPlan {
+        PomodoroPlan(
+            focus: pomodoroFocus, shortBreak: pomodoroShortBreak, longBreak: pomodoroLongBreak,
+            sessions: pomodoroSessions)
+    }
+
+    private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
     /// The city whose weather Home shows. Empty means no weather. Only the name is sent, to Open-Meteo.
     var weatherCity: String {
         didSet {
@@ -247,6 +296,10 @@ final class AppSettings {
         static let pinLimit = "pinLimit"
         static let fullCharge = "fullChargeLevel"
         static let lyrics = "showsLyrics"
+        static let pomodoroFocus = "pomodoroFocus"
+        static let pomodoroShortBreak = "pomodoroShortBreak"
+        static let pomodoroLongBreak = "pomodoroLongBreak"
+        static let pomodoroSessions = "pomodoroSessions"
         static let weatherCity = "weatherCity"
         static let pinned = "pinnedTools"
         static let homeLayout = "home.layout"
@@ -276,6 +329,15 @@ final class AppSettings {
         showsLyrics = defaults.object(forKey: Key.lyrics) as? Bool ?? true
         let storedFull = defaults.integer(forKey: Key.fullCharge)
         fullChargeLevel = Self.fullChargeRange.contains(storedFull) ? storedFull : 100
+        // Absent (or 0) is never chosen: the default. A stored value outside its range is pulled in.
+        func minutes(_ key: String, _ range: ClosedRange<Int>, default fallback: Int) -> Int {
+            defaults.object(forKey: key) == nil ? fallback : Self.clamped(defaults.integer(forKey: key), to: range)
+        }
+        let plan = PomodoroPlan.default
+        pomodoroFocus = minutes(Key.pomodoroFocus, PomodoroPlan.focusRange, default: plan.focus)
+        pomodoroShortBreak = minutes(Key.pomodoroShortBreak, PomodoroPlan.shortBreakRange, default: plan.shortBreak)
+        pomodoroLongBreak = minutes(Key.pomodoroLongBreak, PomodoroPlan.longBreakRange, default: plan.longBreak)
+        pomodoroSessions = minutes(Key.pomodoroSessions, PomodoroPlan.sessionsRange, default: plan.sessions)
         pinLimit = PinLimit(rawValue: defaults.integer(forKey: Key.pinLimit)) ?? .six
         pinnedTools = defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init) ?? ToolID.defaultPins
         menuBarModules = (defaults.stringArray(forKey: Key.menuBar) ?? []).compactMap(IslandModule.init).filter(

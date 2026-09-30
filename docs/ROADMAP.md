@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (630 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (637 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -35,7 +35,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
-- **First run:** a ten-step guide (floating glass in the middle of the screen, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a fifteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
+- **First run:** a ten-step guide (floating glass in the middle of the screen, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a sixteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
@@ -422,7 +422,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] On a fresh install, no Bluetooth or Downloads prompt appears before the guide; both work after it ends. Note any prompt that does appear at launch
 - [ ] Skip (temporary) on step 1 closes the guide and then shows the pending prompts one after another
 - [ ] Open at Login toggles (from the bundle); Open Settings closes the guide, opens Settings, and starts the tour
-- [ ] The tour: the ring follows the Shortcut row while scrolling General and while resizing the window from 830 × 600 to large (if it doesn't, use the fallback in ARCHITECTURE's gotchas); all 15 stops at the minimum size and a large size, in light and dark; clicking a pane in the sidebar mid-tour jumps; closing the window ends it and it doesn't come back; scrolling the target away docks the callout with Show Me; hiding the sidebar on stop 1 docks it too
+- [ ] The tour: the ring follows the Shortcut row while scrolling General and while resizing the window from 830 × 600 to large (if it doesn't, use the fallback in ARCHITECTURE's gotchas); all 16 stops at the minimum size and a large size, in light and dark; clicking a pane in the sidebar mid-tour jumps; closing the window ends it and it doesn't come back; scrolling the target away docks the callout with Show Me; hiding the sidebar on stop 1 docks it too
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
@@ -444,6 +444,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Widget sizes (Settings, Size in a widget's options): every widget at every size draws without clipping; Today 3 × 3 is the month; Music 3 × 2 plays, pauses, and scrubs; Quick Tools 6 × 1 and 6 × 2 run tools; Weather 6 × 1 and 3 × 2 show the forecast; a size that won't fit is dimmed; ⌘Z undoes a size change; the Listening and Dashboard presets open without clipping; idle CPU with Home closed is unchanged (`ps -o cputime= -p PID` over 10 s)
 - [ ] Weather from a real city; changing it updates after a pause in typing
 - [ ] Pomodoro chains and stops after the long break; the streak and chart update
+- [ ] Settings → Clock (written, not run): the preview shows the Clock tab on Pomodoro; changing Focus Length while idle changes the ring's time at once; changing it while a session runs leaves that session as it was and the next focus session takes it; Short Break, Long Break, and Sessions Before Long Break do the same ("n of m" and when the long break comes); quit and reopen keeps them; Export and Import carry them; Reset All Settings puts back 25, 5, 15, 4; search finds "pomodoro"; the tour stop "Set Your Pomodoro" rings Focus Length
 - [ ] The timer dial: a two-finger horizontal swipe over it scrubs (and coasts), the same swipe elsewhere changes tabs, swipe up
       over it closes, a mouse wheel steps a minute, a drag follows the pointer 1:1, a tap glides, the ruler stretches at 1 minute,
       and haptics tap at the ends; the same in a torn-off Clock window

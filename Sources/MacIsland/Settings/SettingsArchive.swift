@@ -34,6 +34,10 @@ struct SettingsArchive: Codable, Equatable {
     var quietDuringFocus: Bool?
     var fullChargeLevel: Int?
     var mutedEvents: [String]?
+    var pomodoroFocus: Int?
+    var pomodoroShortBreak: Int?
+    var pomodoroLongBreak: Int?
+    var pomodoroSessions: Int?
 
     enum ReadError: LocalizedError, Equatable {
         case notAnArchive, tooNew
@@ -74,6 +78,10 @@ struct SettingsArchive: Codable, Equatable {
         archive.quietDuringFocus = settings.quietDuringFocus
         archive.fullChargeLevel = settings.fullChargeLevel
         archive.mutedEvents = settings.mutedEvents.map(\.rawValue).sorted()
+        archive.pomodoroFocus = settings.pomodoroFocus
+        archive.pomodoroShortBreak = settings.pomodoroShortBreak
+        archive.pomodoroLongBreak = settings.pomodoroLongBreak
+        archive.pomodoroSessions = settings.pomodoroSessions
         return archive
     }
 
@@ -140,6 +148,16 @@ extension AppSettings {
         }
         if let value = archive.quietDuringFocus { quietDuringFocus = value }
         if let value = archive.fullChargeLevel, Self.fullChargeRange.contains(value) { fullChargeLevel = value }
+        if let value = archive.pomodoroFocus, PomodoroPlan.focusRange.contains(value) { pomodoroFocus = value }
+        if let value = archive.pomodoroShortBreak, PomodoroPlan.shortBreakRange.contains(value) {
+            pomodoroShortBreak = value
+        }
+        if let value = archive.pomodoroLongBreak, PomodoroPlan.longBreakRange.contains(value) {
+            pomodoroLongBreak = value
+        }
+        if let value = archive.pomodoroSessions, PomodoroPlan.sessionsRange.contains(value) {
+            pomodoroSessions = value
+        }
         if let names = archive.mutedEvents {
             let muted = Set(names.compactMap(AmbientEvent.init))
             for event in AmbientEvent.allCases { setMuted(event, muted.contains(event)) }

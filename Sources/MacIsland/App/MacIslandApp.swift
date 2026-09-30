@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shelf = ShelfModel()
         let work = WorkTracker()
         let notes = NotesModel()
+        let settings = AppSettings()
         return IslandFeatures(
             nowPlaying: NowPlayingModel(),
             outputs: AudioOutputs(),
@@ -40,11 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             privacy: PrivacyMonitor(),
             transfers: TransferMonitor(),
             network: NetworkMonitor(),
-            settings: AppSettings(),
+            settings: settings,
             agenda: AgendaMonitor(),
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            pomodoro: PomodoroModel(),
+            pomodoro: PomodoroModel(plan: { settings.pomodoroPlan }),
             work: work,
             weather: WeatherModel(),
             fileTools: FileTools(shelf: shelf, work: work),

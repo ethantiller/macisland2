@@ -27,6 +27,7 @@ enum SettingsAnchor {
     static let clipboard = "shelf.clipboard"
     static let music = "media.music"
     static let lyrics = "media.lyrics"
+    static let pomodoro = "clock.pomodoro"
     static let toolsRow = "tools.row"
     static let rowOrder = "tools.roworder"
     static let interruptions = "notifications.interruptions"
@@ -149,6 +150,19 @@ enum SettingsSearch {
             .init(
                 pane: .media, title: "Synced Lyrics", keywords: ["lrc", "lrclib", "words", "song", "karaoke"],
                 anchor: SettingsAnchor.lyrics),
+            // Clock
+            .init(
+                pane: .clock, title: "Focus Length",
+                keywords: ["pomodoro", "work", "session", "minutes", "25", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Short Break",
+                keywords: ["pomodoro", "rest", "minutes", "5", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Long Break",
+                keywords: ["pomodoro", "rest", "minutes", "15", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Sessions Before Long Break",
+                keywords: ["pomodoro", "cycle", "rounds", "focus", "four", "4"], anchor: SettingsAnchor.pomodoro),
             // Tools
             .init(
                 pane: .tools, title: "Tools in the Row",

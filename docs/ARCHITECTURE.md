@@ -425,6 +425,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Shelf files | UserDefaults | `shelf.paths` (paths only; the files stay where they are) |
 | First-run state | UserDefaults | `onboarding.install` (`fresh` or `existing`, written once), `onboarding.guide`, `onboarding.settingsTour` (the version last seen). Not in `AppSettings`, so never in the settings file and untouched by Reset All |
 | Pomodoro history | UserDefaults | `pomodoro.history` (JSON: sessions per day) |
+| Pomodoro lengths | UserDefaults | `pomodoroFocus`, `pomodoroShortBreak`, `pomodoroLongBreak`, `pomodoroSessions` (minutes, and a count; clamped to `PomodoroPlan`'s ranges) |
 | Notes and snippets | JSON file | `~/Library/Application Support/MacIsland/notes.json` |
 | Voice Notes | .m4a files | `~/Library/Application Support/MacIsland/Voice Notes/` (kept; the text goes in a note) |
 | Screen recordings | .mov files | `~/Movies/Screen Recording <date>.mov` (kept; also on the Shelf) |
@@ -484,6 +485,15 @@ used. The protection is that only you can create a command widget: nothing outsi
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
 | `NSAppleScript` | Music and Spotify control |
 
+### The Pomodoro's lengths
+
+`PomodoroPlan` (in `PomodoroModel.swift`) holds the four numbers. `PomodoroModel` takes a `plan:` closure, not `UserDefaults`, and
+reads it whenever it needs a length: the app hands it `{ settings.pomodoroPlan }`, the Settings preview hands it the live settings too, and
+a test hands it a scratch `AppSettings`. Because `AppSettings` is observable, a view reading `pomodoro.plan` or `remaining(at:)` follows a
+change with nothing wired. A phase that is running, or paused, keeps `startedLength`, frozen when it started (resuming doesn't restart
+it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
+against the new number.
+
 ### Now Playing
 
 Apple restricts MediaRemote to its own binaries since macOS 15.4, so the vendored `mediaremote-adapter` is compiled to a framework and
@@ -536,7 +546,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **630 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **637 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

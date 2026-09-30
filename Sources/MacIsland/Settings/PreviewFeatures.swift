@@ -60,7 +60,7 @@ enum PreviewFeatures {
             agenda: agenda,
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            pomodoro: PomodoroModel(defaults: defaults),
+            pomodoro: PomodoroModel(defaults: defaults, plan: { live.settings.pomodoroPlan }),
             work: work,
             weather: weather,
             fileTools: FileTools(

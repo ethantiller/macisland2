@@ -183,6 +183,7 @@ struct SettingsView: View {
         case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
         case .shelf: ShelfPane(settings: settings, preview: preview)
         case .media: MediaPane(settings: settings)
+        case .clock: ClockPane(settings: settings)
         case .tools: ToolsPane(settings: settings, preview: preview)
         case .notifications: NotificationsPane(settings: settings, preview: preview)
         case .privacy: PrivacyPane(settings: settings)

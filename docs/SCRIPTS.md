@@ -64,7 +64,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 630 tests, about a second.
+lines; 637 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -223,7 +223,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | --- | --- |
 | `TimerModel.swift` | Countdown with pause, add-minutes, an end date |
 | `StopwatchModel.swift` | Drift-free stopwatch with laps, and `formatStopwatch` |
-| `PomodoroModel.swift` | Phases, chaining, the session history and streak |
+| `PomodoroModel.swift` | Phases, `PomodoroPlan` (the lengths), chaining, the session history and streak |
 | `DialScrubber.swift` | The timer dial's pure math (`DialScrubber`) and scroll routing (`ScrollRouting`, `AxisLock`) |
 | `TimerView.swift` | The Clock tab (rings, presets, the minute dial, laps, the Pomodoro chart), the compact readouts, and the timer, Pomodoro, and stopwatch peeks |
 
@@ -311,7 +311,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ShortcutRecorder.swift`, `KeyCombo.swift` | Recording a global shortcut, and the key combination it stores |
 | `ShelfPane.swift` | The Shelf pane (drag target, screenshots, retention, clipboard limit) |
 | `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
-| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ToolsPane.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
+| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -319,7 +319,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **630 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 40 files, about 9,000 lines, **637 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -357,7 +357,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
 | `SettingsTourTests.swift` | The tour's stops, running, anchors, placement, and visibility |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
-| `OnboardingSnapshots.swift` | Opt-in: the guide's ten steps and the tour's fifteen stops, light and dark (`40-guide-*`, `43-tour-*`) |
+| `OnboardingSnapshots.swift` | Opt-in: the guide's ten steps and the tour's sixteen stops, light and dark (`40-guide-*`, `43-tour-*`) |
 
 ---
 

@@ -23,6 +23,8 @@ struct PreviewContext: Equatable {
     var event: AmbientEvent?
     /// A file is being dragged toward the island: the compact preview shows the drop target the setting chose.
     var fileDrag = false
+    /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
+    var clockMode: ClockMode?
 }
 
 /// The island the Settings window draws beside its controls. It is the real `IslandView` over a second view
@@ -122,6 +124,7 @@ final class IslandPreviewModel {
             case .expanded:
                 clearAnnouncements()
                 viewModel.selectedTab = context.tab
+                if let mode = context.clockMode { viewModel.clockMode = mode }
                 viewModel.state = .expanded
             case .menuBar:
                 // The island keeps the state it had: it shrinks and slides away as it is, and comes back the same.
