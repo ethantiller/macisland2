@@ -1,13 +1,15 @@
 import AppKit
 import SwiftUI
 import Testing
+
 @testable import MacIsland
 
 /// Renders each island state to PNGs for design review. Opt-in:
 /// `ISLAND_SNAPSHOT_DIR=/some/dir ./scripts/test.sh --filter IslandSnapshots`
 @MainActor
 struct IslandSnapshots {
-    private let outputDirectory = ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"].map(URL.init(fileURLWithPath:))
+    private let outputDirectory = ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"].map(
+        URL.init(fileURLWithPath:))
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderStates() async throws {
@@ -34,12 +36,7 @@ struct IslandSnapshots {
         let weather = viewModel.weather
         weather.typingPause = .zero
         weather.usesFahrenheit = false
-        weather.fetch = { url in
-            if url.host == "geocoding-api.open-meteo.com" {
-                return Data(#"{"results":[{"name":"Paris","latitude":48.85,"longitude":2.35}]}"#.utf8)
-            }
-            return Data(#"{"current":{"temperature_2m":18.4,"weather_code":2,"is_day":1}}"#.utf8)
-        }
+        weather.fetch = PreviewSamples.weatherResponse
         weather.configure(city: "Paris")
         try await Task.sleep(for: .milliseconds(100))
         let playing = viewModel.nowPlaying.state
@@ -53,6 +50,24 @@ struct IslandSnapshots {
         viewModel.setCalendarExpanded(true)
         render(viewModel, "04a-expanded-home-calendar")
         viewModel.setCalendarExpanded(false)
+        for (index, preset) in HomeLayout.presets.enumerated() {
+            viewModel.settings.setHomeLayout(preset.layout)
+            render(viewModel, "04f-home-preset-\(index + 1)-\(preset.name.lowercased())")
+        }
+        // Three rows, every cell taken: the tallest Home, in the tallest panel.
+        viewModel.settings.setHomeLayout(
+            HomeLayout(widgets: [
+                WidgetPlacement(widget: .builtIn(.today), size: GridSize(3, 1)),
+                WidgetPlacement(widget: .builtIn(.music), size: GridSize(3, 1)),
+                WidgetPlacement(widget: .builtIn(.quickTools), size: GridSize(1, 1)),
+                WidgetPlacement(widget: .builtIn(.clockActions), size: GridSize(5, 1)),
+                WidgetPlacement(widget: .builtIn(.weather), size: GridSize(1, 1)),
+                WidgetPlacement(widget: .builtIn(.battery), size: GridSize(1, 1)),
+                WidgetPlacement(widget: .builtIn(.reminders), size: GridSize(2, 1)),
+                WidgetPlacement(widget: .builtIn(.note), size: GridSize(2, 1)),
+            ]))
+        render(viewModel, "04a-expanded-home-three-rows")
+        viewModel.settings.setHomeLayout(.default)
         viewModel.timer.start(minutes: 25)
         render(viewModel, "04a-expanded-home-timer-strip")
         viewModel.timer.reset()
@@ -68,7 +83,9 @@ struct IslandSnapshots {
         render(viewModel, "04-expanded-media")
 
         let lyrics = viewModel.nowPlaying.lyrics
-        lyrics.fetch = { _ in Data(#"{"syncedLyrics": "[00:00.00] Waiting in a car, waiting for a ride in the dark"}"#.utf8) }
+        lyrics.fetch = { _ in
+            Data(#"{"syncedLyrics": "[00:00.00] Waiting in a car, waiting for a ride in the dark"}"#.utf8)
+        }
         lyrics.setEnabled(true, for: NowPlayingState())
         viewModel.nowPlaying.apply(sampleTrack())
         viewModel.nowPlaying.toggleShuffle()
@@ -97,6 +114,18 @@ struct IslandSnapshots {
         viewModel.timer.start(minutes: 25)
         viewModel.selectedTab = .clock
         render(viewModel, "06-expanded-timer")
+
+        // Setting a timer: the ruler at rest, past an hour, and mid-scrub between two minutes.
+        viewModel.timer.reset()
+        viewModel.timer.setDuration(minutes: 5)
+        render(viewModel, "06c-expanded-timer-setter")
+        viewModel.timer.setDuration(minutes: 65)
+        render(viewModel, "06d-expanded-timer-setter-hour")
+        viewModel.timer.setDuration(minutes: 5)
+        viewModel.scrubDial(byFingerDX: -299.2)
+        render(viewModel, "06e-expanded-timer-setter-scrub")
+        viewModel.endDialScrub()
+        viewModel.timer.start(minutes: 25)
 
         viewModel.clockMode = .pomodoro
         viewModel.pomodoro.toggle()
@@ -170,28 +199,30 @@ struct IslandSnapshots {
         viewModel.flash(IslandAlert(systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "87%"))
         render(viewModel, "10-compact-alert")
 
-        viewModel.showBanner(IslandBanner(
-            systemImage: "airpodspro", tint: Theme.Tint.neutral, title: "AirPods Pro", detail: "L 80%   R 75%   Case 60%"
-        ))
+        viewModel.showBanner(
+            Announcements.headphones(AudioAccessory(name: "AirPods Pro", left: 80, right: 75, caseLevel: 60)))
         render(viewModel, "11-banner-airpods")
 
-        viewModel.showBanner(IslandBanner(
-            systemImage: "battery.25percent", tint: Theme.Tint.attention, title: "Low Battery",
-            detail: "20% remaining", actions: [.init(title: "Low Power Mode") {}]
-        ))
+        viewModel.showBanner(
+            Announcements.headphones(AudioAccessory(name: "AirPods Pro", left: 12, right: 40, caseLevel: 60)))
+        render(viewModel, "11b-banner-airpods-low")
+
+        viewModel.showBanner(Announcements.lowBattery(percent: 20).banner)
         render(viewModel, "12-banner-low-battery")
 
-        viewModel.showBanner(IslandBanner(
-            systemImage: "calendar", tint: Theme.Tint.neutral, title: "Design Review", detail: "In 5 minutes",
-            actions: [.init(title: "Join") {}, .init(title: "Check Camera") {}]
-        ))
+        viewModel.showBanner(
+            IslandBanner(
+                systemImage: "calendar", tint: Theme.Tint.neutral, title: "Design Review", detail: "In 5 minutes",
+                actions: [.init(title: "Join") {}, .init(title: "Check Camera") {}]
+            ))
         render(viewModel, "12b-banner-two-actions")
 
         // The banner outranks an alert, so let it go first.
         viewModel.performBannerAction()
-        viewModel.flash(IslandAlert(
-            systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "82%", isCharging: true
-        ))
+        viewModel.flash(
+            IslandAlert(
+                systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "82%", isCharging: true
+            ))
         render(viewModel, "13-compact-charging")
 
         // Recording, on a fresh island: the compact dot and time, the voice note's peek, and the Mirror.
@@ -225,8 +256,8 @@ struct IslandSnapshots {
                 .padding(18)
                 .background(Color.black)
             guard let outputDirectory, let image = ImageRenderer(content: content).nsImage,
-                  let tiff = image.tiffRepresentation,
-                  let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+                let tiff = image.tiffRepresentation,
+                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
             else { continue }
             try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
             try? png.write(to: outputDirectory.appendingPathComponent("\(name).png"))
@@ -267,8 +298,8 @@ struct IslandSnapshots {
         let renderer = ImageRenderer(content: content)
         renderer.scale = 2
         guard let image = renderer.nsImage,
-              let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            let tiff = image.tiffRepresentation,
+            let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
         else { return }
         try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         try? png.write(to: outputDirectory.appendingPathComponent("\(name).png"))

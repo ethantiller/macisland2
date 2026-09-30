@@ -19,7 +19,9 @@ struct NotesView: View {
     var body: some View {
         VStack(spacing: Theme.Metrics.rowSpacing) {
             HStack(spacing: 4) {
-                SegmentedChoice(options: NotesMode.allCases, selection: mode, title: \.rawValue, onSelect: viewModel.setNotesMode)
+                SegmentedChoice(
+                    options: NotesMode.allCases, selection: mode, title: \.rawValue, onSelect: viewModel.setNotesMode
+                )
                 .frame(width: 250)
                 Spacer(minLength: 0)
                 IconButton(
@@ -28,7 +30,8 @@ struct NotesView: View {
                     size: 13
                 ) { viewModel.toggleVoiceNote() }
                 switch mode {
-                case .notes: IconButton(systemName: "square.and.pencil", label: "New Note", size: 13) { notes.addNote() }
+                case .notes:
+                    IconButton(systemName: "square.and.pencil", label: "New Note", size: 13) { notes.addNote() }
                 case .snippets: IconButton(systemName: "plus", label: "New Snippet", size: 13) { notes.addSnippet() }
                 case .prompter: EmptyView()
                 }
@@ -94,9 +97,12 @@ private struct SnippetsPane: View {
             if let snippet = notes.selectedSnippet {
                 VStack(spacing: 6) {
                     HStack(spacing: 8) {
-                        TextField("Name", text: Binding(
-                            get: { snippet.title }, set: { notes.setTitle($0, ofSnippet: snippet.id) }
-                        ))
+                        TextField(
+                            "Name",
+                            text: Binding(
+                                get: { snippet.title }, set: { notes.setTitle($0, ofSnippet: snippet.id) }
+                            )
+                        )
                         .textFieldStyle(.plain)
                         .font(Theme.Typography.bodyEmphasized)
                         .foregroundStyle(Theme.Palette.primary)
@@ -134,7 +140,9 @@ private struct ItemList: View {
             VStack(spacing: 2) {
                 ForEach(rows) { row in
                     let isSelected = row.id == selection
-                    Button { onSelect(row.id) } label: {
+                    Button {
+                        onSelect(row.id)
+                    } label: {
                         Text(row.title)
                             .font(Theme.Typography.body)
                             .foregroundStyle(isSelected ? Theme.Palette.inverse : Theme.Palette.primary)
@@ -169,7 +177,9 @@ private struct EditorField: View {
             .focused($isFocused)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(Theme.Palette.fill, in: RoundedRectangle(cornerRadius: Theme.Metrics.cardRadius, style: .continuous))
+            .background(
+                Theme.Palette.fill, in: RoundedRectangle(cornerRadius: Theme.Metrics.cardRadius, style: .continuous)
+            )
             .onChange(of: isFocused) { _, focused in if focused { onFocus() } }
     }
 }
@@ -222,27 +232,27 @@ struct PrompterView: View {
 
     private func scroller(_ text: String) -> some View {
         TimelineView(.animation(paused: !isRunning)) { context in
-            let current = isRunning ? min(offsetAtResume + CGFloat(context.date.timeIntervalSince(resumedAt) * pointsPerSecond), max(textHeight, 0)) : offset
+            let current =
+                isRunning
+                ? min(
+                    offsetAtResume + CGFloat(context.date.timeIntervalSince(resumedAt) * pointsPerSecond),
+                    max(textHeight, 0)) : offset
             Text(text)
                 .font(Theme.Typography.prompter)
                 .foregroundStyle(Theme.Palette.primary)
                 .multilineTextAlignment(.center)
                 .frame(width: 340)
                 .fixedSize(horizontal: false, vertical: true)
-                .background(GeometryReader { geometry in
-                    Color.clear.onAppear { textHeight = geometry.size.height }
-                        .onChange(of: geometry.size.height) { _, height in textHeight = height }
-                })
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.onAppear { textHeight = geometry.size.height }
+                            .onChange(of: geometry.size.height) { _, height in textHeight = height }
+                    }
+                )
                 .offset(y: -current)
                 .frame(maxWidth: .infinity, minHeight: Self.window, maxHeight: Self.window, alignment: .top)
                 .clipped()
-                .mask(
-                    LinearGradient(
-                        stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12),
-                                .init(color: .black, location: 0.88), .init(color: .clear, location: 1)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
+                .edgeFade(.vertical, fraction: Theme.Metrics.prompterFade)
                 .onChange(of: current >= textHeight && isRunning) { _, finished in
                     if finished { stop(at: textHeight) }
                 }

@@ -41,12 +41,16 @@ final class DiskSpace {
 
     /// What the system says is available for important use, which counts space it would free by purging caches.
     nonisolated static func freeBytes() -> Int64? {
-        let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [
+            .volumeAvailableCapacityForImportantUsageKey
+        ])
         return values?.volumeAvailableCapacityForImportantUsage
     }
 
     static func openStorageSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.settings.Storage") { NSWorkspace.shared.open(url) }
+        if let url = URL(string: "x-apple.systempreferences:com.apple.settings.Storage") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     /// "8.2 GB free"

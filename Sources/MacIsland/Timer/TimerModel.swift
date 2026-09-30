@@ -9,6 +9,10 @@ final class TimerModel {
         case paused(remaining: TimeInterval)
     }
 
+    /// The shortest and longest length the dial sets: a minute, and a day (as `macisland://timer` allows).
+    nonisolated static let minimumDialMinutes = 1
+    nonisolated static let maximumDialMinutes = 1440
+
     private(set) var phase: Phase = .idle
     private(set) var duration: TimeInterval = 5 * 60
 
@@ -16,6 +20,8 @@ final class TimerModel {
     @ObservationIgnored private var finishTask: Task<Void, Never>?
 
     var isActive: Bool { phase != .idle }
+
+    var durationMinutes: Int { Int((duration / 60).rounded()) }
 
     var isRunning: Bool {
         if case .running = phase { return true }
@@ -37,6 +43,12 @@ final class TimerModel {
     func start(minutes: Int) {
         duration = TimeInterval(minutes * 60)
         run(for: duration)
+    }
+
+    /// Dial the length Start will use. A running or paused timer keeps the length it was given.
+    func setDuration(minutes: Int) {
+        guard phase == .idle else { return }
+        duration = TimeInterval(min(max(minutes, Self.minimumDialMinutes), Self.maximumDialMinutes)) * 60
     }
 
     func toggle() {

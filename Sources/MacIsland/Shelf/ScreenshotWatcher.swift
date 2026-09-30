@@ -9,14 +9,25 @@ final class ScreenshotWatcher {
     private var observers: [Any] = []
     private var isGathering = true
 
+    var isWatching: Bool { query.isStarted }
+
+    func stop() {
+        query.stop()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        isGathering = true
+    }
+
     func start() {
+        guard !query.isStarted else { return }
         query.predicate = NSPredicate(format: "%K == 1", "kMDItemIsScreenCapture")
         query.searchScopes = [NSMetadataQueryUserHomeScope]
 
         let center = NotificationCenter.default
         observers = [
             // Everything that already exists is the baseline; only later additions are new.
-            center.addObserver(forName: .NSMetadataQueryDidFinishGathering, object: query, queue: .main) { [weak self] _ in
+            center.addObserver(forName: .NSMetadataQueryDidFinishGathering, object: query, queue: .main) {
+                [weak self] _ in
                 MainActor.assumeIsolated { self?.isGathering = false }
             },
             center.addObserver(forName: .NSMetadataQueryDidUpdate, object: query, queue: .main) { [weak self] note in

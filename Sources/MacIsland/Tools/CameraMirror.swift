@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import Observation
 import SwiftUI
 
@@ -102,10 +102,13 @@ final class AVCameraProvider: CameraSessionProviding {
 
     func start() async throws -> AVCaptureSession {
         let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .continuityCamera, .external], mediaType: .video, position: .unspecified
+            deviceTypes: [.builtInWideAngleCamera, .continuityCamera, .external], mediaType: .video,
+            position: .unspecified
         )
         // The built-in camera first, then Continuity and external ones.
-        guard let device = discovery.devices.first(where: { $0.deviceType == .builtInWideAngleCamera }) ?? discovery.devices.first
+        guard
+            let device = discovery.devices.first(where: { $0.deviceType == .builtInWideAngleCamera })
+                ?? discovery.devices.first
         else { throw CameraError.noCamera }
         let session = AVCaptureSession()
         session.sessionPreset = .high

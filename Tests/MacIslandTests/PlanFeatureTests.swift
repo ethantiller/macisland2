@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 @MainActor
@@ -11,17 +12,17 @@ struct PinnedToolsTests {
         return AppSettings(defaults: defaults)
     }
 
-    @Test func defaultsShowSixWithoutLowPower() {
+    @Test func defaultsShowSixWithoutMirror() {
         let settings = makeSettings()
         #expect(settings.visiblePinned.count == 6)
-        #expect(!settings.isPinned(.lowPower))
+        #expect(!settings.isPinned(.mirror))
     }
 
     @Test func pinningIntoAFullRowPushesOutTheOldest() {
         let settings = makeSettings()
         let oldest = settings.visiblePinned[0]
-        settings.togglePin(.lowPower)
-        #expect(settings.isPinned(.lowPower))
+        settings.togglePin(.mirror)
+        #expect(settings.isPinned(.mirror))
         #expect(!settings.isPinned(oldest))
         #expect(settings.visiblePinned.count == 6)
     }
@@ -150,15 +151,18 @@ struct FocusQuietTests {
 
     @Test func alertsThatNeedAttentionStillArrive() {
         let viewModel = viewModel(quiet: true, focused: true)
-        viewModel.showBanner(banner, followUp: IslandAlert(
-            systemImage: "battery.25percent", tint: Theme.Tint.attention, text: "10%", staysUntilSeen: true
-        ))
+        viewModel.showBanner(
+            banner,
+            followUp: IslandAlert(
+                systemImage: "battery.25percent", tint: Theme.Tint.attention, text: "10%", staysUntilSeen: true
+            ))
         #expect(viewModel.banner == nil && viewModel.alert?.text == "10%")
     }
 
     @Test func feedbackToYourOwnActionsIsNeverHeldBack() {
         let viewModel = viewModel(quiet: true, focused: true)
-        viewModel.flash(IslandAlert(systemImage: "bolt", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+        viewModel.flash(
+            IslandAlert(systemImage: "bolt", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
         #expect(viewModel.alert?.text == "Copied")
     }
 
@@ -232,9 +236,12 @@ struct MeetingAppTests {
     private func url(_ text: String) -> URL { URL(string: text)! }
 
     @Test func aTeamsLinkBecomesTheTeamsAppAddress() {
-        let link = url("https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d")
-        #expect(MeetingLink.appURL(for: link)?.absoluteString
-            == "msteams:/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d")
+        let link = url(
+            "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d"
+        )
+        #expect(
+            MeetingLink.appURL(for: link)?.absoluteString
+                == "msteams:/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d")
         #expect(MeetingLink.appURL(for: url("https://teams.microsoft.com/l/meeting/x"))?.scheme == "msteams")
         // Only the /l/ links have an app address.
         #expect(MeetingLink.appURL(for: url("https://teams.microsoft.com/other")) == nil)
@@ -242,9 +249,12 @@ struct MeetingAppTests {
     }
 
     @Test func aZoomLinkBecomesAZoomJoinAddress() {
-        #expect(MeetingLink.appURL(for: url("https://us02web.zoom.us/j/12345678?pwd=abc123"))?.absoluteString
-            == "zoommtg://zoom.us/join?confno=12345678&pwd=abc123")
-        #expect(MeetingLink.appURL(for: url("https://zoom.us/j/999"))?.absoluteString == "zoommtg://zoom.us/join?confno=999")
+        #expect(
+            MeetingLink.appURL(for: url("https://us02web.zoom.us/j/12345678?pwd=abc123"))?.absoluteString
+                == "zoommtg://zoom.us/join?confno=12345678&pwd=abc123")
+        #expect(
+            MeetingLink.appURL(for: url("https://zoom.us/j/999"))?.absoluteString == "zoommtg://zoom.us/join?confno=999"
+        )
         #expect(MeetingLink.appURL(for: url("https://zoom.us/j/notanumber")) == nil)
         #expect(MeetingLink.appURL(for: url("https://zoom.us/pricing")) == nil)
         #expect(MeetingLink.appURL(for: url("https://meet.google.com/abc-defg-hij")) == nil)
@@ -259,7 +269,9 @@ struct MeetingAppTests {
     }
 
     @Test func safeLinksAreUnwrapped() {
-        let wrapped = url("https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2Fabc%3Fx%3D1&data=05%7C01&sdata=zzz&reserved=0")
+        let wrapped = url(
+            "https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2Fabc%3Fx%3D1&data=05%7C01&sdata=zzz&reserved=0"
+        )
         #expect(MeetingLink.unwrap(wrapped).absoluteString == "https://teams.microsoft.com/l/meetup-join/abc?x=1")
         #expect(MeetingLink.find(in: ["Join \(wrapped.absoluteString) now"])?.host == "teams.microsoft.com")
     }

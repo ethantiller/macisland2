@@ -6,3 +6,5 @@ build/
 Secrets.xcconfig
 Support/Secrets.plist
 .claude
+brag-output
+.vscode

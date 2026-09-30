@@ -17,7 +17,9 @@ struct RecognizedText: Equatable, Sendable {
         let sorted = boxes.sorted { $0.box.midY > $1.box.midY }
         var rows: [[(text: String, box: CGRect)]] = []
         for item in sorted {
-            if let first = rows.last?.first, abs(first.box.midY - item.box.midY) < min(first.box.height, item.box.height) / 2 {
+            if let first = rows.last?.first,
+                abs(first.box.midY - item.box.midY) < min(first.box.height, item.box.height) / 2
+            {
                 rows[rows.count - 1].append(item)
             } else {
                 rows.append([item])

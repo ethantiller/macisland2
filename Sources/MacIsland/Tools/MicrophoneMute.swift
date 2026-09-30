@@ -31,11 +31,14 @@ final class MicrophoneMute {
             isAvailable = false
             return
         }
-        if Self.isSettable(device, kAudioDevicePropertyMute), let mute: UInt32 = Self.read(device, kAudioDevicePropertyMute) {
+        if Self.isSettable(device, kAudioDevicePropertyMute),
+            let mute: UInt32 = Self.read(device, kAudioDevicePropertyMute)
+        {
             isAvailable = true
             isMuted = mute == 1
         } else if Self.isSettable(device, kAudioDevicePropertyVolumeScalar),
-                  let volume: Float32 = Self.read(device, kAudioDevicePropertyVolumeScalar) {
+            let volume: Float32 = Self.read(device, kAudioDevicePropertyVolumeScalar)
+        {
             isAvailable = true
             isMuted = volume == 0
         } else {
@@ -82,14 +85,18 @@ final class MicrophoneMute {
         return AudioObjectIsPropertySettable(device, &address, &settable) == noErr && settable.boolValue
     }
 
-    private static func read<T: Numeric & BitwiseCopyable>(_ device: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> T? {
+    private static func read<T: Numeric & BitwiseCopyable>(
+        _ device: AudioDeviceID, _ selector: AudioObjectPropertySelector
+    ) -> T? {
         var address = address(selector)
         var value: T = 0
         var size = UInt32(MemoryLayout<T>.size)
         return AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr ? value : nil
     }
 
-    private static func write<T: BitwiseCopyable>(_ device: AudioDeviceID, _ selector: AudioObjectPropertySelector, _ value: T) {
+    private static func write<T: BitwiseCopyable>(
+        _ device: AudioDeviceID, _ selector: AudioObjectPropertySelector, _ value: T
+    ) {
         var address = address(selector)
         var value = value
         AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<T>.size), &value)

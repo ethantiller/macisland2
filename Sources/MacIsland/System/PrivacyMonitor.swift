@@ -65,7 +65,9 @@ final class PrivacyMonitor {
         objectList(kAudioHardwarePropertyDevices).contains { device in
             var streams = address(kAudioDevicePropertyStreams, scope: kAudioDevicePropertyScopeInput)
             var size: UInt32 = 0
-            guard AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &size) == noErr, size > 0 else { return false }
+            guard AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &size) == noErr, size > 0 else {
+                return false
+            }
             return uint32(device, kAudioDevicePropertyDeviceIsRunningSomewhere) == 1
         }
     }
@@ -77,8 +79,8 @@ final class PrivacyMonitor {
             var name: Unmanaged<CFString>?
             var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
             guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &name) == noErr,
-                  let bundleID = name?.takeRetainedValue() as String?,
-                  !bundleID.isEmpty, bundleID != Bundle.main.bundleIdentifier
+                let bundleID = name?.takeRetainedValue() as String?,
+                !bundleID.isEmpty, bundleID != Bundle.main.bundleIdentifier
             else { continue }
             return bundleID
         }

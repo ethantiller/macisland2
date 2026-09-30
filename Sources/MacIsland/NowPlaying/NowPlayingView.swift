@@ -15,18 +15,19 @@ extension EnvironmentValues {
 
 extension View {
     /// Ties this view to the same view in the other presentation, if the island has set a namespace.
-    func mediaMatch(_ id: String) -> some View {
-        modifier(MediaMatch(id: id))
+    func mediaMatch(_ id: String, enabled: Bool = true) -> some View {
+        modifier(MediaMatch(id: id, enabled: enabled))
     }
 }
 
 private struct MediaMatch: ViewModifier {
     let id: String
+    let enabled: Bool
 
     @Environment(\.mediaNamespace) private var namespace
 
     func body(content: Content) -> some View {
-        if let namespace {
+        if enabled, let namespace {
             content.matchedGeometryEffect(id: id, in: namespace)
         } else {
             content
@@ -44,11 +45,15 @@ struct NowPlayingView: View {
     let bluetooth: BluetoothDevices
     /// The peek is narrower and only needs transport, so shuffle, repeat, and Favorite stay in the Media tab.
     var isPeek = false
+    /// Drawn inside a Home widget: the peek's player, without the art and bars flying to the other presentations,
+    /// the lyric line, or the output picker.
+    var inWidget = false
 
     @State private var showsOutputs = false
 
     private var state: NowPlayingState { nowPlaying.state }
-    private var artworkSize: CGFloat { isPeek ? Theme.Metrics.playerPeekArtwork : Theme.Metrics.playerArtwork }
+    private var isCompact: Bool { isPeek || inWidget }
+    private var artworkSize: CGFloat { isCompact ? Theme.Metrics.playerPeekArtwork : Theme.Metrics.playerArtwork }
 
     var body: some View {
         VStack(spacing: Theme.Metrics.playerSpacing) {
@@ -70,12 +75,12 @@ struct NowPlayingView: View {
 
             transport
 
-            if !nowPlaying.lyrics.lines.isEmpty {
+            if !inWidget, !nowPlaying.lyrics.lines.isEmpty {
                 LyricLineView(nowPlaying: nowPlaying)
                     .transition(.opacity)
             }
         }
-        .padding(.top, isPeek ? 0 : Theme.Metrics.playerTopInset)
+        .padding(.top, isCompact ? 0 : Theme.Metrics.playerTopInset)
         // Asked for while the view is visible, so a first Automation prompt comes from something the person opened.
         .task(id: LyricsModel.key(for: state) + (state.bundleIdentifier ?? "")) {
             await nowPlaying.refreshPlayerState()
@@ -88,9 +93,9 @@ struct NowPlayingView: View {
             ArtworkView(
                 image: nowPlaying.artwork,
                 size: artworkSize,
-                cornerRadius: Theme.Metrics.innerRadius
+                cornerRadius: inWidget ? Theme.Metrics.nestedRadius : Theme.Metrics.innerRadius
             )
-            .mediaMatch("artwork")
+            .mediaMatch("artwork", enabled: !inWidget)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(state.title)
@@ -106,9 +111,12 @@ struct NowPlayingView: View {
 
             Spacer(minLength: 8)
 
-            EqualizerView(tint: nowPlaying.accent, scale: 1.2, isAnimating: state.isPlaying)
-                .mediaMatch("bars")
-                .padding(.top, 6)
+            // A widget keeps the room for the song instead.
+            if !inWidget {
+                EqualizerView(tint: nowPlaying.accent, scale: 1.2, isAnimating: state.isPlaying)
+                    .mediaMatch("bars")
+                    .padding(.top, 6)
+            }
         }
         .frame(height: artworkSize)
     }
@@ -117,7 +125,7 @@ struct NowPlayingView: View {
     private var transport: some View {
         HStack(spacing: 0) {
             HStack(spacing: 2) {
-                if !isPeek {
+                if !isCompact {
                     IconButton(
                         systemName: "shuffle",
                         label: state.isShuffling ? "Shuffle On" : "Shuffle Off",
@@ -155,7 +163,7 @@ struct NowPlayingView: View {
             }
 
             HStack(spacing: 2) {
-                if !isPeek, let isFavorite = nowPlaying.isFavorite {
+                if !isCompact, let isFavorite = nowPlaying.isFavorite {
                     IconButton(
                         systemName: isFavorite ? "heart.fill" : "heart",
                         label: isFavorite ? "Remove from Favorites" : "Add to Favorites",
@@ -164,14 +172,16 @@ struct NowPlayingView: View {
                         action: nowPlaying.toggleFavorite
                     )
                 }
-                IconButton(
-                    systemName: "airplayaudio",
-                    label: "Audio Output and Volume",
-                    isSelected: showsOutputs
-                ) {
-                    // Paired devices are read only when the picker opens.
-                    if !showsOutputs { bluetooth.refresh() }
-                    withAnimation(Theme.Motion.resize) { showsOutputs.toggle() }
+                if !inWidget {
+                    IconButton(
+                        systemName: "airplayaudio",
+                        label: "Audio Output and Volume",
+                        isSelected: showsOutputs
+                    ) {
+                        // Paired devices are read only when the picker opens.
+                        if !showsOutputs { bluetooth.refresh() }
+                        withAnimation(Theme.Motion.resize) { showsOutputs.toggle() }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)

@@ -10,24 +10,33 @@ final class MouseTracker {
     private var dragPollTimer: Timer?
     private var dragStartedOnIsland = false
     private var dragPasteboardCount = 0
-    private var swipe = SwipeRecognizer()
+    private var scrolling = ScrollRouting()
+    private var dialSettleTask: Task<Void, Never>?
 
     init(panel: NSPanel, viewModel: IslandViewModel) {
         self.panel = panel
         self.viewModel = viewModel
 
-        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp, .scrollWheel]
+        let events: NSEvent.EventTypeMask = [
+            .mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp, .scrollWheel,
+        ]
         // Global monitor sees events going to other apps (panel ignoring the mouse);
         // local monitor sees events delivered to the panel itself.
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.handle(event) }
-        }) {
+        if let global = NSEvent.addGlobalMonitorForEvents(
+            matching: events,
+            handler: { [weak self] event in
+                MainActor.assumeIsolated { self?.handle(event) }
+            })
+        {
             monitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.handle(event) }
-            return event
-        }) {
+        if let local = NSEvent.addLocalMonitorForEvents(
+            matching: events,
+            handler: { [weak self] event in
+                MainActor.assumeIsolated { self?.handle(event) }
+                return event
+            })
+        {
             monitors.append(local)
         }
     }
@@ -50,19 +59,47 @@ final class MouseTracker {
         update()
     }
 
-    /// Two-finger swipes over the island: down opens, up closes, left and right change tabs.
-    /// Momentum after the fingers lift is ignored, so one gesture acts once.
+    /// Two-finger swipes over the island: down opens, up closes, left and right change tabs. Momentum after the
+    /// fingers lift is ignored, so one gesture acts once. Over the timer dial a horizontal gesture scrubs the
+    /// dial instead, with its momentum, and a mouse wheel steps a minute (see `ScrollRouting`).
     private func handleScroll(_ event: NSEvent) {
-        guard event.hasPreciseScrollingDeltas, event.momentumPhase.isEmpty,
-              viewModel.hitRect.contains(NSEvent.mouseLocation)
-        else { return }
-        let result = swipe.add(
+        let location = NSEvent.mouseLocation
+        guard viewModel.hitRect.contains(location) || scrolling.ownsGesture else { return }
+        let sample = ScrollSample(
             dx: event.scrollingDeltaX,
             dy: event.scrollingDeltaY,
-            inverted: event.isDirectionInvertedFromDevice,
-            began: event.phase.contains(.began)
+            isPrecise: event.hasPreciseScrollingDeltas,
+            isInverted: event.isDirectionInvertedFromDevice,
+            isBegan: event.phase.contains(.began),
+            isMomentum: !event.momentumPhase.isEmpty
         )
-        switch result {
+        let overDial = viewModel.timerDialRect?.contains(location) ?? false
+        switch scrolling.route(sample, overDial: overDial) {
+        case .scrubDial(let dx):
+            viewModel.scrubDial(byFingerDX: dx)
+            scheduleDialSettle()
+        case .stepDial(let step):
+            viewModel.stepDial(step)
+        case .swipe(let swipe):
+            perform(swipe)
+        case nil:
+            break
+        }
+    }
+
+    /// The dial settles on a whole minute once its scroll, and any coasting after it, has gone quiet.
+    private func scheduleDialSettle() {
+        dialSettleTask?.cancel()
+        dialSettleTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(140))
+            guard !Task.isCancelled else { return }
+            self?.viewModel.endDialScrub()
+        }
+    }
+
+    private func perform(_ swipe: Swipe) {
+        guard viewModel.settings.swipesEnabled else { return }
+        switch swipe {
         case .down where viewModel.presentation != .expanded:
             viewModel.open()
         case .up where viewModel.presentation == .expanded:
@@ -111,7 +148,8 @@ final class MouseTracker {
         }
         // Only a drag that put file URLs on the drag pasteboard counts; text, links, and windows don't.
         let drag = NSPasteboard(name: .drag)
-        let draggingFile = buttonDown && !dragStartedOnIsland
+        let draggingFile =
+            buttonDown && !dragStartedOnIsland
             && drag.changeCount != dragPasteboardCount && drag.types?.contains(.fileURL) == true
         viewModel.setFileDragActive(draggingFile)
 

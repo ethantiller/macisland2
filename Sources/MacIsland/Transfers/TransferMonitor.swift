@@ -28,7 +28,9 @@ final class TransferMonitor {
     }
 
     func start() {
-        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
+            return
+        }
         // The monitor lives as long as the app, so an unowned capture is safe.
         subscriber = Progress.addSubscriber(forFileURL: downloads) { [unowned self] progress in
             let id = UUID()

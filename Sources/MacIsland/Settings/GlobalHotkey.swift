@@ -7,7 +7,7 @@ final class GlobalHotkey {
     /// Control-Option-Space: free in macOS by default.
     nonisolated static let defaultKeyCode = UInt32(kVK_Space)
     nonisolated static let defaultModifiers = UInt32(controlKey | optionKey)
-    nonisolated private static let signature = OSType(0x4D_49_53_4C) // 'MISL'
+    nonisolated private static let signature = OSType(0x4D_49_53_4C)  // 'MISL'
 
     var onPress: (() -> Void)?
 

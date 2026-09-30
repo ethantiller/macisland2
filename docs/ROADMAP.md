@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (321 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (514 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -31,7 +31,11 @@ app after UI changes before saying to look; the user reviews visually and iterat
 - **Live activities:** the minimal pair, full charge, drive eject, the screenshot shelf, Keep Awake durations, headphone batteries.
 - **Media:** shuffle, repeat, Favorite, app volume, and synced lyrics, in a Dynamic Island style player.
 - **Home and productivity:** the Home dashboard, weather, Reminders, Pomodoro, zip and convert, smart actions, notes, Clean Keys.
-- **Reach:** the command palette, search and translate, Shortcuts, menu-bar modules, torn-off windows, Keep on Desktop.
+- **Customization:** the timer dial (scrub, fade, fixed marker), a Settings window of nine panes with a live island preview, Home as
+  a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
+  notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
+  for each are in the checklist below.
+- **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
 peeks, and direct control of Music and Spotify.
@@ -48,22 +52,27 @@ Where the app ended up differently from what was first planned, and why. The des
 | 7 modules; **5 tabs left of the notch and 1 right**, arranged in Settings | User request |
 | Default tabs Home, Media, **Clock, Reminders**, Tools. Shelf and Notes are in *Not Shown* | Reminders became its own tab; Shelf still opens on a drop |
 | Reminders is its own module, not part of Home | User request |
-| No Launch module: apps and Shortcuts are only searched from the palette | User did not like it |
+| The command palette and everything for it (search engines, translation, answers, currency rates, the app and Shortcuts index, its shortcut, `macisland://palette`) was **removed** | User: it was not useful. Shortcuts stay as Home widgets |
 | Home is two rows of boxes: Up Next, music, four tools, timers and Shelf. Battery and stats are not on it | Iterated with the user |
+| **Home is a uniform 6-column grid**: each widget has a few sizes, each with its own layout; Home is 1 to 3 rows tall and grows and shrinks with its widgets; widgets fill in reading order (agreed 2026-09-30). A uniform grid can't draw the old default exactly, so row 1 is pixel-identical and row 2 changed: Quick Tools 72 wide (was 80), the pill 392 (was 384), row 2 64 tall (was 68), Home 138 tall (was 142) | The editor needs one simple model: snap to a grid, sizes not dimensions. The panel is 276 tall (was 260) |
 | Weather is in the tab strip and the idle peek | User liked it beside the notch |
+| **Banners with nothing to press are alerts**: a smaller island (290), centered; Low Battery no longer offers Low Power Mode | Turning it on needs an administrator's password every time (`pmset` through AppleScript), and a privileged helper is out of proportion for one button. The Low Power and Lock Screen tools were removed for the same reason: nothing in the island asks for a password every time |
+| **AirPods banner has a ring** like the charging bolt (green, red at 20% or less) | User request; one `RingedGlyph` for both |
 | Menu-bar windows use the system's own material and only adapt the ink | Avoid glass on glass |
 | Idle peek shows the day and tools; timer, Pomodoro, and stopwatch have their own peeks | Fit the 380 pt width; use the space |
-| The palette hotkey ⌃⌥K is fixed, not a setting | Simplicity |
+| The global shortcut (open the island) is **recorded** in Settings, not picked from presets | Presets can't fix a collision with another app (an input-source switch, Raycast); the recorder refuses a key another app owns |
 | Banners carry one action today; DESIGN allows two; N6 adds the second | Nothing needed two until Check Camera |
 | `Theme.Palette` is surface-aware, as `SurfaceInk` | One view draws on the island and on glass |
 | Type gains `prompter`, `headline`, `subheadline` | The Prompter and the music player |
 | `expandedWidth` stays 520; the right side gets one tab | Fits without widening |
 | Agents is an idea, not a module | The user moved to everyday features: see [Next](#next) and [Ideas](#ideas) |
-| AirDrop blue (`Tint.airDrop`) is an exception to "one meaning per color" | It marks the AirDrop half of the drop target, beside `AirDropGlyph`, so it reads as AirDrop and not as storage |
+| AirDrop blue (`Tint.airDrop`) is an exception to "one meaning per color" | It marks the AirDrop target, beside `AirDropGlyph`, so it reads as AirDrop and not as storage |
 
 ---
 
 ## Next
+
+> The palette parts of N2, N3, and later packages below (its rows, answers, currency, and the `palette` link) were **removed** on 2026-09-30; those briefs are kept as history.
 
 Everyday features that fit [DESIGN.md](../DESIGN.md): on-device processing, no subscriptions, no custom backend. Work through the
 packages in order, and tick each one when it lands (with its hand checks added to the [checklist](#hand-test-checklist)).
@@ -272,7 +281,7 @@ protocol BluetoothDeviceProviding: AnyObject {
     `.resizeAspect`, and mirrored;
   - a column beside it holding Ring Light's `ControlButton`, its brightness `IslandSlider` while Ring Light is on, and a
     **Done** `ChipButton`.
-- Height: 38 + 8 + 180 + 18 = 244, which is ≤ `panelSize` 260.
+- Height: 38 + 8 + 180 + 18 = 244, which is ≤ `panelSize` 276.
 - It calls `holdOpen()` while shown.
 - The camera comes from `AVCaptureDevice.DiscoverySession` (built-in, Continuity, external). `AVCaptureSession` start and
   stop run on a private serial queue. `AVCaptureVideoPreviewLayer` sits in an `NSViewRepresentable`, and no frames reach
@@ -375,6 +384,21 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Idle CPU (see [gotchas](ARCHITECTURE.md#gotchas-and-lessons)) settles near 0.1 to 0.3%
 
 **Settings and tabs**
+- [ ] Shortcut: record a new open shortcut; a key another app owns says "In use by another app" and keeps the old one;
+      Delete turns one off. Peek on Hover off (hover swells, click opens), Swipe off (the dial still scrubs), Show the Island On with an external display
+- [ ] Settings file: Export, then Import into a reset app restores everything; Reset All asks first; a file with a command widget adds none
+- [ ] Shelf choices: drag a file with each mode (Shelf and AirDrop, Shelf Only, AirDrop Only, Do Nothing); Add New Screenshots off; Remove Files after a day;
+      Clipboard History Off stops recording; Show Music Beside the Notch off; the tool Row Order drags
+- [ ] Notifications: select an event and the preview shows its banner; turn one off and the real event stays silent (connect headphones, plug in a drive)
+- [ ] Settings window: drag its corner larger and smaller (it stops at 830 wide, or 640 with the sidebar hidden; wide, the panes stay centered); the search field and three-line button sit above the panes in a 4 to 1 split; typing finds settings (try "airpods", "hover", "weather"), Return opens the first, a result opens its pane and scrolls to its section, Escape clears; the button hides the sidebar (it slides, smoothly), a sidebar icon where that button was shows it again, and the window remembers; there is no toolbar, gear icon, or second sidebar button; the traffic lights float over the top line; click Compact, Peek, Banner, and Expanded above the preview (as well as the arrows and a swipe)
+- [ ] Banners: connect AirPods (and with one earbud low): a small centered alert with a green (or red) ring that draws once, the island narrower than the other banners, content centered; Low Battery (Notifications preview, or unplug at 20%) is a centered alert with no button and never asks for a password
+- [ ] Presets and dropdowns (Settings, Home): the Presets dropdown lists the five built-in presets with a check on the current one; Save opens a name field (Return saves, an empty or built-in name is refused, an existing name asks to replace it); the saved layout shows under Saved, comes back with its sizes and options, and its trash removes it (⌘Z brings it back); every other pop-up in Settings (Shelf, General, Notifications, a widget's options, the custom widget sheet) is the styled dropdown and its list scrolls when long; it works with the keyboard and VoiceOver
+- [ ] The Home editor (Settings, Home): drag a widget and it lifts and follows the pointer, the others slide aside calmly with no flicker, and a trackpad tick marks each new place; Escape calls a drag off and nothing changes; let go on the wallpaper beside the island and the widget snaps back where it was, while the dashed room under the island still places it; the ⊖ badge removes a widget (it is back in Add Widgets, and ⌘Z brings it back) and is dimmed on the last one; drag a corner and the box snaps to sizes with a tick, and a size that won't fit says so; drag the gallery's preview (click a chip first) into the room under the island and onto a gap, press its plus and a chip's plus, and see "No room" when it won't fit; a drag never gets stuck (drag a widget to the wallpaper, let go, and drag it or another again right away); the island grows and shrinks with the rows, and the dashed room and "Room for N more rows" follow; ⊖ removes (dimmed on the last widget), Delete, the arrows, Option-arrows, ⌘] and ⌘[ work with Home focused; VoiceOver offers Move, Make Larger, Make Smaller, and Remove on each widget, with "Weather, 1 by 1" and "row 2, column 1"; with Reduce Motion there is no lift or shadow; ⌘Z and ⇧⌘Z; presets, Export then Import, Reset; right-click a widget on the island, **Edit Home…** opens Settings with it selected; dragging from a tile scrolled partly under the preview still works
+- [ ] Tabs pane: click a row and a tab in the preview to see it; drag a preview tab onto another (swaps), a tray tab onto a tab (replaces it), a tab onto the tray (hides it), click a tray tab (adds it)
+- [ ] Tabs pane, Menu Bar view (last in the picker, only there): icons appear for the modules turned on, clicking one, or a module row (on or off), shows its window; the island slides left and the menu bar in from the right, and back; only the menu bar switches show; back in another view only the tab lists show
+- [ ] The preview's arrow buttons and a two-finger swipe over it step Compact, Peek, Banner, Expanded
+- [ ] The Settings window: each pane opens, the last pane is remembered, the preview shows the pane's context (Compact, Expanded Home,
+      Banner, and so on) and its picker switches presentations, and the **real island never moves** while Settings is open
 - [ ] The Settings gear opens the window without crashing (a crash here was fixed); the window scrolls and resizes
 - [ ] Drag a tab between Left, Right, and Not Shown; reorder within a list; the switches work; right-click menu works
 - [ ] The right-hand tab, the weather, and the pencil never reach the notch, even with a running timer
@@ -387,8 +411,17 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 **Home, Clock, Reminders**
 - [ ] Reminder field: typing works in the panel (focus), Return saves, access prompt appears once
 - [ ] Up Next with a real event: the 5-minute banner and **Join**
+- [ ] Custom widgets, one of each kind: a Shortcut result and a button, a web value (JSON path and first line), a folder (click opens it),
+      a command; **Test** works; nothing fetches while Home is hidden (idle CPU stays near 0.1 to 0.3%); export leaves a command out
+- [ ] Settings → Privacy lists the hosts and the things run, Remove works, and the permission states are right
+- [ ] Home's widgets: Weather, Battery, Reminders (check one off), and Note work in a layout (from Settings)
+- [ ] The gallery (Settings, Home, top): chips wrap with no sideways scroll; clicking a chip shows it, at one size, on black, live from sample data (no list of sizes; resize by dragging its corner once it is on Home); Reminders' sizes may ask for Reminders access; a custom widget's chip has Edit and Delete; New Widget… opens the sheet; the pane reads Add Widgets, the selected widget (Remove from Home), Layout, Up Next, Weather
+- [ ] Widget sizes (Settings, Size in a widget's options): every widget at every size draws without clipping; Today 3 × 3 is the month; Music 3 × 2 plays, pauses, and scrubs; Quick Tools 6 × 1 and 6 × 2 run tools; Weather 6 × 1 and 3 × 2 show the forecast; a size that won't fit is dimmed; ⌘Z undoes a size change; the Listening and Dashboard presets open without clipping; idle CPU with Home closed is unchanged (`ps -o cputime= -p PID` over 10 s)
 - [ ] Weather from a real city; changing it updates after a pause in typing
 - [ ] Pomodoro chains and stops after the long break; the streak and chart update
+- [ ] The timer dial: a two-finger horizontal swipe over it scrubs (and coasts), the same swipe elsewhere changes tabs, swipe up
+      over it closes, a mouse wheel steps a minute, a drag follows the pointer 1:1, a tap glides, the ruler stretches at 1 minute,
+      and haptics tap at the ends; the same in a torn-off Clock window
 
 **Shelf and Tools**
 - [ ] Drop a file on each half; it lands on the Shelf, the drop tiles go away, and AirDrop opens the picker
@@ -397,29 +430,25 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Take a screenshot: it lands on the Shelf with the "Shelf" alert
 - [ ] Plug a drive in: the banner and **Eject**; a failing eject shows the reason
 - [ ] **Clean Keys**: asks for Accessibility, swallows keys for 30 s, the banner and status glyph, Unlock works
-- [ ] Keep Awake durations; Low Power (password prompt); Ring Light; Mute Mic; Focus with and without the shortcuts
+- [ ] Keep Awake durations; Ring Light; Mute Mic; Focus with and without the shortcuts
 - [ ] Right-click a file: Quick Look opens and takes Space and Esc (Space while hovering also opens it); Share shows the system menu
 - [ ] Copy Text on a screenshot, a scanned PDF, and a QR code; a picture without text says *No Text Found*; a Clipboard image card has a **Copy Text** chip
 - [ ] Convert To on a DOCX (to PDF), a Markdown file (to HTML), a PDF (to TXT and to PNG pages), a MOV (to MP4, M4A, GIF), and a WAV or MP3 (to M4A)
 - [ ] Resize and Compress an image; Combine into PDF appears with two or more images or PDFs
-- [ ] Right-click a text Clipboard card: Copy as Plain Text and Save as Snippet (the snippet appears in Notes); `clip …` in the palette lists copies
+- [ ] Right-click a text Clipboard card: Copy as Plain Text and Save as Snippet (the snippet appears in Notes)
 - [ ] Join on a Teams and a Zoom meeting opens the app (and the browser when the app is missing); a SafeLinks link opens the real meeting; Settings → Up Next → Open Internet Accounts opens the pane
 - [ ] Rain Soon: set a city where rain is due; the banner shows once. Low Disk Space: lower the threshold to test, or fill the disk; **Open Storage** opens the pane
 - [ ] Media output picker: a *Not Connected* group lists paired headphones; AirPods connect from it (blue "Connecting", then the headphones banner); right-click to Disconnect; `connect …` in the palette
-- [ ] Mirror (Tools grid, palette, or **Check Camera** on a meeting banner): the camera shows mirrored; Ring Light and its slider work; Done, folding, and changing tab turn the camera off (the green dot goes out); denied Camera access shows "Camera access is off." with **Open Settings**
+- [ ] Mirror (Tools grid, or **Check Camera** on a meeting banner): the camera shows mirrored; Ring Light and its slider work; Done, folding, and changing tab turn the camera off (the green dot goes out); denied Camera access shows "Camera access is off." with **Open Settings**
 - [ ] Record Screen: the region picker (drag, click for the display, Esc); the record dot and time beside the notch; click to stop; the movie is in Movies and on the Shelf; MacIsland's own island is not in it; denied access shows the red banner
-- [ ] Voice Note: the mic in Notes (or the palette) records; the waveform sits beside the notch and hovering shows the meter and **Stop**; stopping makes "Voice Note, <time>" with the words, and the audio is on the Shelf; the first run downloads the speech model; Mute Mic on offers **Unmute**; the compact island does not also show a microphone activity
-- [ ] Palette: `define serendipity`, `5 km in mi`, `72f to c`, `100 usd in eur` (needs the network), and `2*(3+4)` each give a row that copies on Return
-- [ ] `open "macisland://timer?minutes=1"` starts a timer; `macisland://banner?title=Hi` shows a banner; **Lock Screen** locks (and asks for Accessibility the first time)
+- [ ] Voice Note: the mic in Notes records; the waveform sits beside the notch and hovering shows the meter and **Stop**; stopping makes "Voice Note, <time>" with the words, and the audio is on the Shelf; the first run downloads the speech model; Mute Mic on offers **Unmute**; the compact island does not also show a microphone activity
+- [ ] `open "macisland://timer?minutes=1"` starts a timer; `macisland://banner?title=Hi` shows a banner (the Lock Screen and Low Power tools are gone: Tools has nine; a saved Quick Tools choice that named them keeps its other tools) (formerly: Lock Screen asked for Accessibility the first time)
 
 **Notes**
 - [ ] Editing a note and a snippet (focus in the panel, the island stays open); the Prompter scrolls and pauses
 
 **Reach**
-- [ ] ⌃⌥K opens the palette under the notch; typing, arrows, Return, Esc; clicking away closes it
-- [ ] `25m`, `remind …`, `yt …`, an app name, a shortcut name, and `tr es hello` (which may download a language)
 - [ ] A menu-bar module: add from Settings and from a tab's menu; drag its header away; Keep on Desktop; close
-- [ ] Add and remove a custom search engine; change the default engine
 
 ---
 
@@ -427,7 +456,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 | Item | Note |
 | --- | --- |
-| `ClipboardHistory` | Polls every 0.7 s from launch, the one standing timer. Revisit it against the idle budget |
+| `ClipboardHistory` | Polls every 0.7 s while history is on, the one standing timer; **Off** in Settings → Shelf stops it |
 | `.swift-format` and `format.sh` | Never run over the codebase (~490 findings). Commit first, then format in its own commit |
 | `IslandModule.agents` | Reserved for the Agents idea |
 | `Theme.Metrics.cardRadius` (10) vs `widgetRadius` (14) | Home uses 14; older cards and fields use 10. Unify later if it bothers |
@@ -444,7 +473,6 @@ Not planned, not promised.
 - **An app icon** and a proper first-run tour (the app has no Dock icon and no first-run guidance).
 - **Continuous integration**: `./scripts/test.sh` on a macOS runner.
 - **Per-display islands** (currently one, on the notched screen).
-- **Palette: recents and frequency**, so what you use floats up.
 - **A Dynamic Island style for more activities** (the music player's layout, applied to timers on expand).
 - **Converting through Pages** (AppleScript) for full Word fidelity.
 - **Microsoft Graph sign-in (MSAL)** for organizations that block Exchange sync. It needs an Azure app registration, often admin

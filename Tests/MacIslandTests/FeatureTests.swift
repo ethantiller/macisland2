@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 @MainActor
@@ -38,16 +39,18 @@ struct StopwatchModelTests {
 }
 
 struct AudioAccessoryTests {
-    private let json = Data("""
-    {"SPBluetoothDataType":[{"device_connected":[
-      {"Ethan's AirPods Pro":{"device_address":"AA:BB:CC:DD:EE:FF","device_batteryLevelLeft":"80%",
-        "device_batteryLevelRight":"75%","device_batteryLevelCase":"60%","device_minorType":"Headphones"}},
-      {"Magic Keyboard":{"device_address":"11:22:33:44:55:66","device_batteryLevelMain":"91%"}}
-    ]}]}
-    """.utf8)
+    private let json = Data(
+        """
+        {"SPBluetoothDataType":[{"device_connected":[
+          {"Ethan's AirPods Pro":{"device_address":"AA:BB:CC:DD:EE:FF","device_batteryLevelLeft":"80%",
+            "device_batteryLevelRight":"75%","device_batteryLevelCase":"60%","device_minorType":"Headphones"}},
+          {"Magic Keyboard":{"device_address":"11:22:33:44:55:66","device_batteryLevelMain":"91%"}}
+        ]}]}
+        """.utf8)
 
     @Test func readsEarbudAndCaseLevelsByAddress() {
-        let accessory = AudioAccessory.parse(systemProfilerJSON: json, name: "Ethan's AirPods Pro", address: "aa-bb-cc-dd-ee-ff")
+        let accessory = AudioAccessory.parse(
+            systemProfilerJSON: json, name: "Ethan's AirPods Pro", address: "aa-bb-cc-dd-ee-ff")
         #expect(accessory.left == 80)
         #expect(accessory.right == 75)
         #expect(accessory.caseLevel == 60)
@@ -56,7 +59,8 @@ struct AudioAccessoryTests {
     }
 
     @Test func singleBatteryDevice() {
-        let accessory = AudioAccessory.parse(systemProfilerJSON: json, name: "Magic Keyboard", address: "11-22-33-44-55-66")
+        let accessory = AudioAccessory.parse(
+            systemProfilerJSON: json, name: "Magic Keyboard", address: "11-22-33-44-55-66")
         #expect(accessory.batterySummary == "91%")
     }
 

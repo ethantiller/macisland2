@@ -17,6 +17,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/MacIsland" "$APP/Contents/MacOS/MacIsland"
 cp Support/Info.plist "$APP/Contents/Info.plist"
+for resource_bundle in "$BIN_DIR"/*.bundle; do
+    [ -d "$resource_bundle" ] || continue
+    cp -R "$resource_bundle" "$APP/Contents/Resources/"
+done
 # The adapter framework is loaded by /usr/bin/perl at runtime, not linked into the app.
 cp -R build/adapter/MediaRemoteAdapter.framework "$APP/Contents/Frameworks/"
 cp build/adapter/mediaremote-adapter.pl "$APP/Contents/Resources/"

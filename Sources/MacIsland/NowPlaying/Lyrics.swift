@@ -97,14 +97,16 @@ final class LyricsModel {
             URLQueryItem(name: "artist_name", value: state.artist),
         ]
         if !state.album.isEmpty { items.append(URLQueryItem(name: "album_name", value: state.album)) }
-        if state.duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(state.duration.rounded())))) }
+        if state.duration > 0 {
+            items.append(URLQueryItem(name: "duration", value: String(Int(state.duration.rounded()))))
+        }
         components?.queryItems = items
         return components?.url
     }
 
     nonisolated static func lines(fromResponse data: Data) -> [LyricLine] {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let synced = object["syncedLyrics"] as? String
+            let synced = object["syncedLyrics"] as? String
         else { return [] }
         return LRC.parse(synced)
     }
@@ -113,7 +115,7 @@ final class LyricsModel {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("MacIsland/0.1", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200
+            (response as? HTTPURLResponse)?.statusCode == 200
         else { return nil }
         return data
     }

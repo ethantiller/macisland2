@@ -53,7 +53,8 @@ final class BatteryMonitor {
     }
 
     /// What a new reading means, given the previous one.
-    nonisolated static func events(wasOnAC: Bool, lastPercent: Int, onAC: Bool, percent: Int, fullLevel: Int) -> [Event] {
+    nonisolated static func events(wasOnAC: Bool, lastPercent: Int, onAC: Bool, percent: Int, fullLevel: Int) -> [Event]
+    {
         var events: [Event] = []
         if onAC && !wasOnAC {
             events.append(.charging(percent: percent))
@@ -70,15 +71,16 @@ final class BatteryMonitor {
     /// This Mac's battery right now, or `nil` on a desktop.
     nonisolated static func readInternalBattery() -> (percent: Int, onAC: Bool)? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let sources = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef]
+            let sources = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef]
         else { return nil }
 
         for source in sources {
-            guard let description = IOPSGetPowerSourceDescription(info, source)?
-                      .takeUnretainedValue() as? [String: Any],
-                  description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType,
-                  let current = description[kIOPSCurrentCapacityKey] as? Int,
-                  let max = description[kIOPSMaxCapacityKey] as? Int, max > 0
+            guard
+                let description = IOPSGetPowerSourceDescription(info, source)?
+                    .takeUnretainedValue() as? [String: Any],
+                description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType,
+                let current = description[kIOPSCurrentCapacityKey] as? Int,
+                let max = description[kIOPSMaxCapacityKey] as? Int, max > 0
             else { continue }
             let onAC = description[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue
             return (current * 100 / max, onAC)

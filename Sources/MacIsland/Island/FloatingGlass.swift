@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Surfaces that float free of the notch: the command palette, menu-bar modules, torn-off panels.
+/// Surfaces that float free of the notch: menu-bar modules and torn-off panels.
 /// Never used on the island itself.
 struct FloatingGlass: ViewModifier {
     func body(content: Content) -> some View {

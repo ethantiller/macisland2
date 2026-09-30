@@ -1,5 +1,6 @@
 import CoreGraphics
 import Testing
+
 @testable import MacIsland
 
 @MainActor
@@ -25,9 +26,12 @@ struct PresentationTests {
         #expect(viewModel.size.width == Theme.Metrics.expandedWidth)
     }
 
-    @Test func bannerSharesWidthWithPeek() {
+    @Test func aBannerWithButtonsSharesWidthWithPeek() {
         let viewModel = TestSupport.makeViewModel()
-        viewModel.showBanner(IslandBanner(systemImage: "bolt", tint: Theme.Tint.neutral, title: "T", detail: "D"))
+        viewModel.showBanner(
+            IslandBanner(
+                systemImage: "bolt", tint: Theme.Tint.neutral, title: "T", detail: "D", actions: [.init(title: "Go") {}]
+            ))
         #expect(viewModel.presentation == .banner)
         #expect(viewModel.size.width == Theme.Metrics.peekWidth)
     }
@@ -50,13 +54,16 @@ struct PresentationTests {
         #expect(viewModel.state == .compact)
     }
 
-    @Test func dragTargetIsUnchanged() {
+    @Test func compactIslandGainsOnePointAndDragGrowthAddsToIt() {
         let viewModel = TestSupport.makeViewModel()
         let resting = viewModel.size
+        #expect(resting.height == viewModel.geometry.compactSize.height + 1)
         viewModel.setFileDragActive(true)
         #expect(viewModel.showsDragTarget)
         #expect(viewModel.size.height == resting.height + Theme.Metrics.dragTargetHeight)
         #expect(viewModel.size.width == viewModel.geometry.compactSize.width + 2 * Theme.Metrics.dragTargetInset)
+        viewModel.setFileDragActive(false)
+        #expect(viewModel.size == resting)
     }
 
     @Test func pillWithoutANotchIsHiddenUntilSomethingIsLive() {

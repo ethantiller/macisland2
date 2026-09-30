@@ -10,6 +10,7 @@ cd "$(dirname "$0")/.."
 RENDERS="${TMPDIR:-/tmp}/island-docs"
 rm -rf "$RENDERS"
 ISLAND_SNAPSHOT_DIR="$RENDERS" ./scripts/test.sh --filter IslandSnapshots
+ISLAND_SNAPSHOT_DIR="$RENDERS" ./scripts/test.sh --filter WidgetSizeSnapshots
 
 mkdir -p docs/images
 # Keep this list in step with the images the docs mention.
@@ -18,7 +19,7 @@ for name in \
     11-banner-airpods 12-banner-low-battery \
     03e-peek-idle-weather 03b-peek-media 03f-peek-timer-compact 03g-peek-pomodoro 03h-peek-stopwatch \
     04a-expanded-home 04a-expanded-home-calendar 04-expanded-media 04b-expanded-media-lyrics \
-    04c-expanded-reminders 04e-right-tab 05-expanded-shelf-empty 06-expanded-timer 06b-expanded-pomodoro \
+    04c-expanded-reminders 04e-right-tab 05-expanded-shelf-empty 06-expanded-timer 06b-expanded-pomodoro 06c-expanded-timer-setter 04f-home-preset-3-listening 04f-home-preset-5-dashboard 31-widget-sizes \
     07-expanded-stopwatch 08a-expanded-tools-more 08c-expanded-tools-eight 08d-expanded-notes \
     12b-banner-two-actions 14-compact-recording 14b-peek-voice; do
     cp "$RENDERS/$name.png" "docs/images/$name.png"

@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import ImageIO
 import Testing
+
 @testable import MacIsland
 
 // MARK: Pomodoro
@@ -119,9 +120,32 @@ struct PomodoroModelTests {
 
     @Test func pomodoroModeAddsTheStatsToTheClockHeight() {
         let viewModel = TestSupport.makeViewModel()
+        viewModel.setClockMode(.stopwatch)
         let plain = viewModel.contentHeight(for: .clock)
         viewModel.setClockMode(.pomodoro)
         #expect(viewModel.contentHeight(for: .clock) == plain + Theme.Metrics.pomodoroStatsHeight)
+    }
+
+    @Test func settingATimerIsTallerThanARunningOne() {
+        let viewModel = TestSupport.makeViewModel()
+        #expect(viewModel.contentHeight(for: .clock) == Theme.Metrics.timerSetter)
+        viewModel.timer.start(minutes: 5)
+        #expect(viewModel.contentHeight(for: .clock) == Theme.Metrics.clockRing)
+        viewModel.timer.reset()
+    }
+
+    @Test func theDialSetsTheLengthOnlyWhileTheTimerIsIdle() {
+        let timer = TimerModel()
+        timer.setDuration(minutes: 90)
+        #expect(timer.duration == TimeInterval(90 * 60))
+        timer.setDuration(minutes: 0)
+        #expect(timer.duration == TimeInterval(TimerModel.minimumDialMinutes * 60))
+        timer.setDuration(minutes: 5000)
+        #expect(timer.duration == TimeInterval(TimerModel.maximumDialMinutes * 60))
+        timer.start(minutes: 5)
+        timer.setDuration(minutes: 20)
+        #expect(timer.duration == 5 * 60)
+        timer.reset()
     }
 }
 
@@ -154,14 +178,16 @@ struct MonthGridTests {
 @MainActor
 struct WeatherTests {
     private let forecast = Data(#"{"current":{"temperature_2m":18.6,"weather_code":61,"is_day":0}}"#.utf8)
-    private let place = Data(#"{"results":[{"name":"Paris","latitude":48.85,"longitude":2.35,"country":"France"}]}"#.utf8)
+    private let place = Data(
+        #"{"results":[{"name":"Paris","latitude":48.85,"longitude":2.35,"country":"France"}]}"#.utf8)
 
     @Test func requestsUseTheCityNameAndUnits() {
         #expect(WeatherModel.searchName(from: "Paris, France") == "Paris")
         #expect(WeatherModel.searchName(from: "  ") == "")
         let geocode = WeatherModel.geocodingURL(city: "New York")?.absoluteString
         #expect(geocode?.contains("name=New%20York") == true)
-        let url = WeatherModel.forecastURL(place: .init(name: "Paris", latitude: 48.85, longitude: 2.35), fahrenheit: true)
+        let url = WeatherModel.forecastURL(
+            place: .init(name: "Paris", latitude: 48.85, longitude: 2.35), fahrenheit: true)
         #expect(url?.absoluteString.contains("temperature_unit=fahrenheit") == true)
         #expect(url?.absoluteString.contains("latitude=48.85") == true)
     }
@@ -193,7 +219,7 @@ struct WeatherTests {
             return url.host == "geocoding-api.open-meteo.com" ? place : forecast
         }
         model.configure(city: "Paris")
-        try await Task.sleep(for: .milliseconds(200))
+        for _ in 0..<200 where model.conditions == nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(model.conditions?.place == "Paris")
         #expect(requests == ["geocoding-api.open-meteo.com", "api.open-meteo.com"])
         model.configure(city: "")
@@ -216,7 +242,8 @@ struct WeatherTests {
 
 struct SmartActionTests {
     @Test func linksAddressesAndColors() {
-        #expect(SmartAction.detect(in: "https://example.com/a?b=1") == .openURL(URL(string: "https://example.com/a?b=1")!))
+        #expect(
+            SmartAction.detect(in: "https://example.com/a?b=1") == .openURL(URL(string: "https://example.com/a?b=1")!))
         #expect(SmartAction.detect(in: "  someone@example.com  ") == .email("someone@example.com"))
         #expect(SmartAction.detect(in: "#ff5733") == .color(hex: "#FF5733", rgb: "rgb(255, 87, 51)"))
         #expect(SmartAction.detect(in: "#fa0") == .color(hex: "#FFAA00", rgb: "rgb(255, 170, 0)"))
@@ -270,7 +297,9 @@ struct FileToolsTests {
         let out = directory.appendingPathComponent("out")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let restored = try FileTools.unzip(archive, into: out)
-        #expect(restored.lastPathComponent == "hello.txt" && restored.deletingLastPathComponent().lastPathComponent == "out")
+        #expect(
+            restored.lastPathComponent == "hello.txt" && restored.deletingLastPathComponent().lastPathComponent == "out"
+        )
         #expect(try String(contentsOf: restored, encoding: .utf8) == "hello")
     }
 
@@ -308,8 +337,12 @@ struct FileToolsTests {
 
     @Test func aFileIsNotGivenItsParentFolder() {
         let file = URL(fileURLWithPath: "/tmp/a.txt")
-        #expect(!FileTools.zipArguments([file], to: URL(fileURLWithPath: "/tmp/a.zip"), keepParent: false).contains("--keepParent"))
-        #expect(FileTools.zipArguments([file], to: URL(fileURLWithPath: "/tmp/a.zip"), keepParent: true).contains("--keepParent"))
+        #expect(
+            !FileTools.zipArguments([file], to: URL(fileURLWithPath: "/tmp/a.zip"), keepParent: false).contains(
+                "--keepParent"))
+        #expect(
+            FileTools.zipArguments([file], to: URL(fileURLWithPath: "/tmp/a.zip"), keepParent: true).contains(
+                "--keepParent"))
     }
 
     @Test func namesNeverOverwrite() throws {
@@ -329,7 +362,9 @@ struct FileToolsTests {
             _ = try Converters.image(at: png, to: format, destination: output)
             #expect(FileManager.default.fileExists(atPath: output.path))
             if format != .pdf {
-                #expect(CGImageSourceCreateWithURL(output as CFURL, nil).flatMap(CGImageSourceGetType) as String? == format.type.identifier)
+                #expect(
+                    CGImageSourceCreateWithURL(output as CFURL, nil).flatMap(CGImageSourceGetType) as String?
+                        == format.type.identifier)
             }
         }
         #expect(throws: FileToolError.self) {
@@ -443,14 +478,14 @@ struct CleanKeyboardTests {
     }
 
     @Test func toolsGridHoldsEveryToolInTwoRowsOfSix() {
-        #expect(ToolID.allCases.count == 11)
-        // Eleven tools and Less make twelve: two rows of six.
+        #expect(ToolID.allCases.count == 9)
+        // Nine tools and Less make ten: two rows of six, with two cells free.
         #expect(ToolID.allCases.count + 1 <= 2 * 6)
         let defaults = UserDefaults(suiteName: "MacIslandTools8")!
         defaults.removePersistentDomain(forName: "MacIslandTools8")
         let settings = AppSettings(defaults: defaults)
         settings.pinLimit = .eight
-        // Eleven tools do not fit the widest row, so the row keeps its More button.
+        // Nine tools do not fit the widest row (eight), so the row keeps its More button.
         #expect(!settings.rowShowsEveryTool && settings.visiblePinned.count == 8)
     }
 }
@@ -484,7 +519,9 @@ struct ReminderRowTests {
     }
 
     @Test func datedFirstSoonestOnTopThenUndated() {
-        let sorted = ReminderRow.sorted([row("none", after: nil), row("later", after: 30), row("overdue", after: -5), row("soon", after: 2)])
+        let sorted = ReminderRow.sorted([
+            row("none", after: nil), row("later", after: 30), row("overdue", after: -5), row("soon", after: 2),
+        ])
         #expect(sorted.map(\.title) == ["overdue", "soon", "later", "none"])
     }
 
@@ -533,7 +570,8 @@ struct HomeAndPeekTests {
                 : Data(#"{"current":{"temperature_2m":10,"weather_code":0,"is_day":1}}"#.utf8)
         }
         weather.configure(city: "Paris")
-        try await Task.sleep(for: .milliseconds(150))
+        // Poll rather than sleep an exact time: the suite runs in parallel.
+        for _ in 0..<100 where weather.conditions == nil { try await Task.sleep(for: .milliseconds(20)) }
         viewModel.selectedTab = .home
         #expect(viewModel.showsStripWeather)
 
@@ -565,8 +603,12 @@ struct HomeAndPeekTests {
         viewModel.setCalendarExpanded(true)
         #expect(viewModel.contentHeight(for: .home) == Theme.Metrics.homeMonthHeight)
         // Everything fits in the panel below the notch.
-        let room = ScreenGeometry.panelSize.height - viewModel.geometry.notchSize.height - Theme.Metrics.contentTopGap - Theme.Metrics.margin
-        #expect(Theme.Metrics.homeMonthHeight <= room && Theme.Metrics.remindersHeight <= room && Theme.Metrics.notesHeight <= room)
+        let room =
+            ScreenGeometry.panelSize.height - viewModel.geometry.notchSize.height - Theme.Metrics.contentTopGap
+            - Theme.Metrics.margin
+        #expect(
+            Theme.Metrics.homeMonthHeight <= room && Theme.Metrics.remindersHeight <= room
+                && Theme.Metrics.notesHeight <= room)
     }
 
     @Test func openingTheClockFromHomePicksTheRunningMode() {
@@ -599,7 +641,6 @@ struct TimerPeekTests {
     }
 }
 
-
 // MARK: Home layout and Settings wording
 
 @MainActor
@@ -626,9 +667,11 @@ struct HomeWidgetsTests {
 
     @Test func homeFitsBelowTheNotch() {
         let viewModel = TestSupport.makeViewModel()
-        let room = ScreenGeometry.panelSize.height - viewModel.geometry.notchSize.height - Theme.Metrics.contentTopGap - Theme.Metrics.margin
-        #expect(Theme.Metrics.homeContentHeight == Theme.Metrics.homeCardHeight + Theme.Metrics.homeActionsHeight + 10)
-        #expect(Theme.Metrics.homeContentHeight <= room)
+        let room =
+            ScreenGeometry.panelSize.height - viewModel.geometry.notchSize.height - Theme.Metrics.contentTopGap
+            - Theme.Metrics.margin
+        #expect(Theme.Metrics.homeContentHeight == 2 * Theme.Metrics.homeRowHeight + 10)
+        #expect(Theme.Metrics.homeMaxContentHeight <= room)
     }
 }
 
@@ -768,7 +811,8 @@ struct TrailingStripTests {
     }
 
     @Test func thePencilIsLeftOutWhenNotesIsAlreadyATab() {
-        let plan = TrailingStrip.plan(available: 154, rightTabs: 0, hasStatus: false, hasWeather: true, hasNotesTab: true)
+        let plan = TrailingStrip.plan(
+            available: 154, rightTabs: 0, hasStatus: false, hasWeather: true, hasNotesTab: true)
         #expect(plan == .init(weather: true, pencil: false))
     }
 

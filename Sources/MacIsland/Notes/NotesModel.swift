@@ -38,9 +38,10 @@ final class NotesModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     init(directory: URL? = nil) {
-        let folder = directory
+        let folder =
+            directory
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("MacIsland", isDirectory: true)
+            .appendingPathComponent("MacIsland", isDirectory: true)
         fileURL = folder.appendingPathComponent("notes.json")
         if let data = try? Data(contentsOf: fileURL), let stored = try? JSONDecoder().decode(Stored.self, from: data) {
             notes = stored.notes
@@ -143,7 +144,8 @@ final class NotesModel {
         saveTask?.cancel()
         let stored = Stored(notes: notes, snippets: snippets)
         guard let data = try? JSONEncoder().encode(stored) else { return }
-        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: fileURL, options: .atomic)
     }
 }

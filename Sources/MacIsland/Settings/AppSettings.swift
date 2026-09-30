@@ -1,29 +1,32 @@
 import Carbon.HIToolbox
 import Observation
 
-/// The shortcut that opens the island from the keyboard.
-enum HotkeyChoice: String, CaseIterable, Identifiable {
-    case controlOptionSpace
-    case controlOptionI
-    case off
+/// What a file dragged toward the island does.
+enum DragTarget: String, CaseIterable, Identifiable {
+    case shelfAndAirDrop, shelfOnly, airDropOnly, nothing
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .controlOptionSpace: "⌃⌥Space"
-        case .controlOptionI: "⌃⌥I"
-        case .off: "Off"
+        case .shelfAndAirDrop: "Show Shelf and AirDrop"
+        case .shelfOnly: "Show Shelf Only"
+        case .airDropOnly: "Show AirDrop Only"
+        case .nothing: "Do Nothing"
         }
     }
+}
 
-    /// `nil` when the shortcut is off.
-    var keyCombo: (keyCode: UInt32, modifiers: UInt32)? {
-        let modifiers = UInt32(controlKey | optionKey)
+/// Which display carries the island.
+enum IslandDisplay: String, CaseIterable, Identifiable {
+    case builtIn, primary
+
+    var id: String { rawValue }
+
+    var title: String {
         switch self {
-        case .controlOptionSpace: return (UInt32(kVK_Space), modifiers)
-        case .controlOptionI: return (UInt32(kVK_ANSI_I), modifiers)
-        case .off: return nil
+        case .builtIn: "Built-in Display"
+        case .primary: "Primary Display"
         }
     }
 }
@@ -42,7 +45,13 @@ enum PinLimit: Int, CaseIterable, Identifiable {
 @Observable
 final class AppSettings {
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored var onHotkeyChange: ((HotkeyChoice) -> Void)?
+    /// Registers a global shortcut with the system, returning false when another app holds the key. Set by the app;
+    /// without it (in tests) every valid shortcut is accepted.
+    @ObservationIgnored var shortcutRegistrar: ((ShortcutSlot, KeyCombo?) -> Bool)?
+    /// The display choice changed.
+    @ObservationIgnored var onDisplayChange: (() -> Void)?
+    @ObservationIgnored var onScreenshotsChange: (() -> Void)?
+    @ObservationIgnored var onClipboardChange: (() -> Void)?
     /// Calendar or Reminders was turned on or off.
     @ObservationIgnored var onAgendaChange: (() -> Void)?
     /// Quiet in Focus was turned on or off.
@@ -54,11 +63,71 @@ final class AppSettings {
 
     private(set) var launchAtLogin: Bool
 
-    var hotkey: HotkeyChoice {
+    /// The keys that open the island from anywhere. Nil is off.
+    private(set) var openShortcut: KeyCombo? {
         didSet {
-            defaults.set(hotkey.rawValue, forKey: Key.hotkey)
-            onHotkeyChange?(hotkey)
+            defaults.set(try? JSONEncoder().encode(StoredShortcut(combo: openShortcut)), forKey: Key.openShortcut)
         }
+    }
+
+    /// Hovering the compact island opens the peek after a moment. Off: hovering only swells it, and a click or a
+    /// swipe opens it. For accidental peeks while reaching for the menu bar, and for a tremor.
+    var peeksOnHover: Bool {
+        didSet { defaults.set(peeksOnHover, forKey: Key.peeksOnHover) }
+    }
+
+    /// A two-finger swipe over the island opens it, closes it, and changes tabs. The timer dial's own scrubbing works
+    /// either way.
+    var swipesEnabled: Bool {
+        didSet { defaults.set(swipesEnabled, forKey: Key.swipesEnabled) }
+    }
+
+    /// Which display carries the island: for a desk with the lid open and an external display as primary.
+    var islandDisplay: IslandDisplay {
+        didSet {
+            defaults.set(islandDisplay.rawValue, forKey: Key.islandDisplay)
+            onDisplayChange?()
+        }
+    }
+
+    /// What a file dragged toward the island does: grow into a Shelf and AirDrop, Shelf-only, or AirDrop-only target, or nothing.
+    var dragTarget: DragTarget {
+        didSet { defaults.set(dragTarget.rawValue, forKey: Key.dragTarget) }
+    }
+
+    /// New screenshots land on the Shelf. Off also stops the Spotlight query that finds them.
+    var addsScreenshots: Bool {
+        didSet {
+            defaults.set(addsScreenshots, forKey: Key.addsScreenshots)
+            onScreenshotsChange?()
+        }
+    }
+
+    var shelfRetention: ShelfRetention {
+        didSet { defaults.set(shelfRetention.rawValue, forKey: Key.shelfRetention) }
+    }
+
+    /// How many copies the clipboard history keeps; 0 is off.
+    var clipboardLimit: Int {
+        didSet {
+            defaults.set(clipboardLimit, forKey: Key.clipboardLimit)
+            onClipboardChange?()
+        }
+    }
+
+    /// The Shelf opens on the mode it was last left in. A dropped file always shows Files.
+    var shelfMode: ShelfMode {
+        didSet { defaults.set(shelfMode.rawValue, forKey: Key.shelfMode) }
+    }
+
+    /// The music beside the notch while the island is collapsed. Off: the Home widget and the Media tab stay.
+    var showsMusicCompact: Bool {
+        didSet { defaults.set(showsMusicCompact, forKey: Key.showsMusicCompact) }
+    }
+
+    /// Interruptions the person turned off.
+    private(set) var mutedEvents: Set<AmbientEvent> {
+        didSet { defaults.set(mutedEvents.map(\.rawValue).sorted(), forKey: Key.mutedEvents) }
     }
 
     /// Hold back banners and short alerts while a Focus is on.
@@ -135,14 +204,21 @@ final class AppSettings {
         didSet { defaults.set(menuBarModules.map(\.rawValue), forKey: Key.menuBar) }
     }
 
-    /// The engine the palette searches with when no keyword is typed.
-    var defaultSearchEngineID: String {
-        didSet { defaults.set(defaultSearchEngineID, forKey: Key.searchEngine) }
+    /// A Home widget the island asked Settings to select (right-click, Edit Home). Not stored: the editor takes it.
+    var requestedHomeSelection: UUID?
+
+    /// Widgets the person made, in the order they made them.
+    private(set) var customWidgets: [CustomWidget] {
+        didSet { defaults.set(try? JSONEncoder().encode(customWidgets), forKey: Key.customWidgets) }
     }
 
-    /// Engines the person added, after the built-in ones.
-    private(set) var customEngines: [SearchEngine] {
-        didSet { defaults.set(try? JSONEncoder().encode(customEngines), forKey: Key.customEngines) }
+    /// What Home shows. Always normalized: what didn't fit is in `hidden`, and it is never empty.
+    private(set) var homeLayout: HomeLayout {
+        didSet { defaults.set(try? JSONEncoder().encode(homeLayout), forKey: Key.homeLayout) }
+    }
+    /// Arrangements the person saved, for the Presets menu. The built-in presets are code.
+    private(set) var savedHomePresets: [SavedHomePreset] {
+        didSet { defaults.set(try? JSONEncoder().encode(savedHomePresets), forKey: Key.savedHomePresets) }
     }
 
     /// Every tab, left to right. Never empty.
@@ -152,10 +228,19 @@ final class AppSettings {
         static let tabs = "tabs"
         static let leftTabs = "tabsLeft"
         static let menuBar = "menuBarModules"
-        static let searchEngine = "searchEngine"
-        static let customEngines = "customSearchEngines"
         static let rightTabs = "tabsRight"
         static let hotkey = "hotkey"
+        static let openShortcut = "shortcut.open"
+        static let peeksOnHover = "peeksOnHover"
+        static let swipesEnabled = "swipesEnabled"
+        static let islandDisplay = "islandDisplay"
+        static let mutedEvents = "mutedEvents"
+        static let dragTarget = "dragTarget"
+        static let addsScreenshots = "addsScreenshots"
+        static let shelfRetention = "shelfRetention"
+        static let clipboardLimit = "clipboardLimit"
+        static let shelfMode = "shelfMode"
+        static let showsMusicCompact = "showsMusicCompact"
         static let quiet = "quietDuringFocus"
         static let calendar = "showsCalendar"
         static let reminders = "showsReminders"
@@ -164,12 +249,26 @@ final class AppSettings {
         static let lyrics = "showsLyrics"
         static let weatherCity = "weatherCity"
         static let pinned = "pinnedTools"
+        static let homeLayout = "home.layout"
+        static let savedHomePresets = "home.savedPresets"
+        static let customWidgets = "widgets.custom"
     }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         launchAtLogin = LaunchAtLogin.isEnabled
-        hotkey = defaults.string(forKey: Key.hotkey).flatMap(HotkeyChoice.init) ?? .controlOptionSpace
+        openShortcut = Self.storedShortcut(defaults, Key.openShortcut) ?? Self.legacyOpenShortcut(defaults)
+        peeksOnHover = defaults.object(forKey: Key.peeksOnHover) as? Bool ?? true
+        swipesEnabled = defaults.object(forKey: Key.swipesEnabled) as? Bool ?? true
+        islandDisplay = defaults.string(forKey: Key.islandDisplay).flatMap(IslandDisplay.init) ?? .builtIn
+        dragTarget = defaults.string(forKey: Key.dragTarget).flatMap(DragTarget.init) ?? .shelfAndAirDrop
+        addsScreenshots = defaults.object(forKey: Key.addsScreenshots) as? Bool ?? true
+        shelfRetention = defaults.string(forKey: Key.shelfRetention).flatMap(ShelfRetention.init) ?? .never
+        let storedLimit = defaults.object(forKey: Key.clipboardLimit) as? Int ?? ClipboardHistory.limit
+        clipboardLimit = ClipboardHistory.limits.contains(storedLimit) ? storedLimit : ClipboardHistory.limit
+        shelfMode = defaults.string(forKey: Key.shelfMode).flatMap(ShelfMode.init) ?? .files
+        showsMusicCompact = defaults.object(forKey: Key.showsMusicCompact) as? Bool ?? true
+        mutedEvents = Set((defaults.stringArray(forKey: Key.mutedEvents) ?? []).compactMap(AmbientEvent.init))
         quietDuringFocus = defaults.bool(forKey: Key.quiet)
         showsCalendar = defaults.bool(forKey: Key.calendar)
         showsReminders = defaults.bool(forKey: Key.reminders)
@@ -179,15 +278,83 @@ final class AppSettings {
         fullChargeLevel = Self.fullChargeRange.contains(storedFull) ? storedFull : 100
         pinLimit = PinLimit(rawValue: defaults.integer(forKey: Key.pinLimit)) ?? .six
         pinnedTools = defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init) ?? ToolID.defaultPins
-        menuBarModules = (defaults.stringArray(forKey: Key.menuBar) ?? []).compactMap(IslandModule.init).filter(\.isAvailable)
-        defaultSearchEngineID = defaults.string(forKey: Key.searchEngine) ?? SearchEngine.defaultID
-        customEngines = defaults.data(forKey: Key.customEngines).flatMap { try? JSONDecoder().decode([SearchEngine].self, from: $0) } ?? []
+        menuBarModules = (defaults.stringArray(forKey: Key.menuBar) ?? []).compactMap(IslandModule.init).filter(
+            \.isAvailable)
+        let customs =
+            defaults.data(forKey: Key.customWidgets).flatMap {
+                try? JSONDecoder().decode([CustomWidget].self, from: $0)
+            }
+            ?? []
+        customWidgets = customs.filter(\.isValid)
+        // A layout that won't decode is shown as the default, and its bytes stay as they are until the next edit.
+        homeLayout =
+            defaults.data(forKey: Key.homeLayout).flatMap { try? JSONDecoder().decode(HomeLayout.self, from: $0) }
+            .map { HomeLayout.normalized($0, catalog: { WidgetCatalog.descriptor(for: $0, customs: customs) }) }
+            ?? .default
+        savedHomePresets =
+            defaults.data(forKey: Key.savedHomePresets).flatMap {
+                try? JSONDecoder().decode([SavedHomePreset].self, from: $0)
+            }
+            ?? []
         // The strip before it had two sides was one list; it becomes the left side. A strip nobody changed
         // follows the default to its new shape.
-        func stored(_ key: String) -> [IslandModule]? { defaults.stringArray(forKey: key)?.compactMap(IslandModule.init) }
+        func stored(_ key: String) -> [IslandModule]? {
+            defaults.stringArray(forKey: key)?.compactMap(IslandModule.init)
+        }
         let legacy = stored(Key.tabs)
-        let left = stored(Key.leftTabs) ?? (legacy == IslandModule.previousDefaultTabs ? IslandModule.defaultTabs : legacy) ?? []
+        let left =
+            stored(Key.leftTabs) ?? (legacy == IslandModule.previousDefaultTabs ? IslandModule.defaultTabs : legacy)
+            ?? []
         (leftTabs, rightTabs) = Self.normalized(left: left, right: stored(Key.rightTabs) ?? [])
+    }
+
+    /// A saved shortcut: `.some(nil)` is one turned off, and nil is one never chosen.
+    private static func storedShortcut(_ defaults: UserDefaults, _ key: String) -> KeyCombo?? {
+        guard let data = defaults.data(forKey: key),
+            let stored = try? JSONDecoder().decode(StoredShortcut.self, from: data)
+        else { return nil }
+        return .some(stored.combo?.isValid == true ? stored.combo : nil)
+    }
+
+    /// The picker this replaced stored a name. It is read once, and from then on the new key is used.
+    private static func legacyOpenShortcut(_ defaults: UserDefaults) -> KeyCombo? {
+        switch defaults.string(forKey: Key.hotkey) {
+        case "controlOptionI": .controlOptionI
+        case "off": nil
+        default: .openDefault
+        }
+    }
+
+    // MARK: Shortcuts
+
+    func shortcut(_ slot: ShortcutSlot) -> KeyCombo? {
+        switch slot {
+        case .open: openShortcut
+        }
+    }
+
+    /// Records a shortcut, or turns it off with nil. Refuses (false) one without Control, Option, or Command, and one
+    /// the system won't give this app because another app holds it. A refused shortcut leaves the old one in place.
+    /// Does nothing unless it changes something.
+    @discardableResult
+    func setShortcut(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
+        if let combo, !combo.isValid { return false }
+        guard combo != shortcut(slot) else { return true }
+        guard shortcutRegistrar?(slot, combo) ?? true else { return false }
+        switch slot {
+        case .open: openShortcut = combo
+        }
+        return true
+    }
+
+    // MARK: Notifications
+
+    func isMuted(_ event: AmbientEvent) -> Bool { mutedEvents.contains(event) }
+
+    /// Does nothing unless it changes something (a binding may call it again with the same value).
+    func setMuted(_ event: AmbientEvent, _ muted: Bool) {
+        guard isMuted(event) != muted else { return }
+        if muted { mutedEvents.insert(event) } else { mutedEvents.remove(event) }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -197,6 +364,91 @@ final class AppSettings {
     /// The user may have changed Login Items in System Settings.
     func refresh() {
         launchAtLogin = LaunchAtLogin.isEnabled
+    }
+
+    // MARK: Restoring (used by `restore(_:)`, which lives with the archive)
+
+    func replaceTabs(left: [IslandModule], right: [IslandModule]) {
+        (leftTabs, rightTabs) = Self.normalized(left: left, right: right)
+    }
+
+    func replacePinned(_ tools: [ToolID]) { pinnedTools = tools }
+
+    func replaceCustomWidgets(_ widgets: [CustomWidget]) { customWidgets = widgets }
+
+    // MARK: Home
+
+    /// Sets Home's layout, repaired to fit. Does nothing unless it changes something.
+    func setHomeLayout(_ layout: HomeLayout) {
+        let repaired = HomeLayout.normalized(layout, catalog: widgetDescriptor(for:))
+        guard repaired != homeLayout else { return }
+        homeLayout = repaired
+    }
+
+    /// Keeps the arrangement on Home under a name. Saving a name a saved layout has replaces it; a built-in preset's name is refused.
+    @discardableResult
+    func saveHomePreset(named raw: String) -> SavedHomePreset.SaveResult {
+        let name = SavedHomePreset.cleaned(raw)
+        guard !name.isEmpty else { return .empty }
+        guard !SavedHomePreset.isBuiltIn(name) else { return .reserved }
+        let layout = HomeLayout(widgets: homeLayout.widgets)
+        if let index = savedHomePresets.firstIndex(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            savedHomePresets[index].layout = layout
+            return .replaced(savedHomePresets[index])
+        }
+        let preset = SavedHomePreset(name: name, layout: layout)
+        savedHomePresets.append(preset)
+        return .saved(preset)
+    }
+
+    /// Removes a saved layout, returning it and where it was so it can be put back.
+    @discardableResult
+    func deleteHomePreset(_ id: UUID) -> (preset: SavedHomePreset, index: Int)? {
+        guard let index = savedHomePresets.firstIndex(where: { $0.id == id }) else { return nil }
+        return (savedHomePresets.remove(at: index), index)
+    }
+
+    func restoreHomePreset(_ preset: SavedHomePreset, at index: Int) {
+        guard !savedHomePresets.contains(where: { $0.id == preset.id }) else { return }
+        savedHomePresets.insert(preset, at: min(max(index, 0), savedHomePresets.count))
+    }
+
+    /// Home's height with nothing else open: computed from the layout.
+    var homeContentHeight: CGFloat { homeLayout.contentHeight(catalog: widgetDescriptor(for:)) }
+
+    /// The descriptor for a widget this build knows, or one the person made.
+    func widgetDescriptor(for id: WidgetID) -> WidgetDescriptor? {
+        WidgetCatalog.descriptor(for: id, customs: customWidgets)
+    }
+
+    func customWidget(id: UUID) -> CustomWidget? { customWidgets.first { $0.id == id } }
+
+    /// Adds a widget, or replaces the one with the same id. Refuses (false) one that isn't valid.
+    @discardableResult
+    func saveCustomWidget(_ widget: CustomWidget) -> Bool {
+        guard widget.isValid else { return false }
+        var widget = widget
+        widget.title = widget.title.trimmingCharacters(in: .whitespaces)
+        widget.maxAgeMinutes = max(widget.maxAgeMinutes, CustomWidget.minimumMaxAge)
+        if let index = customWidgets.firstIndex(where: { $0.id == widget.id }) {
+            guard customWidgets[index] != widget else { return true }
+            customWidgets[index] = widget
+        } else {
+            customWidgets.append(widget)
+        }
+        // Its size may have changed, so the layout is fitted again.
+        setHomeLayout(homeLayout)
+        return true
+    }
+
+    /// Deletes a widget, and takes it off Home. This is the one place a widget is really removed.
+    func removeCustomWidget(_ id: UUID) {
+        guard customWidgets.contains(where: { $0.id == id }) else { return }
+        var layout = homeLayout
+        layout.widgets.removeAll { $0.widget == .custom(id) }
+        layout.hidden.removeAll { $0.widget == .custom(id) }
+        customWidgets.removeAll { $0.id == id }
+        setHomeLayout(layout)
     }
 
     // MARK: Menu bar
@@ -212,34 +464,6 @@ final class AppSettings {
         } else {
             menuBarModules.removeAll { $0 == module }
         }
-    }
-
-    // MARK: Search engines
-
-    /// Built-in engines, then the person's own.
-    var searchEngines: [SearchEngine] { SearchEngine.builtIn + customEngines }
-
-    var defaultSearchEngine: SearchEngine {
-        searchEngines.first { $0.id == defaultSearchEngineID } ?? SearchEngine.builtIn[0]
-    }
-
-    /// Adds an engine. Refuses (returning `false`) a template without `%s`, a keyword or name that is empty or
-    /// already taken, or an address that isn't http or https.
-    @discardableResult
-    func addCustomEngine(name: String, keyword: String, template: String) -> Bool {
-        let name = name.trimmingCharacters(in: .whitespaces)
-        let keyword = keyword.trimmingCharacters(in: .whitespaces).lowercased()
-        let template = template.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !keyword.isEmpty, !keyword.contains(" "), SearchEngine.isValid(template: template),
-              !searchEngines.contains(where: { $0.keyword.lowercased() == keyword })
-        else { return false }
-        customEngines.append(SearchEngine(id: UUID().uuidString, name: name, keyword: keyword, template: template))
-        return true
-    }
-
-    func removeCustomEngine(_ id: String) {
-        customEngines.removeAll { $0.id == id }
-        if defaultSearchEngineID == id { defaultSearchEngineID = SearchEngine.defaultID }
     }
 
     // MARK: Tabs
@@ -334,6 +558,83 @@ final class AppSettings {
         return true
     }
 
+    /// Swaps two tabs: each takes the other's place, on either side of the notch. If `module` is in Not Shown, it takes the
+    /// place of `target`, and `target` goes to Not Shown. Only a tab that is shown can be replaced. Returns false when
+    /// nothing could change.
+    @discardableResult
+    func swapTab(_ module: IslandModule, with target: IslandModule) -> Bool {
+        guard module.isAvailable, target.isAvailable, module != target, let targetSide = side(of: target) else {
+            return false
+        }
+        var lists: [TabSide: [IslandModule]] = [.left: leftTabs, .right: rightTabs]
+        if let from = side(of: module) {
+            // Both are shown: each takes the other's place.
+            guard let a = lists[from]?.firstIndex(of: module), let b = lists[targetSide]?.firstIndex(of: target) else {
+                return false
+            }
+            lists[from]?[a] = target
+            lists[targetSide]?[b] = module
+        } else {
+            guard let b = lists[targetSide]?.firstIndex(of: target) else { return false }
+            lists[targetSide]?[b] = module
+        }
+        leftTabs = lists[.left] ?? leftTabs
+        rightTabs = lists[.right] ?? rightTabs
+        return true
+    }
+
+    /// Puts `module` at the place of the tab `target`, for the list in Settings (which can also make room).
+    /// - On its own side, it takes the target's place and the ones between shift over.
+    /// - On the other side (or from Not Shown), it goes in before the target if there is room. If the side is full, the two
+    ///   **swap**: the dragged tab takes the target's place, and the target takes the dragged tab's old place (or goes to Not
+    ///   Shown if the dragged one came from there).
+    /// Returns false when nothing could change.
+    @discardableResult
+    func placeTab(_ module: IslandModule, before target: IslandModule) -> Bool {
+        guard module.isAvailable, target.isAvailable, module != target, let targetSide = side(of: target) else {
+            return false
+        }
+        var left = leftTabs
+        var right = rightTabs
+        func read(_ side: TabSide) -> [IslandModule] { side == .left ? left : right }
+        func write(_ list: [IslandModule], _ side: TabSide) { if side == .left { left = list } else { right = list } }
+
+        let from = side(of: module)
+        var list = read(targetSide)
+        if from == targetSide {
+            let slot = list.firstIndex(of: target) ?? list.count
+            list.removeAll { $0 == module }
+            list.insert(module, at: min(slot, list.count))
+            write(list, targetSide)
+        } else if list.count < targetSide.capacity {
+            if let from { write(read(from).filter { $0 != module }, from) }
+            list.insert(module, at: list.firstIndex(of: target) ?? list.count)
+            write(list, targetSide)
+        } else {
+            guard let slot = list.firstIndex(of: target) else { return false }
+            list[slot] = module
+            write(list, targetSide)
+            if let from {
+                var other = read(from)
+                if let index = other.firstIndex(of: module) { other[index] = target }
+                write(other, from)
+            }
+        }
+        leftTabs = left
+        rightTabs = right
+        return true
+    }
+
+    /// Moving `module` to a side: last on it, or in place of its last tab when it is full.
+    @discardableResult
+    func moveTab(_ module: IslandModule, toSide side: TabSide) -> Bool {
+        guard module.isAvailable else { return false }
+        if self.side(of: module) == side { return move(module, to: side) }
+        if hasRoom(on: side) { return move(module, to: side) }
+        guard let last = tabs(on: side).last else { return false }
+        return placeTab(module, before: last)
+    }
+
     /// Turns a tab off or on and says whether it now is what was asked. For drop handlers.
     @discardableResult
     func setEnabledReturning(_ module: IslandModule, _ enabled: Bool) -> Bool {
@@ -356,6 +657,17 @@ final class AppSettings {
     /// up to the row length (or every tool, if there are fewer).
     var visiblePinned: [ToolID] {
         Self.filled(Array(pinnedTools.prefix(pinLimit.rawValue)), to: pinLimit.rawValue)
+    }
+
+    /// Puts a pinned tool before another in the row, or last when `other` is nil. The row is what the Tools tab and
+    /// Home's quick tools show, so this is how their order is chosen. Does nothing unless the order changes.
+    func movePinned(_ tool: ToolID, before other: ToolID?) {
+        var row = visiblePinned
+        guard let from = row.firstIndex(of: tool), tool != other else { return }
+        row.remove(at: from)
+        if let other, let to = row.firstIndex(of: other) { row.insert(tool, at: to) } else { row.append(tool) }
+        guard row != visiblePinned else { return }
+        pinnedTools = row
     }
 
     func isPinned(_ tool: ToolID) -> Bool { visiblePinned.contains(tool) }

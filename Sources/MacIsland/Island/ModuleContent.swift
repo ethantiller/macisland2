@@ -13,7 +13,8 @@ struct ModuleContent: View {
             HomeView(viewModel: viewModel)
         case .media:
             if viewModel.nowPlaying.state.hasMedia {
-                NowPlayingView(nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth)
+                NowPlayingView(
+                    nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth)
             } else {
                 Label("Not Playing", systemImage: "music.note")
                     .font(Theme.Typography.bodyEmphasized)

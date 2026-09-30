@@ -6,7 +6,7 @@ import SwiftUI
 // margin) for the boxes, then `nestedRadius` (8) for what is inside them.
 
 /// The box behind a Home widget.
-private struct WidgetBox: ViewModifier {
+struct WidgetBox: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Metrics.widgetRadius, style: .continuous)
         content
@@ -17,54 +17,103 @@ private struct WidgetBox: ViewModifier {
 }
 
 extension View {
-    fileprivate func widgetBox() -> some View { modifier(WidgetBox()) }
+    func widgetBox() -> some View { modifier(WidgetBox()) }
 }
 
-// MARK: Row 1: time and music
+// MARK: Today, music, and tools
 
-/// One widget: today on a single line (which opens the calendar), over what is next.
+/// Today. Every size keeps the date line (it opens the month calendar) over what is next: the next item alone, the
+/// next three, or the month itself.
 struct TimeWidget: View {
     let viewModel: IslandViewModel
+    var size = GridSize(3, 1)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { viewModel.setCalendarExpanded(true) } label: {
-                HStack(spacing: 6) {
-                    Text(Date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
-                        .font(Theme.Typography.bodyEmphasized)
-                        .foregroundStyle(Theme.Palette.primary)
-                    Image(systemName: "chevron.down")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.tertiary)
-                        .accessibilityHidden(true)
-                    Spacer(minLength: 0)
-                }
-                .lineLimit(1)
-                .frame(height: 24)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(IslandButtonStyle())
-            .accessibilityLabel("Show Calendar, \(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))")
-
+            dateLine
             Rectangle()
                 .fill(Theme.Palette.widgetEdge)
                 .frame(height: 1)
-
-            Button(action: openNext) {
-                UpNextLabel(item: viewModel.agenda.next, emptyTitle: "All Clear")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+            switch size.rows {
+            case 3: month
+            case 2: upcoming
+            default: next
             }
-            .buttonStyle(IslandButtonStyle())
         }
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetBox()
     }
 
+    private var dateLine: some View {
+        Button {
+            viewModel.setCalendarExpanded(true)
+        } label: {
+            HStack(spacing: 6) {
+                Text(
+                    Date().formatted(
+                        size.columns <= 2
+                            ? .dateTime.weekday(.abbreviated).day()
+                            : .dateTime.weekday(.wide).month(.abbreviated).day())
+                )
+                .font(Theme.Typography.bodyEmphasized)
+                .foregroundStyle(Theme.Palette.primary)
+                Image(systemName: "chevron.down")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.tertiary)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 0)
+            }
+            .lineLimit(1)
+            .frame(height: 24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(IslandButtonStyle())
+        .accessibilityLabel("Show Calendar, \(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))")
+    }
+
+    /// 2 by 1 and 3 by 1: the one thing that is next.
+    private var next: some View {
+        Button {
+            open(viewModel.agenda.next)
+        } label: {
+            UpNextLabel(item: viewModel.agenda.next, emptyTitle: "All Clear")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(IslandButtonStyle())
+    }
+
+    /// 3 by 2: the next three things, each its own row.
+    private var upcoming: some View {
+        let items = Array(viewModel.agenda.upcoming.prefix(3))
+        return VStack(spacing: 0) {
+            if items.isEmpty {
+                next
+            } else {
+                ForEach(items) { item in
+                    Button {
+                        open(item)
+                    } label: {
+                        UpNextLabel(item: item, emptyTitle: "All Clear")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(IslandButtonStyle())
+                }
+            }
+        }
+    }
+
+    /// 3 by 3: the month, inline. Filling the box under the date line.
+    private var month: some View {
+        MonthGridView(month: Date(), rowHeight: 26)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     /// A meeting with a call link joins it; a reminder opens the Reminders tab.
-    private func openNext() {
-        guard let item = viewModel.agenda.next else { return }
+    private func open(_ item: AgendaItem?) {
+        guard let item else { return }
         if let url = item.joinURL {
             MeetingLink.join(url)
         } else if item.kind == .reminder {
@@ -73,16 +122,44 @@ struct TimeWidget: View {
     }
 }
 
-/// What's playing, with play and pause. Opens the Media tab.
+/// What's playing. The player itself from 3 by 2 up; below that, art and the transport that fits. Opens the Media tab.
 struct MediaWidget: View {
     let viewModel: IslandViewModel
+    var size = GridSize(3, 1)
 
     private var nowPlaying: NowPlayingModel { viewModel.nowPlaying }
 
     var body: some View {
+        Group {
+            if !nowPlaying.state.hasMedia {
+                Label("Not Playing", systemImage: "music.note")
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: size.rows > 1 ? .center : .leading)
+                    .padding(.leading, size.rows > 1 ? 0 : 12)
+            } else if size.rows > 1 {
+                NowPlayingView(
+                    nowPlaying: nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth, isPeek: true,
+                    inWidget: true
+                )
+                .padding(.horizontal, 12)
+                .frame(maxHeight: .infinity)
+            } else {
+                row
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .widgetBox()
+        .contentShape(Rectangle())
+        .onTapGesture { viewModel.select(.media) }
+    }
+
+    /// 2 by 1: art, play, next. 3 by 1: art, the song, play. 6 by 1: art, the song, back, play, forward.
+    private var row: some View {
         HStack(spacing: 10) {
-            if nowPlaying.state.hasMedia {
-                ArtworkView(image: nowPlaying.artwork, size: 40, cornerRadius: Theme.Metrics.nestedRadius)
+            ArtworkView(image: nowPlaying.artwork, size: 40, cornerRadius: Theme.Metrics.nestedRadius)
+            if size.columns >= 3 {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(nowPlaying.state.title)
                         .font(Theme.Typography.bodyEmphasized)
@@ -93,55 +170,90 @@ struct MediaWidget: View {
                 }
                 .lineLimit(1)
                 .accessibilityElement(children: .combine)
-                Spacer(minLength: 0)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                if size.columns >= 6 {
+                    IconButton(systemName: "backward.fill", label: "Previous Track", action: nowPlaying.previousTrack)
+                }
                 IconButton(
                     systemName: nowPlaying.state.isPlaying ? "pause.fill" : "play.fill",
                     label: nowPlaying.state.isPlaying ? "Pause" : "Play",
                     action: nowPlaying.togglePlayPause
                 )
-            } else {
-                Label("Not Playing", systemImage: "music.note")
-                    .font(Theme.Typography.bodyEmphasized)
-                    .foregroundStyle(Theme.Palette.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+                if size.columns == 2 || size.columns >= 6 {
+                    IconButton(systemName: "forward.fill", label: "Next Track", action: nowPlaying.nextTrack)
+                }
             }
         }
         .padding(.leading, 12)
         .padding(.trailing, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .widgetBox()
-        .contentShape(Rectangle())
-        .onTapGesture { viewModel.select(.media) }
     }
 }
 
-// MARK: Row 2: actions
-
-/// The four everyday tools as a 2 by 2 grid in one module. On is a white fill with a black glyph.
+/// The everyday tools. 1 by 1 is a 2 by 2 of round buttons; 2 by 1 a row of four and 3 by 1 a row of six; 6 by 1 is
+/// eight named buttons, and 6 by 2 is every tool, as on the Tools tab.
 struct QuickActionsGrid: View {
     let viewModel: IslandViewModel
+    /// Tools of the person's choosing; nil follows the Tools row.
+    var chosen: [ToolID]?
+    var size = GridSize(1, 1)
+
+    /// How many tools a size shows. 6 by 2 shows them all.
+    static func toolCount(for size: GridSize) -> Int {
+        if size.rows >= 2 { return ToolID.allCases.count }
+        switch size.columns {
+        case ...2: return 4
+        case 3: return 6
+        default: return 8
+        }
+    }
+
+    /// The tools a size shows: the person's (or the Tools row's) first, then others to fill it. 6 by 2 is the Tools
+    /// tab's own order.
+    static func tools(for size: GridSize, chosen: [ToolID]?, pinned: [ToolID]) -> [ToolID] {
+        if size.rows >= 2 { return ToolID.allCases }
+        let first = chosen ?? pinned
+        let rest = ToolID.allCases.filter { !first.contains($0) }
+        return Array((first + rest).prefix(toolCount(for: size)))
+    }
 
     var body: some View {
         let catalog = ToolCatalog(viewModel: viewModel)
-        let tools = Array(viewModel.settings.visiblePinned.prefix(4))
-        Grid(horizontalSpacing: 8, verticalSpacing: 6) {
-            ForEach(0..<2, id: \.self) { row in
-                GridRow {
-                    ForEach(tools.dropFirst(row * 2).prefix(2)) { id in
-                        QuickToolButton(
-                            item: catalog.item(for: id),
-                            size: Theme.Metrics.homeGridButton,
-                            restingFill: Theme.Palette.fillHover,
-                            hoverFill: Theme.Palette.tertiary
-                        )
+        let tools = Self.tools(for: size, chosen: chosen, pinned: viewModel.settings.visiblePinned)
+        Group {
+            switch (size.columns, size.rows) {
+            case (1, _):
+                Grid(horizontalSpacing: 8, verticalSpacing: 6) {
+                    ForEach(0..<2, id: \.self) { row in
+                        GridRow {
+                            ForEach(tools.dropFirst(row * 2).prefix(2)) { round(catalog.item(for: $0)) }
+                        }
                     }
+                }
+            case (_, 2...):
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 6), spacing: 10) {
+                    ForEach(tools) { ToolControlButton(tool: catalog.item(for: $0)) }
+                }
+            case (6..., _):
+                HStack(spacing: 0) {
+                    ForEach(tools) { ToolControlButton(tool: catalog.item(for: $0)) }
+                }
+            default:
+                HStack(spacing: 8) {
+                    ForEach(tools) { round(catalog.item(for: $0)) }
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .frame(maxHeight: .infinity)
+        .padding(.horizontal, size.columns == 1 ? 8 : (size.columns >= 6 ? 4 : 12))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetBox()
+    }
+
+    private func round(_ item: ToolItem) -> some View {
+        QuickToolButton(
+            item: item, size: Theme.Metrics.homeGridButton, restingFill: Theme.Palette.fillHover,
+            hoverFill: Theme.Palette.tertiary)
     }
 }
 
@@ -165,13 +277,24 @@ enum HomeAction: Equatable, Identifiable {
         }
     }
 
-    /// Two quick timers and a Pomodoro, each replaced by its running clock while it runs; the stopwatch
-    /// joins only while it runs; Shelf is always last.
-    static func list(timerActive: Bool, pomodoroActive: Bool, stopwatchActive: Bool, shelfCount: Int) -> [HomeAction] {
-        var actions: [HomeAction] = timerActive ? [.runningTimer] : [.timer(minutes: 5), .timer(minutes: 25)]
-        actions.append(pomodoroActive ? .runningPomodoro : .pomodoro)
+    /// How many of the four segments (timer, timer, Pomodoro, Shelf) a width has room for: 2 columns have the
+    /// timers, 3 add Pomodoro, and 4 or more add Shelf.
+    static func segments(forColumns columns: Int) -> Int { min(max(columns, 2), 4) }
+
+    /// Two quick timers, a Pomodoro, and Shelf, as many as `segments` allows and the options keep. A running
+    /// clock replaces its segment and is always shown; the stopwatch joins only while it runs; Shelf is always last.
+    static func list(
+        timerActive: Bool, pomodoroActive: Bool, stopwatchActive: Bool, shelfCount: Int,
+        timerMinutes: [Int] = [5, 25], showsPomodoro: Bool = true, showsShelf: Bool = true, segments: Int = 4
+    ) -> [HomeAction] {
+        var actions: [HomeAction] = timerActive ? [.runningTimer] : timerMinutes.map { .timer(minutes: $0) }
+        if pomodoroActive {
+            actions.append(.runningPomodoro)
+        } else if showsPomodoro, segments >= 3 {
+            actions.append(.pomodoro)
+        }
         if stopwatchActive { actions.append(.runningStopwatch) }
-        actions.append(.shelf(count: shelfCount))
+        if showsShelf, segments >= 4 { actions.append(.shelf(count: shelfCount)) }
         return actions
     }
 }
@@ -179,13 +302,19 @@ enum HomeAction: Equatable, Identifiable {
 /// Timers and the Shelf as one segmented pill. Each segment stacks its glyph or number over a caption.
 struct HomeActionPill: View {
     let viewModel: IslandViewModel
+    var options = WidgetOptions()
+    var size = GridSize(5, 1)
 
     var body: some View {
         let actions = HomeAction.list(
             timerActive: viewModel.timer.isActive,
             pomodoroActive: viewModel.pomodoro.isActive,
             stopwatchActive: viewModel.stopwatch.isActive,
-            shelfCount: viewModel.shelf.items.count
+            shelfCount: viewModel.shelf.items.count,
+            timerMinutes: options.timerMinutes ?? [5, 25],
+            showsPomodoro: options.showsPomodoro ?? true,
+            showsShelf: options.showsShelf ?? true,
+            segments: HomeAction.segments(forColumns: size.columns)
         )
         HStack(spacing: 0) {
             ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
@@ -210,27 +339,39 @@ struct HomeActionPill: View {
                 Text("\(minutes)")
                     .font(Theme.Typography.largeNumeral)
                     .foregroundStyle(Theme.Palette.primary)
-            } action: { viewModel.timer.start(minutes: minutes) }
+            } action: {
+                viewModel.timer.start(minutes: minutes)
+            }
         case .runningTimer:
             PillSegment(caption: "Timer", accessibilityLabel: "Timer") {
                 CompactTimerText(timer: viewModel.timer)
-            } action: { viewModel.openClock(.timer) }
+            } action: {
+                viewModel.openClock(.timer)
+            }
         case .pomodoro:
             PillSegment(caption: "Pomodoro", accessibilityLabel: "Start Pomodoro") {
                 Image(systemName: "brain.head.profile").font(Theme.Typography.glyph)
-            } action: { viewModel.pomodoro.toggle() }
+            } action: {
+                viewModel.pomodoro.toggle()
+            }
         case .runningPomodoro:
             PillSegment(caption: viewModel.pomodoro.phase.title, accessibilityLabel: "Pomodoro") {
                 CompactPomodoroText(pomodoro: viewModel.pomodoro)
-            } action: { viewModel.openClock(.pomodoro) }
+            } action: {
+                viewModel.openClock(.pomodoro)
+            }
         case .runningStopwatch:
             PillSegment(caption: "Stopwatch", accessibilityLabel: "Stopwatch") {
                 CompactStopwatchText(stopwatch: viewModel.stopwatch)
-            } action: { viewModel.openClock(.stopwatch) }
+            } action: {
+                viewModel.openClock(.stopwatch)
+            }
         case .shelf(let count):
             PillSegment(caption: count == 0 ? "Shelf" : "Shelf \(count)", accessibilityLabel: "Open Shelf") {
                 Image(systemName: "tray.full").font(Theme.Typography.glyph)
-            } action: { viewModel.select(.shelf) }
+            } action: {
+                viewModel.select(.shelf)
+            }
         }
     }
 }

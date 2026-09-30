@@ -1,5 +1,5 @@
-import ApplicationServices
 import AppKit
+import ApplicationServices
 import Observation
 
 /// Swallows every key press for a short time so the keyboard can be wiped without typing anything.
@@ -25,7 +25,9 @@ final class KeyboardCleaner {
     @ObservationIgnored private var unlockTask: Task<Void, Never>?
 
     /// Key down, key up, modifier changes, and media keys (`NX_SYSDEFINED`).
-    nonisolated static let swallowedTypes: [CGEventType] = [.keyDown, .keyUp, .flagsChanged, CGEventType(rawValue: 14)!]
+    nonisolated static let swallowedTypes: [CGEventType] = [
+        .keyDown, .keyUp, .flagsChanged, CGEventType(rawValue: 14)!,
+    ]
 
     nonisolated static var hasAccess: Bool { AXIsProcessTrusted() }
 
@@ -60,10 +62,12 @@ final class KeyboardCleaner {
             return nil
         }
         let context = Unmanaged.passUnretained(self).toOpaque()
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-            eventsOfInterest: mask, callback: callback, userInfo: context
-        ) else { return false }
+        guard
+            let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                eventsOfInterest: mask, callback: callback, userInfo: context
+            )
+        else { return false }
 
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)

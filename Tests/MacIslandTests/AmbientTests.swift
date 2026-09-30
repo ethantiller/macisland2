@@ -1,12 +1,15 @@
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 struct RainRuleTests {
     private let noon = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func samples(_ amounts: [Double], from start: Date) -> [RainSample] {
-        amounts.enumerated().map { RainSample(time: start.addingTimeInterval(Double($0.offset) * 15 * 60), millimeters: $0.element) }
+        amounts.enumerated().map {
+            RainSample(time: start.addingTimeInterval(Double($0.offset) * 15 * 60), millimeters: $0.element)
+        }
     }
 
     @Test func rainStartingWithinHalfAnHourIsFoundWhenItIsDryNow() {
@@ -33,7 +36,9 @@ struct RainRuleTests {
     @Test func rainExactlyAtTheEdgeCounts() {
         let edge = [RainSample(time: noon.addingTimeInterval(30 * 60), millimeters: 0.2)]
         #expect(RainRule.start(samples: edge, now: noon) == noon.addingTimeInterval(30 * 60))
-        #expect(RainRule.start(samples: [RainSample(time: noon.addingTimeInterval(31 * 60), millimeters: 5)], now: noon) == nil)
+        #expect(
+            RainRule.start(samples: [RainSample(time: noon.addingTimeInterval(31 * 60), millimeters: 5)], now: noon)
+                == nil)
     }
 
     @Test func aSpellIsAnnouncedOnceAndResetsAfterADryHour() {
@@ -44,7 +49,8 @@ struct RainRuleTests {
         let whileWet = spell.shouldAnnounce(start: nil, wetNow: true, now: noon.addingTimeInterval(30 * 60))
         let stillDrying = spell.shouldAnnounce(start: soon, wetNow: false, now: noon.addingTimeInterval(45 * 60))
         // An hour after it last rained, the next spell is announced.
-        let nextSpell = spell.shouldAnnounce(start: soon, wetNow: false, now: noon.addingTimeInterval(30 * 60 + 61 * 60))
+        let nextSpell = spell.shouldAnnounce(
+            start: soon, wetNow: false, now: noon.addingTimeInterval(30 * 60 + 61 * 60))
         #expect(first && !whileWet && !stillDrying && nextSpell)
     }
 
@@ -61,16 +67,18 @@ struct RainRuleTests {
 @MainActor
 struct RainForecastTests {
     /// Quarter hours from 15:00 local (UTC+2): dry, dry, then 0.5 mm from 15:30.
-    private let forecast = Data(#"""
-    {"utc_offset_seconds":7200,
-     "current":{"temperature_2m":18.4,"weather_code":3,"is_day":1},
-     "minutely_15":{"time":["2026-09-29T15:00","2026-09-29T15:15","2026-09-29T15:30","2026-09-29T15:45"],
-                    "precipitation":[0.0,0.0,0.5,null]}}
-    """#.utf8)
+    private let forecast = Data(
+        #"""
+        {"utc_offset_seconds":7200,
+         "current":{"temperature_2m":18.4,"weather_code":3,"is_day":1},
+         "minutely_15":{"time":["2026-09-29T15:00","2026-09-29T15:15","2026-09-29T15:30","2026-09-29T15:45"],
+                        "precipitation":[0.0,0.0,0.5,null]}}
+        """#.utf8)
 
     @Test func theRequestAsksForQuarterHours() {
         let place = WeatherModel.Place(name: "Paris", latitude: 48.85, longitude: 2.35)
-        let items = URLComponents(url: WeatherModel.forecastURL(place: place, fahrenheit: false)!, resolvingAgainstBaseURL: false)?.queryItems
+        let items = URLComponents(
+            url: WeatherModel.forecastURL(place: place, fahrenheit: false)!, resolvingAgainstBaseURL: false)?.queryItems
         #expect(items?.contains { $0.name == "minutely_15" && $0.value == "precipitation" } == true)
     }
 
@@ -79,7 +87,9 @@ struct RainForecastTests {
         #expect(samples.map(\.millimeters) == [0, 0, 0.5, 0])
         // 15:00 at UTC+2 is 13:00 UTC.
         let first = try #require(samples.first)
-        #expect(Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: first.time).hour == 13)
+        #expect(
+            Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: first.time).hour
+                == 13)
         #expect(WeatherModel.parseRain(Data("{}".utf8)).isEmpty)
     }
 
@@ -211,23 +221,5 @@ struct BluetoothDevicesTests {
         devices.refresh()
         devices.disconnect(devices.devices[0])
         #expect(provider.disconnected == ["aa"] && devices.notConnected.count == 1)
-    }
-
-    @Test func thePaletteOffersToConnectWhatIsPaired() async {
-        let provider = StubBluetooth()
-        provider.devices = [
-            PairedDevice(id: "aa", name: "AirPods", isConnected: false),
-            PairedDevice(id: "bb", name: "Speaker", isConnected: true),
-        ]
-        let viewModel = TestSupport.makeViewModel(bluetooth: provider)
-        let palette = PaletteModel(viewModel: viewModel)
-        palette.reset()
-        palette.query = "connect air"
-        let row = palette.results.first { $0.id == "bluetooth-aa" }
-        #expect(row?.title == "Connect AirPods" && row?.subtitle == "Bluetooth")
-        #expect(!palette.results.contains { $0.id == "bluetooth-bb" })
-        row?.run()
-        for _ in 0..<50 where !provider.devices[0].isConnected { try? await Task.sleep(for: .milliseconds(10)) }
-        #expect(provider.devices[0].isConnected)
     }
 }

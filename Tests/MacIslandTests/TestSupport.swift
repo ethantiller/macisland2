@@ -1,5 +1,6 @@
-import AppKit
 import AVFoundation
+import AppKit
+
 @testable import MacIsland
 
 /// One place that builds a view model from test doubles, so adding a feature to
@@ -7,52 +8,55 @@ import AVFoundation
 @MainActor
 enum TestSupport {
     static func makeViewModel(
-        rates: ExchangeRates? = nil, bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
+        bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
         screen: StubScreen? = nil, transcriber: StubTranscriber? = nil
     ) -> IslandViewModel {
-        UserDefaults(suiteName: "MacIslandTests")!.removePersistentDomain(forName: "MacIslandTests")
-        let shelf = ShelfModel()
+        // A private suite per view model, so tests running in parallel never see each other's settings.
+        let suite = "MacIslandTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let shelf = ShelfModel(defaults: defaults)
         let work = WorkTracker()
-        let notes = NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let notes = NotesModel(
+            directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         var geometry = ScreenGeometry.current()
         geometry.notchSize = CGSize(width: 179, height: 32)
         geometry.hasNotch = true
-        let viewModel = IslandViewModel(features: IslandFeatures(
-            nowPlaying: NowPlayingModel(adapter: nil),
-            outputs: AudioOutputs(),
-            shelf: shelf,
-            timer: TimerModel(),
-            stopwatch: StopwatchModel(),
-            keepAwake: KeepAwake(),
-            lowPower: LowPowerMode(),
-            ringLight: RingLight(),
-            micMute: MicrophoneMute(),
-            privacy: PrivacyMonitor(),
-            transfers: TransferMonitor(),
-            network: NetworkMonitor(),
-            settings: AppSettings(defaults: UserDefaults(suiteName: "MacIslandTests")!),
-            agenda: AgendaMonitor(),
-            focus: FocusMode(),
-            clipboard: ClipboardHistory(),
-            pomodoro: PomodoroModel(defaults: UserDefaults(suiteName: "MacIslandTests")!),
-            work: work,
-            weather: WeatherModel(),
-            fileTools: FileTools(
-                shelf: shelf, work: work, recognizer: StubRecognizer(),
-                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
-            ),
-            notes: notes,
-            keyboardCleaner: KeyboardCleaner(),
-            launch: LaunchModel(appDirectories: []),
-            rates: rates ?? ExchangeRates(fetch: { _ in ([:], Date()) }),
-            bluetooth: BluetoothDevices(provider: bluetooth ?? StubBluetooth()),
-            mirror: CameraMirror(provider: camera ?? StubCamera()),
-            screenRecorder: ScreenRecorder(recorder: screen ?? StubScreen(), shelf: shelf),
-            voice: VoiceRecorder(
-                transcriber: transcriber ?? StubTranscriber(), notes: notes, shelf: shelf,
-                folder: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            )
-        ))
+        let viewModel = IslandViewModel(
+            features: IslandFeatures(
+                nowPlaying: NowPlayingModel(adapter: nil),
+                outputs: AudioOutputs(),
+                shelf: shelf,
+                timer: TimerModel(),
+                stopwatch: StopwatchModel(),
+                keepAwake: KeepAwake(),
+                ringLight: RingLight(),
+                micMute: MicrophoneMute(),
+                privacy: PrivacyMonitor(),
+                transfers: TransferMonitor(),
+                network: NetworkMonitor(),
+                settings: AppSettings(defaults: defaults),
+                agenda: AgendaMonitor(),
+                focus: FocusMode(),
+                clipboard: ClipboardHistory(),
+                pomodoro: PomodoroModel(defaults: defaults),
+                work: work,
+                weather: WeatherModel(),
+                fileTools: FileTools(
+                    shelf: shelf, work: work, recognizer: StubRecognizer(),
+                    pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+                ),
+                notes: notes,
+                keyboardCleaner: KeyboardCleaner(),
+                bluetooth: BluetoothDevices(provider: bluetooth ?? StubBluetooth()),
+                mirror: CameraMirror(provider: camera ?? StubCamera()),
+                screenRecorder: ScreenRecorder(recorder: screen ?? StubScreen(), shelf: shelf),
+                voice: VoiceRecorder(
+                    transcriber: transcriber ?? StubTranscriber(), notes: notes, shelf: shelf,
+                    folder: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                ),
+                widgets: CustomWidgetValues(fetcher: StubWidgetFetcher())
+            ))
         viewModel.geometry = geometry
         return viewModel
     }
@@ -150,5 +154,30 @@ final class StubTranscriber: Transcribing {
     func stop() async throws -> String {
         stops += 1
         return transcript
+    }
+}
+
+/// Returns a fixed reading, and counts how often it was asked.
+final class StubWidgetFetcher: WidgetValueFetching, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _calls = 0
+    var text = "42"
+    var failure: WidgetFetchError?
+    /// When set, a fetch waits for it before answering, to hold one in flight.
+    var gate: AsyncStream<Void>?
+
+    var calls: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _calls
+    }
+
+    func value(for source: CustomWidget.Source) async throws -> WidgetValue {
+        lock.lock()
+        _calls += 1
+        lock.unlock()
+        if let gate { for await _ in gate { break } }
+        if let failure { throw failure }
+        return WidgetValue(text: text, detail: nil, fetchedAt: Date())
     }
 }

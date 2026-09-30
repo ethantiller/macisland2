@@ -3,8 +3,16 @@ import QuickLook
 import SwiftUI
 
 /// Where a dragged file is about to land, decided by which half of the island it's over.
-enum DropZone {
+enum DropZone: Equatable {
     case shelf, airDrop
+
+    static func destination(for target: DragTarget, locationX: CGFloat, width: CGFloat) -> Self {
+        switch target {
+        case .shelfAndAirDrop: locationX > width / 2 ? .airDrop : .shelf
+        case .shelfOnly, .nothing: .shelf
+        case .airDropOnly: .airDrop
+        }
+    }
 }
 
 enum ShelfMode: String, CaseIterable, Identifiable {
@@ -30,8 +38,18 @@ struct ShelfView: View {
     var body: some View {
         if let dropZone, Self.showsDropTiles(zone: dropZone, isFileDragActive: viewModel.isFileDragActive) {
             HStack(spacing: 8) {
-                DropTile(title: "Add to Shelf", systemImage: "tray.and.arrow.down", isTargeted: dropZone == .shelf)
-                DropTile(title: "AirDrop", systemImage: nil, isTargeted: dropZone == .airDrop, tint: Theme.Tint.airDrop)
+                switch viewModel.settings.dragTarget {
+                case .shelfAndAirDrop:
+                    DropTile(title: "Add to Shelf", systemImage: "tray.and.arrow.down", isTargeted: dropZone == .shelf)
+                    DropTile(
+                        title: "AirDrop", systemImage: nil, isTargeted: dropZone == .airDrop, tint: Theme.Tint.airDrop)
+                case .shelfOnly:
+                    DropTile(title: "Add to Shelf", systemImage: "tray.and.arrow.down", isTargeted: true)
+                case .airDropOnly:
+                    DropTile(title: "AirDrop", systemImage: nil, isTargeted: true, tint: Theme.Tint.airDrop)
+                case .nothing:
+                    EmptyView()
+                }
             }
         } else {
             VStack(spacing: 6) {
@@ -42,6 +60,7 @@ struct ShelfView: View {
                 }
             }
             .quickLookPreview(quickLook, in: shelf.items)
+            .onAppear { viewModel.sweepShelf() }
         }
     }
 
@@ -214,7 +233,10 @@ private struct ClipboardCard: View {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(color)
                 .frame(width: 18, height: 18)
-                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Theme.Palette.secondary, lineWidth: 1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(
+                        Theme.Palette.secondary, lineWidth: 1)
+                )
                 .padding(6)
                 .accessibilityHidden(true)
         }

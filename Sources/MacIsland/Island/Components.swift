@@ -83,7 +83,8 @@ struct ChipButton: View {
             .padding(.horizontal, 10)
             .frame(minHeight: 24)
             .background(
-                isSelected || isProminent ? Theme.Palette.primary : (isHovering ? Theme.Palette.fillHover : Theme.Palette.fill),
+                isSelected || isProminent
+                    ? Theme.Palette.primary : (isHovering ? Theme.Palette.fillHover : Theme.Palette.fill),
                 in: Capsule()
             )
             .contentShape(Capsule())
@@ -106,7 +107,9 @@ struct SegmentedChoice<Option: Hashable & Identifiable>: View {
         HStack(spacing: 0) {
             ForEach(options) { option in
                 let isSelected = option == selection
-                Button { onSelect(option) } label: {
+                Button {
+                    onSelect(option)
+                } label: {
                     Text(title(option))
                         .font(Theme.Typography.bodyEmphasized)
                         .foregroundStyle(isSelected ? Theme.Palette.inverse : Theme.Palette.secondary)
@@ -144,7 +147,8 @@ struct IslandSlider: View {
             let active = isEnabled && (isHovering || dragValue != nil)
             ZStack(alignment: .leading) {
                 Capsule().fill(Theme.Palette.fillHover)
-                Capsule().fill(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary)).frame(width: geometry.size.width * shown)
+                Capsule().fill(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary)).frame(
+                    width: geometry.size.width * shown)
             }
             .frame(height: active ? 6 : 4)
             .frame(maxHeight: .infinity)
@@ -226,10 +230,16 @@ struct ProgressRing: View {
     }
 }
 
-/// A bolt with a ring that draws once around it, starting from the top. Under Reduce Motion
-/// the ring is simply there.
-struct ChargingBadge: View {
+/// A symbol with a ring that draws once around it, starting from the top. Under Reduce Motion the ring is simply there. The
+/// charging bolt and the AirPods banner share it, so they arrive the same way.
+struct RingedGlyph: View {
+    let systemName: String
+    /// The ring's color: a live meaning (green for good, red for low).
+    let ringTint: Color
+    /// The symbol's color; the palette's primary ink when nil.
+    var glyphTint: Color?
     let size: CGFloat
+    let label: String
 
     @State private var drawn = false
 
@@ -238,11 +248,11 @@ struct ChargingBadge: View {
         ZStack {
             Circle()
                 .trim(from: 0, to: drawn || !animates ? 1 : 0)
-                .stroke(Theme.Tint.positive, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(ringTint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Image(systemName: "bolt.fill")
+            Image(systemName: systemName)
                 .font(.system(size: size * 0.5, weight: .semibold))
-                .foregroundStyle(Theme.Tint.positive)
+                .foregroundStyle(glyphTint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
         }
         .frame(width: size, height: size)
         .onAppear {
@@ -250,7 +260,18 @@ struct ChargingBadge: View {
             withAnimation(.easeInOut(duration: 1.0)) { drawn = true }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Charging")
+        .accessibilityLabel(label)
+    }
+}
+
+/// A bolt with a green ring drawn around it.
+struct ChargingBadge: View {
+    let size: CGFloat
+
+    var body: some View {
+        RingedGlyph(
+            systemName: "bolt.fill", ringTint: Theme.Tint.positive, glyphTint: Theme.Tint.positive, size: size,
+            label: "Charging")
     }
 }
 
@@ -305,5 +326,34 @@ struct AirDropGlyph: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+}
+
+/// Fades a view out toward both ends of an axis, so it scrolls out of sight and does not stop at an edge.
+/// A mask, not a visible gradient.
+struct EdgeFade: ViewModifier {
+    enum Axis { case horizontal, vertical }
+
+    let axis: Axis
+    /// The share of the length each end fades over.
+    let fraction: CGFloat
+
+    func body(content: Content) -> some View {
+        content.mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0), .init(color: .black, location: fraction),
+                    .init(color: .black, location: 1 - fraction), .init(color: .clear, location: 1),
+                ],
+                startPoint: axis == .horizontal ? .leading : .top,
+                endPoint: axis == .horizontal ? .trailing : .bottom
+            )
+        )
+    }
+}
+
+extension View {
+    func edgeFade(_ axis: EdgeFade.Axis, fraction: CGFloat) -> some View {
+        modifier(EdgeFade(axis: axis, fraction: fraction))
     }
 }

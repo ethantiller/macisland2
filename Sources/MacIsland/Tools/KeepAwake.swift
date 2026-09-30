@@ -19,9 +19,11 @@ enum KeepAwakeDuration: Equatable {
 
     /// Whole hours from the next hour on, for the "until" choices.
     static func upcomingHours(from now: Date, count: Int = 12, calendar: Calendar = .current) -> [Date] {
-        guard let next = calendar.nextDate(
-            after: now, matching: DateComponents(minute: 0, second: 0), matchingPolicy: .nextTime
-        ) else { return [] }
+        guard
+            let next = calendar.nextDate(
+                after: now, matching: DateComponents(minute: 0, second: 0), matchingPolicy: .nextTime
+            )
+        else { return [] }
         return (0..<count).compactMap { calendar.date(byAdding: .hour, value: $0, to: next) }
     }
 }

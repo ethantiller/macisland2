@@ -29,14 +29,15 @@ final class FloatingPanels {
             return
         }
         let state = DetachedPanelState()
-        let panel = FloatingGlassPanel(style: .window)
-        let hosting = NSHostingView(rootView: DetachedModuleView(
-            module: module,
-            viewModel: viewModel,
-            state: state,
-            onClose: { [weak self] in self?.close(module) },
-            onToggleDesktop: { [weak self] in self?.toggleDesktop(module) }
-        ))
+        let panel = FloatingGlassPanel()
+        let hosting = NSHostingView(
+            rootView: DetachedModuleView(
+                module: module,
+                viewModel: viewModel,
+                state: state,
+                onClose: { [weak self] in self?.close(module) },
+                onToggleDesktop: { [weak self] in self?.toggleDesktop(module) }
+            ))
         hosting.sizingOptions = []
         panel.contentView = hosting
 
@@ -71,9 +72,11 @@ final class FloatingPanels {
     }
 
     private static func origin(for size: CGSize, at point: NSPoint?) -> NSPoint {
-        let screen = NSScreen.screens.first { NSMouseInRect(point ?? NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+        let screen =
+            NSScreen.screens.first { NSMouseInRect(point ?? NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         let frame = screen?.visibleFrame ?? .zero
-        var origin = point.map { NSPoint(x: $0.x - 40, y: $0.y - size.height + 20) }
+        var origin =
+            point.map { NSPoint(x: $0.x - 40, y: $0.y - size.height + 20) }
             ?? NSPoint(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2)
         origin.x = min(max(origin.x, frame.minX), frame.maxX - size.width)
         origin.y = min(max(origin.y, frame.minY), frame.maxY - size.height)

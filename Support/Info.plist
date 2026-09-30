@@ -41,6 +41,10 @@
     <string>MacIsland can stay quiet while a Focus is on and shows whether one is active.</string>
     <key>NSDownloadsFolderUsageDescription</key>
     <string>MacIsland shows the progress of files arriving in Downloads, including AirDrop.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>MacIsland shows how many items are in a folder you chose for a Home widget.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>MacIsland shows how many items are in a folder you chose for a Home widget.</string>
     <key>NSCameraUsageDescription</key>
     <string>MacIsland shows your camera so you can check how you look before a call.</string>
     <key>NSMicrophoneUsageDescription</key>

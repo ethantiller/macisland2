@@ -93,7 +93,8 @@ final class PomodoroModel {
     init(defaults: UserDefaults = .standard, calendar: Calendar = .current) {
         self.defaults = defaults
         self.calendar = calendar
-        history = defaults.data(forKey: Self.historyKey)
+        history =
+            defaults.data(forKey: Self.historyKey)
             .flatMap { try? JSONDecoder().decode(PomodoroHistory.self, from: $0) } ?? PomodoroHistory()
     }
 

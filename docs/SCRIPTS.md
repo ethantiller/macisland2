@@ -13,10 +13,15 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Want to | Run |
 | --- | --- |
-| Build and restart the app | `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app` |
+| Check style | `make lint` |
+| Format Swift sources in place | `make format` (see the warning below) |
+| Build the app bundle | `make bundle` |
+| Restart the built app | `make restart` |
+| Build and restart the app | `make build-and-restart` |
+| Build and restart the app | `make build-and-restart` |
 | Build a release bundle | `./scripts/bundle.sh release` |
 | Run the tests | `./scripts/test.sh` |
-| Run some tests | `./scripts/test.sh --filter PaletteModelTests` |
+| Run some tests | `./scripts/test.sh --filter WidgetTests` |
 | Render every state to PNG | `ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots` |
 | Refresh the pictures in the docs | `./scripts/docs-images.sh` |
 | Check style (reports only) | `./scripts/lint.sh` |
@@ -44,8 +49,8 @@ Builds the app and wraps the binary in a bundle you can open.
 1. `swift build -c <config>`, then finds the built binary with `--show-bin-path`.
 2. If `build/adapter/MediaRemoteAdapter.framework` does not exist, runs `build-adapter.sh` first.
 3. Recreates `build/MacIsland.app/Contents/{MacOS,Resources,Frameworks}`.
-4. Copies in the binary, `Support/Info.plist`, the adapter framework (into `Frameworks/`), and `mediaremote-adapter.pl` (into
-   `Resources/`).
+4. Copies in the binary, `Support/Info.plist`, SwiftPM's resource bundle (into `Contents/Resources/`), the adapter framework (into
+  `Frameworks/`), and `mediaremote-adapter.pl` (into `Resources/`).
 5. Ad-hoc signs the bundle (`codesign --sign -`).
 
 Output: `build/MacIsland.app`. Because signing is ad hoc, macOS treats each build as a new app and asks for permissions again.
@@ -56,7 +61,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 321 tests, about a second.
+lines; 514 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -114,6 +119,7 @@ Formats in place with `swift format format`, using [`.swift-format`](#config-fil
 | File | Contains |
 | --- | --- |
 | `Package.swift` | Tools version 6.2, `platforms: [.macOS(.v26)]`, an executable target `MacIsland` (`Sources/MacIsland`) and a test target `MacIslandTests` (`Tests/MacIslandTests`), both in **Swift 5 language mode**. No dependencies |
+| `Makefile` | Shortcuts for linting, formatting, bundling, restarting, and building then restarting the app |
 | `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events, Camera, Microphone, Speech recognition, and the `macisland` URL scheme |
 | `.swift-format` | 4-space indent, 120-column lines, at most one blank line, existing line breaks respected; rules that would fight this codebase's style (force unwraps, naming, doc comments) are off; imports must be ordered |
 | `.gitignore` | `.build/`, `.swiftpm/`, `build/`, Xcode user data, `.DS_Store`, secrets files, and `.claude` |
@@ -141,25 +147,43 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | File | Contains |
 | --- | --- |
 | `IslandPanel.swift` | The always-there `NSPanel`: borderless, non-activating, over everything, click-through by default, first-click-acts hosting view |
-| `ScreenGeometry.swift` | Notch detection and sizes; `panelSize` (560 x 260); `islandRect(for:)` |
+| `ScreenGeometry.swift` | Notch detection and sizes; `panelSize` (560 x 276); `islandRect(for:)` |
 | `MouseTracker.swift` | Global and local event monitors: hover, click-through, file-drag detection, swipes, click-outside |
 | `SwipeRecognizer.swift` | Turns one gesture's scroll deltas into down, up, left, or right, once |
+| `Announcements.swift` | `AmbientEvent` (what can be muted) and the banners and alerts of each, built once for the island and the preview |
 | `IslandViewModel.swift` | `IslandModule`, `ClockMode`, `IslandAlert`, `IslandBanner`, `CompactActivity`, `IslandFeatures`, the view model itself, and `TrailingStrip` (what fits right of the notch) |
 | `IslandView.swift` | The island's content: the tab strip, compact layers and pair, banners, the file drop target, the settings and pencil buttons |
 | `IslandContainer.swift` | `IslandPresentation`, `IslandSurface`, and the container that draws the outline, surface, size, and swell |
 | `NotchShape.swift` | The island outline (flat top, concave flares, continuous bottom corners) |
 | `PeekContent.swift` | What each peek shows, and the idle peek |
 | `ModuleContent.swift` | The one module-to-view switch used everywhere |
-| `Theme.swift` | All design tokens: `Palette`, `SurfaceInk`, `Tint` (with `Tint.airDrop`, the AirDrop half of the drop target), `Typography`, `Metrics`, `Timing`, `Motion`, `BlurFade`, the `\.islandSurface` key |
-| `Components.swift` | Shared controls: `IconButton`, `ChipButton`, `SegmentedChoice`, `IslandSlider`, `ArtworkView`, `ProgressRing`, `ChargingBadge`, `AirDropGlyph`, `Glyph`, `IslandButtonStyle`, `formatTime` |
+| `Theme.swift` | All design tokens: `Palette`, `SurfaceInk`, `Tint` (with `Tint.airDrop` for the AirDrop target), `Typography`, `Metrics`, `Timing`, `Motion`, `BlurFade`, the `\.islandSurface` key |
+| `Components.swift` | Shared controls: `IconButton`, `ChipButton`, `SegmentedChoice`, `IslandSlider`, `ArtworkView`, `ProgressRing`, `EdgeFade`, `ChargingBadge`, `AirDropGlyph`, `Glyph`, `IslandButtonStyle`, `formatTime` |
 | `FloatingGlass.swift` | The `floatingGlass()` modifier (padding plus Liquid Glass) |
-| `FloatingGlassPanel.swift` | The floating window class (palette and window styles) and the `\.isFloatingWindow` key |
+| `FloatingGlassPanel.swift` | The torn-off window class and the `\.isFloatingWindow` key |
+
+### `Widgets/`
+
+| File | Contains |
+| --- | --- |
+| `WidgetCatalog.swift` | `BuiltInWidget`, `WidgetID`, `WidgetDescriptor` (width, kind, height, source, refresh, tint, tap) |
+| `HomeLayout.swift` | `HomeLayout` (v2: an ordered list of sized `WidgetPlacement`), `WidgetOptions`, the presets, `frames`/`contentHeight`/`capacityText`, `normalized`, and the key-based decoder |
+| `HomeGridSpec.swift` | `GridSize`, `GridCell`, `GridRect`, and `HomeGridSpec`: packing, geometry, and the drag-target maths (pure) |
+| `SavedHomePreset.swift` | A layout saved under a name, and the rules for its name |
+| `HomeLayoutMigration.swift` | Version 1 (rows) to version 2, once, on read (frozen) |
+| `ShortcutsCLI.swift` | `shortcuts list` and `shortcuts run`, for Shortcut widgets |
+| `CustomWidget.swift` | `CustomWidget` (four sources), `WebValue.extract`, and the catalog lookup that includes them |
+| `CustomWidgetValues.swift` | `CustomWidgetValues` (in-memory values, freshness, one fetch at a time), `LiveWidgetFetcher`, `SampleWidgetFetcher` |
+| `BoundedProcess.swift` | Runs one program with a time limit, an output cap, and a minimal environment |
+| `HomeLayoutEditing.swift` | The editor's pure edits: `inserting`, `placing`, `moving`, `resizing`, `removing`, `adding`, `applying` |
 
 ### `Home/`
 
 | File | Contains |
 | --- | --- |
-| `HomeView.swift` | The Home module: two rows of widgets, and the month calendar it opens |
+| `HomeView.swift` | The Home module: the widget grid, and the month calendar it opens |
+| `HomeGrid.swift` | `HomeGrid` (the grid from a `HomeLayout`) and `HomeWidgetView` (a widget at a size) |
+| `MoreWidgets.swift` | Weather, Battery, Reminders, Note, and custom widgets, each at its sizes |
 | `HomeWidgets.swift` | The boxes: `TimeWidget`, `MediaWidget`, `QuickActionsGrid`, `HomeAction` and `HomeActionPill` |
 | `HomeCards.swift` | Pieces the idle peek reuses: `DateInline`, `UpNextLabel`, `QuickToolsRow`, `QuickToolButton`, `QuickTimerChips`, `MacBatteryGlance` |
 | `MonthGrid.swift` | Six-week month layout and its view |
@@ -183,7 +207,8 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `TimerModel.swift` | Countdown with pause, add-minutes, an end date |
 | `StopwatchModel.swift` | Drift-free stopwatch with laps, and `formatStopwatch` |
 | `PomodoroModel.swift` | Phases, chaining, the session history and streak |
-| `TimerView.swift` | The Clock tab (rings, presets, laps, the Pomodoro chart), the compact readouts, and the timer, Pomodoro, and stopwatch peeks |
+| `DialScrubber.swift` | The timer dial's pure math (`DialScrubber`) and scroll routing (`ScrollRouting`, `AxisLock`) |
+| `TimerView.swift` | The Clock tab (rings, presets, the minute dial, laps, the Pomodoro chart), the compact readouts, and the timer, Pomodoro, and stopwatch peeks |
 
 ### `Shelf/`
 
@@ -191,7 +216,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | --- | --- |
 | `ShelfModel.swift` | The files on the Shelf (paths only) and AirDrop |
 | `ShelfView.swift` | The Files and Clipboard views, drop tiles, item and card views with their menus |
-| `ClipboardHistory.swift` | The pasteboard poller and the ten-item, memory-only history, and `matches` for the palette |
+| `ClipboardHistory.swift` | The pasteboard poller and the memory-only history (0, 10, 25, or 50 items) |
 | `SmartAction.swift` | Detects a lone link, address, or `#hex` color and names the action |
 | `FileTools.swift` | Zip, unzip, and the Shelf jobs (convert, combine, resize, compress, Copy Text), unique names |
 | `Converters.swift` | `FileKind`, `ConversionTarget`, and every converter: images, documents, PDF, video, audio, plus `MarkdownText` |
@@ -202,19 +227,18 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 | File | Contains |
 | --- | --- |
-| `ToolID.swift` | The eleven tools and the default pins |
-| `ToolCatalog.swift` | What each tool is and does (shared by the Tools tab, Home, the peek, and the palette) |
+| `ToolID.swift` | The nine tools and the default pins |
+| `ToolCatalog.swift` | What each tool is and does (shared by the Tools tab, Home, and the peek) |
 | `ToolsView.swift` | The Tools tab: row (or the Mirror), grid, Ring Light sliders, Keep Awake chips; `ControlButton` |
 | `CameraMirror.swift` | `CameraMirror`, `CameraSessionProviding`, the AVFoundation provider, and the preview layer view |
 | `MirrorView.swift` | The Mirror: preview, Ring Light, Done |
 | `ScreenRecorder.swift` | `ScreenRecorder` (30-minute cap), the ScreenCaptureKit recorder, and `RegionPicker` |
 | `KeepAwake.swift` | The power assertion, with durations |
-| `LowPowerMode.swift` | Reads Low Power Mode and toggles it (admin prompt) |
 | `RingLight.swift` | The screen-edge glow (a click-through window) |
 | `MicrophoneMute.swift` | Mutes the default input device |
 | `KeyboardCleaner.swift` | The event tap that swallows keys for 30 seconds |
 | `AudioOutputs.swift` | Output devices and the default one |
-| `SystemActions.swift` | Eyedropper, hex strings, clipboard, area screenshot, Lock Screen |
+| `SystemActions.swift` | Eyedropper, hex strings, clipboard, area screenshot |
 
 ### `Agenda/`
 
@@ -224,7 +248,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `AgendaView.swift` | `IdleView` (the agenda row) and `AgendaAction` |
 | `RemindersView.swift` | The Reminders tab |
 
-### `Notes/`, `Weather/`, `Launch/`, `Palette/`
+### `Notes/` and `Weather/`
 
 | File | Contains |
 | --- | --- |
@@ -233,16 +257,6 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `Notes/NotesView.swift` | The Notes tab: lists, editors, the Prompter |
 | `Weather/WeatherModel.swift` | Open-Meteo geocoding and forecast (with quarter-hour rain), WMO code names, `WeatherGlance` |
 | `Weather/RainRule.swift` | `RainSample`, `RainRule` (dry now, 0.2 mm within 30 minutes), `RainSpell` (once per spell) |
-| `Launch/AppIndex.swift` | Scans app folders for the palette |
-| `Launch/ShortcutsCLI.swift` | `shortcuts list` and `shortcuts run` |
-| `Launch/LaunchModel.swift` | Holds the app index and the Shortcuts list for the palette |
-| `Palette/PaletteModel.swift` | Builds and ranks the rows; translation states; answer rows (define, units, currency, calculate) and `clip` rows |
-| `Palette/Answers.swift` | `DictionaryLookup`, `DictionaryText`, `UnitConversion`, `Calculator`, `CurrencyRequest` |
-| `Palette/ExchangeRates.swift` | The Frankfurter rates, cached 12 hours per base |
-| `Palette/PaletteSearch.swift` | Match scoring, the timer parser, the translation parser |
-| `Palette/SearchEngine.swift` | The nine engines, custom ones, URL building, keyword matching |
-| `Palette/PaletteView.swift` | The panel's content on Liquid Glass |
-| `Palette/PaletteController.swift` | Shows and hides the panel; reads Esc, Return, and arrows |
 
 ### `System/` and `Transfers/`
 
@@ -264,7 +278,20 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | File | Contains |
 | --- | --- |
 | `AppSettings.swift` | Every setting, its storage, the tab sides, menu-bar modules, search engines, pinned tools |
-| `SettingsView.swift` | The Settings window and its tab lists |
+| `SettingsView.swift` | The Settings window: a sidebar of panes over a live preview and the pane's form |
+| `SettingsPane.swift` | The panes, and what the preview shows for each |
+| `IslandPreview.swift` | `IslandPreviewModel` (a second view model on sample data) and `IslandPreview` (the real `IslandView` on a desk band) |
+| `PreviewFeatures.swift` | `IslandFeatures` from sample data, the samples, and the inert doubles |
+| `CustomWidgetSheet.swift`, `PrivacyPane.swift`, `PrivacyAccess.swift` | Making a custom widget, and the Privacy pane (what leaves, what runs, permission states) |
+| `MenuBarPreview.swift` | The preview's Menu Bar view: a menu-bar strip and the chosen module's window |
+| `TabEditor.swift` | The Tabs pane's canvas: the preview's tab strip and the Not Shown tray under it (swap, replace, hide, add) |
+| `HomeEditor.swift`, `HomeCanvas.swift`, `WidgetGallery.swift`, `HomeLayoutEditor.swift`, `WidgetInspector.swift`, `HomeArchive.swift` | The Home editor: the controller (gestures, keys, undo), the chrome over the preview (handles, badges, room to grow, the lifted widget, the hint), the gallery of widgets to add (chips, each size at 1:1, `FlowLayout`), the Layout section (presets, Save, file menu), the selected widget's options, and layout export and import |
+| `Dropdown.swift` | The styled controls used across Settings: `StyledDropdown`, `DropdownItem`, `SettingsDropdown`, `SettingsSegmented`, `FieldButton` |
+| `SettingsSidebar.swift`, `SettingsSearch.swift`, `SettingsWindow.swift` | The sidebar (search field, hide and show button, panes or results), the pure search (an entry for each setting, and the ranking), and the window setup (resizable, transparent title bar, sidebar material) |
+| `ShortcutRecorder.swift`, `KeyCombo.swift` | Recording a global shortcut, and the key combination it stores |
+| `ShelfPane.swift` | The Shelf pane (drag target, screenshots, retention, clipboard limit) |
+| `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
+| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ToolsPane.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -272,12 +299,28 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 18 files, about 3,700 lines, **321 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 36 files, about 7,900 lines, **514 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
 | `TestSupport.swift` | `makeViewModel()`: a view model from test doubles |
 | `KeyboardTests.swift` | Hotkey pinning, arrow tabs, banners |
+| `SettingsPreviewTests.swift`, `SettingsSnapshots.swift` | The Settings preview: size parity, isolation, sample data; its opt-in renders |
+| `CustomWidgetTests.swift` | Web values, freshness and overlap, `BoundedProcess` (timeout, cap, environment), custom widgets in settings |
+| `BehaviorTests.swift` | Shortcuts, Peek on Hover, the display choice, muting events |
+| `ChoicesTests.swift` | Shelf retention, the clipboard limit, drag modes, music in compact, the tool row order |
+| `SettingsArchiveTests.swift` | The settings file: round trip, refusal, repair, commands never in or out, Reset All |
+| `TabDragTests.swift` | Dragging tabs (move, swap, Not Shown), the preview's arrows, and clicking a tab |
+| `WidgetTests.swift` | Home layout: the default, presets, grid budget, repair, persistence, editing, the editor, the drags (driven by points), archives |
+| `HomeGridTests.swift` | The grid maths: packing, geometry, targets, sizes |
+| `SavedPresetTests.swift` | Saved layouts: saving, names, replacing, applying with options, removing and undo |
+| `SettingsSearchTests.swift` | Finding a setting by name, other words, accents, and ranking |
+| `BannerTests.swift` | The AirPods ring and low rule, Low Battery as an alert, and the smaller alert island |
+| `HomeMigrationTests.swift` | Version 1 layouts and files become version 2 |
+| `HomeSizeTests.swift` | What each size shows: timer segments, tools per size, forecast parsing, upcoming items, presets, the Size row |
+| `WidgetSizeSnapshots.swift` | Opt-in: every widget at every size, on black (`31-widget-*.png`) |
+| `URLAndSystemTests.swift` | `macisland://` links |
+| `DialTests.swift` | The timer dial: drag math, rubber band, scroll routing, the dial rectangle |
 | `PresentationTests.swift` | Hover, peek, expanded, banner widths, drag target, the hidden pill, swipes |
 | `SettingsTests.swift` | Hotkey, tabs |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
@@ -286,10 +329,9 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 | `PlanFeatureTests.swift` | Agenda rules, meeting links, pinned tools, drop tiles |
 | `MediaTests.swift` | LRC, lyrics, transport, shuffle and repeat, players |
 | `Phase4Tests.swift` | Pomodoro, month grid, weather, smart actions, file tools, notes, Clean Keys, reminders, the strip, the tab sides |
-| `Phase5Tests.swift` | Search engines, ranking, parsers, apps, Shortcuts, the palette model, menu bar and windows, the player layout, transport routing |
+| `Phase5Tests.swift` | Shortcuts CLI, menu bar and windows, the player layout, transport routing |
 | `ShelfToolsTests.swift` | File kinds and targets, Copy Text, document, PDF, image, audio, and video conversions |
-| `ClipboardTests.swift` | History search, plain-text copy, Save as Snippet, the `clip` palette rows |
-| `AnswersTests.swift` | Definitions, units, the calculator, currency parsing and rates, the answer rows, `macisland://` links, Lock Screen |
+| `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |

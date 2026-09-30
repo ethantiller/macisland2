@@ -17,6 +17,14 @@ struct AudioAccessory: Equatable {
         return "headphones"
     }
 
+    /// The emptier earbud, or the one battery a headset has. The case doesn't count: the earbuds are what run out.
+    var lowestLevel: Int? { [left, right, main].compactMap { $0 }.min() }
+
+    /// Low enough to need charging soon: the banner's ring turns red.
+    var isLow: Bool { (lowestLevel ?? 100) <= Self.lowLevel }
+
+    static let lowLevel = 20
+
     var batterySummary: String? {
         if left != nil || right != nil {
             return [
@@ -34,14 +42,15 @@ struct AudioAccessory: Equatable {
     static func parse(systemProfilerJSON data: Data, name: String, address: String) -> AudioAccessory {
         var accessory = AudioAccessory(name: name)
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let controllers = root["SPBluetoothDataType"] as? [[String: Any]]
+            let controllers = root["SPBluetoothDataType"] as? [[String: Any]]
         else { return accessory }
 
         let wantedAddress = normalize(address)
         let connected = controllers.flatMap { $0["device_connected"] as? [[String: Any]] ?? [] }
         let entries = connected.flatMap { $0.map { (name: $0.key, info: $0.value as? [String: Any] ?? [:]) } }
-        guard let match = entries.first(where: { normalize($0.info["device_address"] as? String ?? "") == wantedAddress })
-            ?? entries.first(where: { $0.name == name })
+        guard
+            let match = entries.first(where: { normalize($0.info["device_address"] as? String ?? "") == wantedAddress })
+                ?? entries.first(where: { $0.name == name })
         else { return accessory }
 
         func level(_ key: String) -> Int? {
@@ -78,7 +87,7 @@ final class AudioAccessoryMonitor: NSObject {
     @objc private func deviceConnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
         // Registration reports devices that were already connected; only announce new ones.
         guard Date().timeIntervalSince(startedAt) > 3,
-              device.deviceClassMajor == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio)
+            device.deviceClassMajor == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio)
         else { return }
 
         let name = device.name ?? "Headphones"

@@ -1,7 +1,8 @@
-import AppKit
 import AVFoundation
+import AppKit
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 @MainActor
@@ -90,7 +91,10 @@ struct TwoActionBannerTests {
     private func banner(_ log: Log) -> IslandBanner {
         IslandBanner(
             systemImage: "calendar", tint: Theme.Tint.neutral, title: "Standup", detail: "In 5 minutes",
-            actions: [.init(title: "Join") { log.lines.append("join") }, .init(title: "Check Camera") { log.lines.append("camera") }]
+            actions: [
+                .init(title: "Join") { log.lines.append("join") },
+                .init(title: "Check Camera") { log.lines.append("camera") },
+            ]
         )
     }
 
@@ -118,13 +122,16 @@ struct TwoActionBannerTests {
     @Test func aMeetingWithALinkOffersJoinThenCheckCamera() {
         let agenda = AgendaMonitor()
         var checked = 0
-        let item = AgendaItem(id: "a", kind: .event, title: "Standup", date: Date().addingTimeInterval(300), joinURL: URL(string: "https://zoom.us/j/1"))
+        let item = AgendaItem(
+            id: "a", kind: .event, title: "Standup", date: Date().addingTimeInterval(300),
+            joinURL: URL(string: "https://zoom.us/j/1"))
         let banner = AgendaAction.announcement(for: item, agenda: agenda) { checked += 1 }
         #expect(banner.actions.map(\.title) == ["Join", "Check Camera"])
         banner.actions[1].perform()
         #expect(checked == 1)
 
-        let lunch = AgendaItem(id: "b", kind: .event, title: "Lunch", date: Date().addingTimeInterval(300), joinURL: nil)
+        let lunch = AgendaItem(
+            id: "b", kind: .event, title: "Lunch", date: Date().addingTimeInterval(300), joinURL: nil)
         #expect(AgendaAction.announcement(for: lunch, agenda: agenda) {}.actions.isEmpty)
         let reminder = AgendaItem(id: "c", kind: .reminder, title: "Call", date: Date(), joinURL: nil)
         #expect(AgendaAction.announcement(for: reminder, agenda: agenda) {}.actions.map(\.title) == ["Done"])
@@ -133,7 +140,9 @@ struct TwoActionBannerTests {
 
 @MainActor
 struct ScreenRecorderTests {
-    private func recorder(_ screen: StubScreen, shelf: ShelfModel? = nil, maxDuration: Duration = ScreenRecorder.maxDuration) -> ScreenRecorder {
+    private func recorder(
+        _ screen: StubScreen, shelf: ShelfModel? = nil, maxDuration: Duration = ScreenRecorder.maxDuration
+    ) -> ScreenRecorder {
         ScreenRecorder(recorder: screen, shelf: shelf ?? ShelfModel(), maxDuration: maxDuration)
     }
 
@@ -250,9 +259,12 @@ struct ScreenRecorderTests {
         let start = CGPoint(x: 100, y: 100)
         #expect(RegionPicker.selection(from: start, to: CGPoint(x: 102, y: 101), screenHeight: 900) == .display)
         // Dragged up and to the left, on a 900 pt tall screen: the y flips to count from the top.
-        #expect(RegionPicker.selection(from: CGPoint(x: 300, y: 400), to: CGPoint(x: 100, y: 200), screenHeight: 900)
-            == .region(CGRect(x: 100, y: 500, width: 200, height: 200)))
-        #expect(RegionPicker.rect(from: CGPoint(x: 5, y: 9), to: CGPoint(x: 1, y: 3)) == CGRect(x: 1, y: 3, width: 4, height: 6))
+        #expect(
+            RegionPicker.selection(from: CGPoint(x: 300, y: 400), to: CGPoint(x: 100, y: 200), screenHeight: 900)
+                == .region(CGRect(x: 100, y: 500, width: 200, height: 200)))
+        #expect(
+            RegionPicker.rect(from: CGPoint(x: 5, y: 9), to: CGPoint(x: 1, y: 3))
+                == CGRect(x: 1, y: 3, width: 4, height: 6))
     }
 }
 
@@ -261,10 +273,15 @@ struct VoiceRecorderTests {
     private func makeRecorder(
         _ transcriber: StubTranscriber, maxDuration: Duration = VoiceRecorder.maxDuration
     ) -> (VoiceRecorder, NotesModel, ShelfModel) {
-        let notes = NotesModel(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let notes = NotesModel(
+            directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         let shelf = ShelfModel()
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        return (VoiceRecorder(transcriber: transcriber, notes: notes, shelf: shelf, folder: folder, maxDuration: maxDuration), notes, shelf)
+        return (
+            VoiceRecorder(
+                transcriber: transcriber, notes: notes, shelf: shelf, folder: folder, maxDuration: maxDuration), notes,
+            shelf
+        )
     }
 
     @Test func stoppingMakesANoteOfTheWordsAndShelvesTheAudio() async throws {
@@ -369,7 +386,9 @@ struct RecordingActivityTests {
         #expect(viewModel.compactActivities == [.recording(.voice), .timer, .working("Zipping")])
 
         viewModel.flash(IslandAlert(systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "80%"))
-        #expect(viewModel.compactActivities.first == .alert(viewModel.alert!) && viewModel.compactActivities[1] == .recording(.voice))
+        #expect(
+            viewModel.compactActivities.first == .alert(viewModel.alert!)
+                && viewModel.compactActivities[1] == .recording(.voice))
 
         viewModel.showBanner(IslandBanner(systemImage: "bell", tint: Theme.Tint.neutral, title: "Hi"))
         #expect(viewModel.compactActivities.count == 1)
@@ -407,16 +426,7 @@ struct CaptureToolTests {
         #expect(mirror.title == "Mirror" && mirror.systemImage == "person.crop.rectangle")
         let record = catalog.item(for: .recordScreen)
         #expect(record.title == "Record" && record.label == "Record Screen" && record.systemImage == "record.circle")
-        #expect(ToolID.allCases.count == 11 && (ToolID.allCases.count + 1) % 6 == 0)
-    }
-
-    @Test func thePaletteOffersRecordingAndVoiceNotes() {
-        let palette = PaletteModel(viewModel: TestSupport.makeViewModel())
-        palette.query = "record"
-        let titles = palette.results.map(\.title)
-        #expect(titles.contains("Record Screen") && titles.contains("Record Voice Note"))
-        palette.query = "mirror"
-        #expect(palette.results.first?.title == "Mirror")
+        #expect(ToolID.allCases.count == 9 && ToolID.allCases.count + 1 <= 2 * 6)
     }
 
     @Test func theMirrorToolTurnsOn() async {

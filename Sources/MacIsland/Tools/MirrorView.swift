@@ -18,8 +18,10 @@ struct MirrorView: View {
                     withAnimation(Theme.Motion.resize) { light.toggle() }
                 }
                 if light.isOn {
-                    IslandSlider(value: light.brightness, label: "Ring Light Brightness", onChange: { light.brightness = $0 })
-                        .transition(.opacity)
+                    IslandSlider(
+                        value: light.brightness, label: "Ring Light Brightness", onChange: { light.brightness = $0 }
+                    )
+                    .transition(.opacity)
                 }
                 Spacer(minLength: 0)
                 ChipButton(title: "Done", fillsWidth: true) { viewModel.stopMirror() }
@@ -35,7 +37,9 @@ struct MirrorView: View {
     @ViewBuilder
     private var preview: some View {
         if mirror.access == .denied {
-            problem("Camera access is off.", action: ChipButton(title: "Open Settings", action: CameraMirror.openCameraSettings))
+            problem(
+                "Camera access is off.",
+                action: ChipButton(title: "Open Settings", action: CameraMirror.openCameraSettings))
         } else if mirror.isUnavailable {
             problem("No camera found.", action: nil as ChipButton?)
         } else if let session = mirror.session {

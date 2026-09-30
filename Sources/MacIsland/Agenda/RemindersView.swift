@@ -73,8 +73,10 @@ struct RemindersView: View {
     }
 }
 
-private struct ReminderRowView: View {
+struct ReminderRowView: View {
     let row: ReminderRow
+    /// The due text is left out where there is no room for it (Home's narrowest Reminders).
+    var showsDue = true
     let onDone: () -> Void
 
     var body: some View {
@@ -85,10 +87,12 @@ private struct ReminderRowView: View {
                 .foregroundStyle(Theme.Palette.primary)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                Text(row.dueText(now: context.date))
-                    .font(Theme.Typography.numeral)
-                    .foregroundStyle(Theme.Palette.secondary)
+            if showsDue {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    Text(row.dueText(now: context.date))
+                        .font(Theme.Typography.numeral)
+                        .foregroundStyle(Theme.Palette.secondary)
+                }
             }
         }
         .frame(height: 28)

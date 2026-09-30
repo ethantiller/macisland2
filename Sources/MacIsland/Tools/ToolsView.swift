@@ -58,12 +58,7 @@ struct ToolsView: View {
     }
 
     private func toolButton(_ id: ToolID) -> some View {
-        let tool = ToolCatalog(viewModel: viewModel).item(for: id)
-        return ControlButton(
-            title: tool.title, systemImage: tool.systemImage, isOn: tool.isOn, accessibilityLabel: tool.label, action: tool.action
-        )
-            .disabled(!tool.isAvailable)
-            .opacity(tool.isAvailable ? 1 : 0.4)
+        ToolControlButton(tool: ToolCatalog(viewModel: viewModel).item(for: id))
             .contextMenu {
                 if !settings.rowShowsEveryTool {
                     Button(settings.isPinned(id) ? "Unpin from Row" : "Pin to Row") {
@@ -73,6 +68,20 @@ struct ToolsView: View {
             }
     }
 
+}
+
+/// A tool as a named round button: the Tools tab, and Quick Tools at its larger sizes.
+struct ToolControlButton: View {
+    let tool: ToolItem
+
+    var body: some View {
+        ControlButton(
+            title: tool.title, systemImage: tool.systemImage, isOn: tool.isOn, accessibilityLabel: tool.label,
+            action: tool.action
+        )
+        .disabled(!tool.isAvailable)
+        .opacity(tool.isAvailable ? 1 : 0.4)
+    }
 }
 
 /// Round Control Center-style button. On state is a white fill with a black glyph.

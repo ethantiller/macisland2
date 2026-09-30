@@ -53,8 +53,6 @@ enum Theme {
         /// The music player, after the Dynamic Island's: the song, and who plays it.
         static let headline = Font.system(size: 15, weight: .semibold)
         static let subheadline = Font.system(size: 13, weight: .regular)
-        /// The command palette's field: the one thing on it you look at while typing.
-        static let query = Font.system(size: 20, weight: .regular)
         /// The Prompter: readable from arm's length while looking at the camera.
         static let prompter = Font.system(size: 20, weight: .medium)
     }
@@ -65,6 +63,8 @@ enum Theme {
         /// Peek and banner share a width, so one becomes the other by changing height only.
         static let peekWidth: CGFloat = 380
         static let bannerWidth: CGFloat = peekWidth
+        /// A banner with nothing to press (AirPods, low battery, rain) is an alert: a smaller island, its contents centered.
+        static let bannerAlertWidth: CGFloat = 290
         static let maxTabs = 5
         /// The tab right of the notch, beside the status and the gear.
         static let maxRightTabs = 1
@@ -86,8 +86,8 @@ enum Theme {
         /// Banner height below the notch.
         static let bannerContentHeight: CGFloat = 56
         /// While a file is dragged, the compact island grows by this much on each side and below.
-        static let dragTargetInset: CGFloat = 90
-        static let dragTargetHeight: CGFloat = 48
+        static let dragTargetInset: CGFloat = 100
+        static let dragTargetHeight: CGFloat = 56
         static let artwork: CGFloat = 40
         /// The player's album art in the Media tab, and in the peek (which is narrower).
         static let playerArtwork: CGFloat = 58
@@ -101,6 +101,27 @@ enum Theme {
         static let playerScrubber: CGFloat = 20
         /// Timer and stopwatch ring; its height sets the Clock tab's height.
         static let clockRing: CGFloat = 64
+        /// The minute ruler shown while a timer is being set: labels, ticks, and the marker.
+        static let dialLabelHeight: CGFloat = 12
+        static let dialRowSpacing: CGFloat = 3
+        static let dialTickWidth: CGFloat = 2
+        static let dialMajorTick: CGFloat = 22
+        static let dialMinorTick: CGFloat = 14
+        /// The fixed triangle under the chosen minute.
+        static let dialMarker: CGFloat = 8
+        /// Points between two minutes. Also the drag and scroll points per minute, so the ruler follows the pointer 1:1.
+        static let dialMinuteSpacing: CGFloat = 8
+        /// How far the ruler may stretch past its ends.
+        static let dialRubberBand: CGFloat = 24
+        /// The ruler fades out over this fraction of its width at each side.
+        static let dialFade: CGFloat = 0.16
+        static let timerDial: CGFloat = dialLabelHeight + dialRowSpacing + dialMajorTick + dialRowSpacing + dialMarker
+        /// The Prompter's text fades over this fraction of its height at each end.
+        static let prompterFade: CGFloat = 0.12
+        /// Setting a timer: the mode picker and presets.
+        static let clockHeaderHeight: CGFloat = 24
+        /// Setting a timer: the mode picker and presets, the dial, then Start Timer and the length.
+        static let timerSetter: CGFloat = clockHeaderHeight + 10 + timerDial + 10 + hitTarget
         static let artworkRadius: CGFloat = 8
         static let cardRadius: CGFloat = 10
         /// Home's widgets, concentric with the island: its 32 radius less its 18 margin. Continuous.
@@ -131,31 +152,48 @@ enum Theme {
         static let glanceHeight: CGFloat = 68
         /// The current lyric line under the scrubber, and the gap above it.
         static let lyricsRowHeight: CGFloat = 24
-        /// Home's rows: the time and music widgets, then the actions.
-        static let homeCardHeight: CGFloat = 64
-        static let homeActionsHeight: CGFloat = 68
         /// The four quick tools' round buttons in Home's 2 by 2 grid, and the buttons in the idle peek.
         static let homeGridButton: CGFloat = 24
         static let homeQuickHeight: CGFloat = 32
         static let homeHeaderHeight: CGFloat = 28
         /// Home with the month calendar open: the header and six weeks.
         static let homeMonthHeight: CGFloat = 170
-        /// Home closed: the two rows, with 10 pt between them.
-        static let homeContentHeight: CGFloat = 64 + 68 + 10
+        /// Home closed with its default two rows, with 10 pt between them.
+        static let homeContentHeight: CGFloat = 2 * homeRowHeight + homeRowGap
+        /// Home is a grid of widgets in rows: this wide (the island's content, and the torn-off window's), with
+        /// `rowSpacing` between widgets and `homeRowGap` between rows.
+        static let homeContentWidth: CGFloat = expandedWidth - 2 * (ScreenGeometry.topFlare + margin)
+        static let homeRowGap: CGFloat = 10
+        /// Home's grid: 6 columns of 72 with `rowSpacing` between (80 n - 8 wide), and 1 to `homeMaxRows` rows of
+        /// `homeRowHeight` with `homeRowGap` between (74 m - 10 tall).
+        static let homeColumns = 6
+        static let homeColumnWidth: CGFloat =
+            (homeContentWidth - CGFloat(homeColumns - 1) * rowSpacing) / CGFloat(homeColumns)
+        static let homeRowHeight: CGFloat = 64
+        static let homeMaxRows = 3
+        /// The tallest notch on any Mac, so a layout that fits here fits everywhere.
+        static let maxNotchHeight: CGFloat = 38
+        /// What Home can be tall: `homeMaxRows` rows, which the panel is built around.
+        static let homeMaxContentHeight: CGFloat =
+            CGFloat(homeMaxRows) * homeRowHeight + CGFloat(homeMaxRows - 1) * homeRowGap
+        /// The panel's height: the worst-case notch, the gap above the content, the tallest Home, and the margin.
+        static let panelHeight: CGFloat = maxNotchHeight + contentTopGap + homeMaxContentHeight + margin
         /// The idle peek: the date, weather and what is next, then the quick controls.
         static let idlePeekHeight: CGFloat = 44 + 10 + 32
-        /// Floating glass: command palette, menu-bar modules, torn-off panels.
+        /// Floating glass: menu-bar modules and torn-off panels.
         static let floatRadius: CGFloat = 24
         /// Inset inside floating glass; `floatRadius - floatPadding == cardRadius`, so corners are concentric.
         static let floatPadding: CGFloat = 14
         /// Gap between the notch and floating glass hung below it.
         static let floatGap: CGFloat = 8
-        /// The command palette, including its glass padding.
-        static let paletteWidth: CGFloat = 520
         /// A torn-off module: its content width, and the header above the content.
         static let detachedWidth: CGFloat = 472
         static let detachedHeaderHeight: CGFloat = 28
         static let detachedChromeHeight: CGFloat = 28 + rowSpacing
+        /// Settings chrome for the Home editor, drawn over the preview and never on the island: the remove badge's disc, and the
+        /// hit size of the badge and the resize handle.
+        static let editorBadge: CGFloat = 18
+        static let editorHandle: CGFloat = 28
     }
 
     enum Timing {
@@ -184,6 +222,12 @@ enum Theme {
             reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.36, dampingFraction: 0.88)
         }
 
+        /// A whole view sliding away for another (Settings' preview between the island and the menu bar). Slower and
+        /// nearly critical, so a long slide stays smooth.
+        static var slide: Animation {
+            reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.92)
+        }
+
         /// Follows the pointer: the hover swell, swipes, the drag target. Retargets mid-flight without a jump.
         static var track: Animation {
             reduceMotion
@@ -191,7 +235,10 @@ enum Theme {
                 : .interactiveSpring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.1)
         }
 
-        /// Floating glass (palette, torn-off panels) dropping in below the notch.
+        /// How much a widget lifts while the Home editor drags it (Settings chrome only; not with Reduce Motion).
+        static let liftScale: CGFloat = 1.03
+
+        /// Floating glass (torn-off panels) dropping in below the notch.
         static var float: Animation {
             reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.34, dampingFraction: 0.84)
         }
@@ -221,7 +268,7 @@ struct BlurFade: ViewModifier {
     }
 }
 
-/// What the palette is drawn on.
+/// What Home's and the island's views are drawn on.
 private struct IslandSurfaceKey: EnvironmentKey {
     static let defaultValue: IslandSurface = .hardware
 }

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The Home module, a dashboard of two rows: today and what's next beside what's playing, then the
-/// everyday tools beside the timers and the Shelf. Each piece takes the useful part of another tab. The
-/// date opens a month calendar.
+/// The Home module, a dashboard of widgets in rows (`HomeGrid`). By default: today and what's next beside
+/// what's playing, then the everyday tools beside the timers and the Shelf. Each piece takes the useful part
+/// of another tab. The date opens a month calendar, which replaces the grid.
 struct HomeView: View {
     let viewModel: IslandViewModel
 
@@ -17,20 +17,7 @@ struct HomeView: View {
                 MonthGridView(month: shownMonth)
                     .transition(.opacity)
             } else {
-                // Row 1: time and music, in two halves.
-                HStack(spacing: 8) {
-                    TimeWidget(viewModel: viewModel)
-                    MediaWidget(viewModel: viewModel)
-                }
-                .frame(height: Theme.Metrics.homeCardHeight)
-
-                // Row 2: the everyday tools and the timers.
-                HStack(spacing: 8) {
-                    QuickActionsGrid(viewModel: viewModel)
-                        .fixedSize(horizontal: true, vertical: false)
-                    HomeActionPill(viewModel: viewModel)
-                }
-                .frame(height: Theme.Metrics.homeActionsHeight)
+                HomeGrid(layout: viewModel.homeLayout, viewModel: viewModel)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)

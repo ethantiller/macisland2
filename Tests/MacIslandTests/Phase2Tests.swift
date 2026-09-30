@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 @MainActor
@@ -69,14 +70,17 @@ struct FullChargeTests {
 
     @Test func doesNotFireOnBatteryOrWhenAlreadyFull() {
         #expect(BatteryMonitor.events(wasOnAC: false, lastPercent: 89, onAC: false, percent: 90, fullLevel: 90).isEmpty)
-        #expect(BatteryMonitor.events(wasOnAC: true, lastPercent: 100, onAC: true, percent: 100, fullLevel: 100).isEmpty)
+        #expect(
+            BatteryMonitor.events(wasOnAC: true, lastPercent: 100, onAC: true, percent: 100, fullLevel: 100).isEmpty)
     }
 
     @Test func pluggingInAndLowBatteryStillWork() {
-        #expect(BatteryMonitor.events(wasOnAC: false, lastPercent: 50, onAC: true, percent: 50, fullLevel: 100)
-            == [.charging(percent: 50)])
-        #expect(BatteryMonitor.events(wasOnAC: false, lastPercent: 21, onAC: false, percent: 20, fullLevel: 100)
-            == [.low(percent: 20)])
+        #expect(
+            BatteryMonitor.events(wasOnAC: false, lastPercent: 50, onAC: true, percent: 50, fullLevel: 100)
+                == [.charging(percent: 50)])
+        #expect(
+            BatteryMonitor.events(wasOnAC: false, lastPercent: 21, onAC: false, percent: 20, fullLevel: 100)
+                == [.low(percent: 20)])
     }
 
     @MainActor
@@ -137,9 +141,11 @@ struct KeepAwakeDurationTests {
 struct DriveAndScreenshotTests {
     @Test func onlyExternalEjectableLocalDrivesAreAnnounced() {
         #expect(VolumeMonitor.isEjectableDrive(isLocal: true, isBrowsable: true, isInternal: false, isEjectable: true))
-        #expect(!VolumeMonitor.isEjectableDrive(isLocal: false, isBrowsable: true, isInternal: false, isEjectable: true))
+        #expect(
+            !VolumeMonitor.isEjectableDrive(isLocal: false, isBrowsable: true, isInternal: false, isEjectable: true))
         #expect(!VolumeMonitor.isEjectableDrive(isLocal: true, isBrowsable: true, isInternal: true, isEjectable: false))
-        #expect(!VolumeMonitor.isEjectableDrive(isLocal: true, isBrowsable: false, isInternal: false, isEjectable: true))
+        #expect(
+            !VolumeMonitor.isEjectableDrive(isLocal: true, isBrowsable: false, isInternal: false, isEjectable: true))
     }
 
     @Test func hiddenAndMissingScreenshotFilesAreSkipped() throws {

@@ -1,263 +1,170 @@
 import SwiftUI
 
-/// The Settings window. Personal choices only.
+/// The Settings window: a sidebar of panes, and beside each pane's controls a live preview of the island.
+/// Personal choices only. What the island shows and where is a setting; how it looks is not.
 struct SettingsView: View {
     let settings: AppSettings
+    let features: IslandFeatures
 
-    var body: some View {
-        Form {
-            Section("General") {
-                Toggle("Launch at Login", isOn: Binding(
-                    get: { settings.launchAtLogin },
-                    set: { settings.setLaunchAtLogin($0) }
-                ))
-                Toggle("Quiet in Focus", isOn: Bindable(settings).quietDuringFocus)
-                Picker("Shortcut", selection: Bindable(settings).hotkey) {
-                    ForEach(HotkeyChoice.allCases) { Text($0.title).tag($0) }
-                }
-            }
-            Section {
-                Toggle("Calendar Events", isOn: Bindable(settings).showsCalendar)
-                Toggle("Due Reminders", isOn: Bindable(settings).showsReminders)
-                Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
-            } header: {
-                Text("Up Next")
-            } footer: {
-                Text("Meetings and due reminders show in Up Next on Home, and announce themselves as banners. The Reminders tab works either way. Outlook, Google, and Exchange calendars come from Internet Accounts.")
-            }
-            Section {
-                TextField("City", text: Bindable(settings).weatherCity, prompt: Text("Paris"))
-            } header: {
-                Text("Weather")
-            } footer: {
-                Text("Shown beside the tabs and in the idle peek. Weather comes from Open-Meteo, which is sent only the city name.")
-            }
-            TabSection(settings: settings, side: .left)
-            TabSection(settings: settings, side: .right)
-            HiddenTabsSection(settings: settings)
-            MenuBarSection(settings: settings)
-            SearchSection(settings: settings)
-            Section {
-                Toggle("Synced Lyrics", isOn: Bindable(settings).showsLyrics)
-            } header: {
-                Text("Media")
-            } footer: {
-                Text("Looks up lyrics on lrclib.net using the track\u{2019}s name, artist, album, and length.")
-            }
-            Section("Battery") {
-                Picker("Full Charge Alert", selection: Bindable(settings).fullChargeLevel) {
-                    ForEach(Array(stride(from: 80, through: 100, by: 5)), id: \.self) { Text("\($0)%").tag($0) }
-                }
-            }
-            Section {
-                Picker("Tools in the Row", selection: Bindable(settings).pinLimit) {
-                    ForEach(PinLimit.allCases) { Text("\($0.rawValue)").tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Tools")
-            } footer: {
-                Text("How many tools the Tools tab shows before More. Right-click a tool to pin it. Home\u{2019}s quick actions are the first four.")
-            }
-        }
-        .formStyle(.grouped)
-        // The form scrolls, and the window can be resized to whatever fits the screen.
-        .frame(minWidth: 420, idealWidth: 460, maxWidth: 640, minHeight: 320, idealHeight: 560, maxHeight: .infinity)
-        .onAppear { settings.refresh() }
+    @AppStorage("settings.pane") private var storedPane = SettingsPane.general.rawValue
+    /// Hidden, the window is all pane; the pane's own icon, where the hide button was, brings the sidebar back.
+    @State private var sidebarHidden = UserDefaults.standard.bool(forKey: SettingsView.sidebarHiddenKey)
+    @State private var searchText = ""
+    /// A section a search result pointed at, until the pane has scrolled to it.
+    @State private var scrollTarget: String?
+    @State private var preview: IslandPreviewModel?
+    @State private var editor: HomeEditor
+    @State private var tabEditor: TabEditor
+    @Environment(\.undoManager) private var undoManager
+
+    init(settings: AppSettings, features: IslandFeatures) {
+        self.settings = settings
+        self.features = features
+        _editor = State(initialValue: HomeEditor(settings: settings))
+        _tabEditor = State(initialValue: TabEditor(settings: settings))
     }
-}
 
-// MARK: Tabs
+    private var pane: SettingsPane { SettingsPane(rawValue: storedPane) ?? .general }
 
-/// One side of the notch: its tabs in order, each draggable to reorder or to move to another list, with an
-/// on/off switch. Turning one off moves it to Not Shown.
-private struct TabSection: View {
-    let settings: AppSettings
-    let side: AppSettings.TabSide
-
-    private var title: String { side == .left ? "Left of the Notch" : "Right of the Notch" }
+    /// The panes are laid out for this much width: a wider window centers them instead of stretching every row.
+    static let maxContentWidth: CGFloat = 900
+    /// Space above the first row, where the traffic lights float: the sidebar's search and the preview's switcher share the line
+    /// below it, and a pane with no preview leaves room for that line too.
+    static let chromeHeight: CGFloat = 40
+    static let rowHeight: CGFloat = 28
+    /// The sidebar is a quarter of the window, within these limits, so it grows and shrinks with it.
+    static func sidebarWidth(for windowWidth: CGFloat) -> CGFloat { min(max(windowWidth * 0.24, 190), 260) }
+    static let sidebarAnimation = Animation.smooth(duration: 0.42)
+    static let sidebarHiddenKey = "settings.sidebarHidden"
+    /// The narrowest the window goes: the preview is 560 wide and needs its margins, with or without the sidebar beside it.
+    static let minWidthWithSidebar: CGFloat = 830
+    static let minWidthWithoutSidebar: CGFloat = 640
 
     var body: some View {
-        let tabs = settings.tabs(on: side)
-        Section {
-            ForEach(tabs) { module in
-                TabRow(settings: settings, module: module)
+        GeometryReader { geometry in
+            let sidebarWidth = Self.sidebarWidth(for: geometry.size.width)
+            HStack(spacing: 0) {
+                // The sidebar is always there, and its width is what slides to nothing and back: a view that came and went would
+                // snap, and the panes beside it would jump to fill the space.
+                SettingsSidebar(
+                    selection: Binding(get: { pane }, set: { storedPane = $0.rawValue }), searchText: $searchText,
+                    hideSidebar: { setSidebar(hidden: true) }, onOpen: open
+                )
+                .padding(.top, Self.chromeHeight)
+                .frame(width: sidebarWidth)
+                .background(SidebarBackground().ignoresSafeArea())
+                .overlay(alignment: .trailing) { Divider().ignoresSafeArea() }
+                .frame(width: sidebarHidden ? 0 : sidebarWidth, alignment: .leading)
+                .clipped()
+                .opacity(sidebarHidden ? 0 : 1)
+                .allowsHitTesting(!sidebarHidden)
+                .accessibilityHidden(sidebarHidden)
+                .zIndex(1)
+                detail
             }
-            if settings.hasRoom(on: side) {
-                DropPlaceholder(text: "Drop a tab here") { module in
-                    settings.move(module, to: side)
-                }
-            }
-        } header: {
-            Text("\(title) (\(tabs.count) of \(side.capacity))")
-        } footer: {
-            Text(side == .left
-                ? "Up to \(Theme.Metrics.maxTabs) tabs. Drag a tab to reorder it, or onto another list."
-                : "One tab, beside Settings. It leaves room for the timer, and the New Note pencil and weather step aside when there isn\u{2019}t any.")
+            .animation(Self.sidebarAnimation, value: sidebarHidden)
         }
+        .ignoresSafeArea(.container, edges: .top)
+        .frame(
+            minWidth: sidebarHidden ? Self.minWidthWithoutSidebar : Self.minWidthWithSidebar, idealWidth: 900,
+            minHeight: 600, idealHeight: 760
+        )
+        .onAppear {
+            settings.refresh()
+            editor.undoManager = undoManager
+            editor.watchesMouseUp = true
+            takeRequestedSelection()
+            let model = IslandPreviewModel(live: features)
+            preview = model
+            tabEditor.preview = model
+            editor.previewModel = model
+            showPreview(for: pane)
+        }
+        .onDisappear {
+            preview?.stop()
+            preview = nil
+        }
+        .onChange(of: storedPane) { showPreview(for: pane) }
+        .onChange(of: sidebarHidden) { _, hidden in UserDefaults.standard.set(hidden, forKey: Self.sidebarHiddenKey) }
+        .onChange(of: settings.requestedHomeSelection) { takeRequestedSelection() }
     }
-}
 
-/// Modules that aren't tabs. Turning one on puts it on the left, or the right if the left is full.
-private struct HiddenTabsSection: View {
-    let settings: AppSettings
-
-    var body: some View {
-        Section {
-            ForEach(settings.hiddenModules) { module in
-                TabRow(settings: settings, module: module)
-            }
-            DropPlaceholder(text: "Drop a tab here to turn it off") { module in
-                settings.setEnabled(module, false)
-                return !settings.isInTabs(module)
-            }
-        } header: {
-            Text("Not Shown")
-        } footer: {
-            Text("These still open another way: the pencil beside the tabs opens Notes, dropping a file opens Shelf, and the command palette finds everything.")
-        }
-    }
-}
-
-private struct TabRow: View {
-    let settings: AppSettings
-    let module: IslandModule
-
-    private var side: AppSettings.TabSide? { settings.side(of: module) }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal")
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Label(module.title, systemImage: module.systemImage)
-                if side == nil, let hint = module.otherWayIn {
-                    Text(hint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 8)
-            Toggle("Show \(module.title)", isOn: Binding(
-                get: { side != nil },
-                set: { settings.setEnabled(module, $0) }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .disabled(side == nil ? !settings.canAddTab : settings.tabs.count <= 1)
-        }
-        .contentShape(Rectangle())
-        .draggable(module.rawValue)
-        // Dropping another tab on this row puts it just before this one, on this row's side.
-        .dropDestination(for: String.self) { items, _ in
-            guard let dragged = items.first.flatMap(IslandModule.init(rawValue:)) else { return false }
-            guard let side else { return settings.setEnabledReturning(dragged, false) }
-            return settings.move(dragged, to: side, before: module)
-        }
-        .contextMenu {
-            if let side {
-                Button("Move Up") { settings.nudge(module, by: -1) }
-                Button("Move Down") { settings.nudge(module, by: 1) }
-                Button(side == .left ? "Move to Right" : "Move to Left") {
-                    settings.move(module, to: side == .left ? .right : .left)
-                }
+    /// The pane: the preview with its switcher on the top line, then the controls; or, for a pane with no preview, just the controls
+    /// under that line. The Home editor's drags start in the preview or in Add Widgets and end in either, so both share one space,
+    /// and the widget being dragged is drawn over the whole pane.
+    private var detail: some View {
+        VStack(spacing: 0) {
+            if pane.previewContext != nil, let preview {
+                IslandPreview(
+                    model: preview, editor: pane == .home ? editor : nil, tabEditor: pane == .tabs ? tabEditor : nil)
                 Divider()
-                Button("Turn Off") { settings.setEnabled(module, false) }
             } else {
-                Button("Turn On") { settings.setEnabled(module, true) }
+                Color.clear.frame(height: Self.chromeHeight + Self.rowHeight + 8)
+            }
+            ScrollViewReader { proxy in
+                content
+                    .task(id: scrollTarget) { await scroll(to: scrollTarget, with: proxy) }
             }
         }
-        .accessibilityElement(children: .combine)
+        .padding(.top, pane.previewContext != nil && preview != nil ? Self.chromeHeight - 12 : 0)
+        .frame(maxWidth: Self.maxContentWidth)
+        .frame(maxWidth: .infinity)
+        .coordinateSpace(.named(HomeEditor.space))
+        .overlay { if pane == .home { HomeDragLayer(editor: editor) } }
+        .overlay(alignment: .topLeading) { if sidebarHidden { showSidebarButton } }
     }
-}
 
-/// The empty end of a list: where a dragged tab can be dropped to go last.
-private struct DropPlaceholder: View {
-    let text: String
-    let onDrop: (IslandModule) -> Bool
-
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity, minHeight: 22)
-            .contentShape(Rectangle())
-            .dropDestination(for: String.self) { items, _ in
-                guard let module = items.first.flatMap(IslandModule.init(rawValue:)) else { return false }
-                return onDrop(module)
-            }
+    /// With the sidebar hidden: the standard sidebar icon, on the line the hide button was on, brings it back.
+    private var showSidebarButton: some View {
+        SidebarToggleButton(systemImage: "sidebar.left", help: "Show Sidebar", action: { setSidebar(hidden: false) })
+            .frame(width: Self.rowHeight, height: Self.rowHeight)
+            .padding(.leading, 16)
+            .padding(.top, Self.chromeHeight)
+            .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .topLeading)))
     }
-}
 
-// MARK: Menu bar and search
-
-/// Put a module in the menu bar. None are there until you choose.
-private struct MenuBarSection: View {
-    let settings: AppSettings
-
-    var body: some View {
-        Section {
-            ForEach(IslandModule.allCases.filter(\.isAvailable)) { module in
-                Toggle(isOn: Binding(
-                    get: { settings.isInMenuBar(module) },
-                    set: { settings.setInMenuBar(module, $0) }
-                )) {
-                    Label(module.title, systemImage: module.systemImage)
-                }
-            }
-        } header: {
-            Text("Menu Bar")
-        } footer: {
-            Text("Each one adds an icon that opens the module. Drag its header away to pop it out into a window; Keep on Desktop puts that window just above the desktop icons. You can also right-click a tab.")
+    @ViewBuilder private var content: some View {
+        switch pane {
+        case .general: GeneralPane(settings: settings)
+        case .tabs: TabsPane(settings: settings, preview: preview)
+        case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
+        case .shelf: ShelfPane(settings: settings, preview: preview)
+        case .media: MediaPane(settings: settings)
+        case .tools: ToolsPane(settings: settings, preview: preview)
+        case .notifications: NotificationsPane(settings: settings, preview: preview)
+        case .privacy: PrivacyPane(settings: settings)
         }
     }
-}
 
-/// The command palette's web search: which engine it uses, and engines of your own.
-private struct SearchSection: View {
-    let settings: AppSettings
+    private func setSidebar(hidden: Bool) {
+        withAnimation(Self.sidebarAnimation) { sidebarHidden = hidden }
+    }
 
-    @State private var name = ""
-    @State private var keyword = ""
-    @State private var template = ""
+    /// A search result: go to its pane, and to its section.
+    private func open(_ entry: SettingsSearchEntry) {
+        storedPane = entry.pane.rawValue
+        searchText = ""
+        scrollTarget = entry.anchor
+    }
 
-    var body: some View {
-        Section {
-            Picker("Search With", selection: Bindable(settings).defaultSearchEngineID) {
-                ForEach(settings.searchEngines) { engine in
-                    Text("\(engine.name)  (\(engine.keyword))").tag(engine.id)
-                }
-            }
-            ForEach(settings.customEngines) { engine in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(engine.name)  (\(engine.keyword))")
-                        Text(engine.template)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Button("Remove", role: .destructive) { settings.removeCustomEngine(engine.id) }
-                        .buttonStyle(.borderless)
-                }
-            }
-            TextField("Name", text: $name, prompt: Text("Kagi"))
-            TextField("Keyword", text: $keyword, prompt: Text("k"))
-            TextField("Address", text: $template, prompt: Text("https://kagi.com/search?q=%s"))
-            Button("Add Search Engine") {
-                if settings.addCustomEngine(name: name, keyword: keyword, template: template) {
-                    name = ""
-                    keyword = ""
-                    template = ""
-                }
-            }
-            .disabled(name.isEmpty || keyword.isEmpty || !SearchEngine.isValid(template: template))
-        } header: {
-            Text("Command Palette Search")
-        } footer: {
-            Text("Press \u{2303}\u{2325}K, then type a keyword and a search, like \u{201C}yt swift\u{201D}. Use %s in an address where the search goes. Type \u{201C}tr hello\u{201D} to translate, or \u{201C}tr es hello\u{201D} to pick the language.")
-        }
+    /// Scrolls a pane to a section once the pane is on screen.
+    private func scroll(to anchor: String?, with proxy: ScrollViewProxy) async {
+        guard let anchor else { return }
+        try? await Task.sleep(for: .milliseconds(150))
+        withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(anchor, anchor: .top) }
+        scrollTarget = nil
+    }
+
+    /// Right-click, Edit Home\u{2026} in the island: select that widget.
+    private func takeRequestedSelection() {
+        guard let id = settings.requestedHomeSelection else { return }
+        editor.selection = id
+        settings.requestedHomeSelection = nil
+    }
+
+    private func showPreview(for pane: SettingsPane) {
+        // Menu Bar is a view of the preview only where its icons are chosen.
+        preview?.allowsMenuBar = pane == .tabs
+        if let context = pane.previewContext { preview?.show(context) }
     }
 }

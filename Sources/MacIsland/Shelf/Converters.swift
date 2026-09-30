@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import ImageIO
 import PDFKit
 import UniformTypeIdentifiers
@@ -135,18 +135,23 @@ enum Converters {
             throw FileToolError.unreadable
         }
         if format == .pdf {
-            guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else { throw FileToolError.unreadable }
+            guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else {
+                throw FileToolError.unreadable
+            }
             let document = PDFDocument()
             document.insert(page, at: 0)
             guard document.write(to: destination) else { throw FileToolError.failed("The PDF could not be saved.") }
             return destination
         }
         guard format.isAvailable,
-            let output = CGImageDestinationCreateWithURL(destination as CFURL, format.type.identifier as CFString, 1, nil)
+            let output = CGImageDestinationCreateWithURL(
+                destination as CFURL, format.type.identifier as CFString, 1, nil)
         else { throw FileToolError.failed("\(format.rawValue) isn\u{2019}t supported on this Mac.") }
         // Carries over orientation and metadata, and drops nothing but the container.
         CGImageDestinationAddImageFromSource(output, source, 0, nil)
-        guard CGImageDestinationFinalize(output) else { throw FileToolError.failed("The image could not be converted.") }
+        guard CGImageDestinationFinalize(output) else {
+            throw FileToolError.failed("The image could not be converted.")
+        }
         return destination
     }
 
@@ -178,7 +183,8 @@ enum Converters {
     /// A JPEG at quality 0.7, flattened onto white so transparency doesn't turn black.
     nonisolated static func compress(_ url: URL, destination: URL) throws -> URL {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-            let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
+            let image = CGImageSourceCreateImageAtIndex(
+                source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
         else { throw FileToolError.unreadable }
         let flattened = flatten(image) ?? image
         try write(flattened, type: UTType.jpeg.identifier, quality: 0.7, to: destination)
@@ -186,10 +192,12 @@ enum Converters {
     }
 
     private nonisolated static func flatten(_ image: CGImage) -> CGImage? {
-        guard let context = CGContext(
-            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )
+        else { return nil }
         let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(rect)
@@ -218,7 +226,9 @@ enum Converters {
                     if let page = document.page(at: index) { combined.insert(page, at: combined.pageCount) }
                 }
             case .image:
-                guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else { throw FileToolError.unreadable }
+                guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else {
+                    throw FileToolError.unreadable
+                }
                 combined.insert(page, at: combined.pageCount)
             default:
                 continue
@@ -251,7 +261,9 @@ enum Converters {
             for index in 0..<document.pageCount {
                 guard let page = document.page(at: index), let image = render(page, scale: 2) else { continue }
                 let name = "Page " + String(format: "%0\(digits)d", index + 1) + "." + target.fileExtension
-                try write(image, type: target.type.identifier, quality: target == .jpeg ? 0.9 : nil, to: destination.appendingPathComponent(name))
+                try write(
+                    image, type: target.type.identifier, quality: target == .jpeg ? 0.9 : nil,
+                    to: destination.appendingPathComponent(name))
             }
             return destination
         default:
@@ -262,10 +274,13 @@ enum Converters {
     /// A page drawn onto white at `scale` times its size.
     nonisolated static func render(_ page: PDFPage, scale: CGFloat) -> CGImage? {
         let box = page.bounds(for: .mediaBox)
-        guard box.width > 0, box.height > 0, let context = CGContext(
-            data: nil, width: Int(box.width * scale), height: Int(box.height * scale), bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ) else { return nil }
+        guard box.width > 0, box.height > 0,
+            let context = CGContext(
+                data: nil, width: Int(box.width * scale), height: Int(box.height * scale), bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )
+        else { return nil }
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: context.width, height: context.height))
         context.scaleBy(x: scale, y: scale)
@@ -307,16 +322,26 @@ enum Converters {
         }
     }
 
-    nonisolated static func writeDocument(_ text: NSAttributedString, as target: ConversionTarget, to destination: URL) throws {
+    nonisolated static func writeDocument(_ text: NSAttributedString, as target: ConversionTarget, to destination: URL)
+        throws
+    {
         let range = NSRange(location: 0, length: text.length)
         let data: Data?
         do {
             switch target {
             case .txt: data = text.string.data(using: .utf8)
-            case .docx: data = try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
-            case .rtf: data = try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
-            case .html: data = try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html])
-            case .odt: data = try text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.openDocument])
+            case .docx:
+                data = try text.data(
+                    from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
+            case .rtf:
+                data = try text.data(
+                    from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+            case .html:
+                data = try text.data(
+                    from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html])
+            case .odt:
+                data = try text.data(
+                    from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.openDocument])
             default: throw FileToolError.failed("\(target.rawValue) isn\u{2019}t supported for a document.")
             }
             guard let data else { throw FileToolError.failed("The document could not be converted.") }
@@ -380,7 +405,9 @@ enum Converters {
 
     static func export(_ url: URL, preset: String, as type: AVFileType, to destination: URL) async throws -> URL {
         let asset = AVURLAsset(url: url)
-        guard let session = AVAssetExportSession(asset: asset, presetName: preset) else { throw FileToolError.unreadable }
+        guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
+            throw FileToolError.unreadable
+        }
         do {
             try await session.export(to: destination, as: type)
         } catch {
@@ -405,10 +432,14 @@ enum Converters {
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance
 
-        guard let output = CGImageDestinationCreateWithURL(destination as CFURL, UTType.gif.identifier as CFString, count, nil) else {
+        guard
+            let output = CGImageDestinationCreateWithURL(
+                destination as CFURL, UTType.gif.identifier as CFString, count, nil)
+        else {
             throw FileToolError.failed("The GIF could not be saved.")
         }
-        CGImageDestinationSetProperties(output, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        CGImageDestinationSetProperties(
+            output, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
         let frame = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1 / frameRate]] as CFDictionary
 
         // A frame that can't be read repeats the one before it, so the count still adds up.
@@ -450,7 +481,8 @@ enum MarkdownText {
                     result.append(NSAttributedString(string: listItem && previousWasListItem ? "\n" : "\n\n"))
                 }
                 if let prefix = listPrefix(components) {
-                    result.append(NSAttributedString(string: prefix, attributes: [.font: NSFont.systemFont(ofSize: 13)]))
+                    result.append(
+                        NSAttributedString(string: prefix, attributes: [.font: NSFont.systemFont(ofSize: 13)]))
                 }
                 currentBlock = block
                 previousWasListItem = listItem
@@ -470,7 +502,9 @@ enum MarkdownText {
         return ordered ? "\(ordinal). " : "\u{2022} "
     }
 
-    private nonisolated static func font(for run: AttributedString.Runs.Run, components: [PresentationIntent.IntentType]) -> NSFont {
+    private nonisolated static func font(
+        for run: AttributedString.Runs.Run, components: [PresentationIntent.IntentType]
+    ) -> NSFont {
         var size: CGFloat = 13
         var bold = false
         for component in components {
@@ -480,10 +514,14 @@ enum MarkdownText {
             }
         }
         let inline = run.inlinePresentationIntent ?? []
-        if inline.contains(.code) || components.contains(where: { if case .codeBlock = $0.kind { true } else { false } }) {
-            return NSFont.monospacedSystemFont(ofSize: 12, weight: bold || inline.contains(.stronglyEmphasized) ? .bold : .regular)
+        if inline.contains(.code)
+            || components.contains(where: { if case .codeBlock = $0.kind { true } else { false } })
+        {
+            return NSFont.monospacedSystemFont(
+                ofSize: 12, weight: bold || inline.contains(.stronglyEmphasized) ? .bold : .regular)
         }
-        var font = NSFont.systemFont(ofSize: size, weight: bold || inline.contains(.stronglyEmphasized) ? .bold : .regular)
+        var font = NSFont.systemFont(
+            ofSize: size, weight: bold || inline.contains(.stronglyEmphasized) ? .bold : .regular)
         if inline.contains(.emphasized) {
             font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
         }

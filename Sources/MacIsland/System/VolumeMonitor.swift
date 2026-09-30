@@ -29,7 +29,9 @@ final class VolumeMonitor {
     }
 
     /// Only local, browsable drives that can be ejected: not the startup disk, network shares, or hidden volumes.
-    nonisolated static func isEjectableDrive(isLocal: Bool, isBrowsable: Bool, isInternal: Bool, isEjectable: Bool) -> Bool {
+    nonisolated static func isEjectableDrive(isLocal: Bool, isBrowsable: Bool, isInternal: Bool, isEjectable: Bool)
+        -> Bool
+    {
         isLocal && isBrowsable && !isInternal && isEjectable
     }
 
@@ -39,12 +41,12 @@ final class VolumeMonitor {
             .volumeIsEjectableKey, .volumeTotalCapacityKey,
         ]
         guard let values = try? url.resourceValues(forKeys: keys),
-              isEjectableDrive(
-                  isLocal: values.volumeIsLocal ?? false,
-                  isBrowsable: values.volumeIsBrowsable ?? false,
-                  isInternal: values.volumeIsInternal ?? true,
-                  isEjectable: values.volumeIsEjectable ?? false
-              )
+            isEjectableDrive(
+                isLocal: values.volumeIsLocal ?? false,
+                isBrowsable: values.volumeIsBrowsable ?? false,
+                isInternal: values.volumeIsInternal ?? true,
+                isEjectable: values.volumeIsEjectable ?? false
+            )
         else { return nil }
         return Volume(
             url: url,

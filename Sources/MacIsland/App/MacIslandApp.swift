@@ -8,13 +8,11 @@ struct MacIslandApp: App {
 
     var body: some Scene {
         MenuBarExtra("MacIsland", systemImage: "capsule.fill") {
-            Button("Command Palette") { appDelegate.palette.toggle() }
-            SettingsLink { Text("Settings…") }
+            Button("Settings…") { SettingsWindowController.shared.show() }
                 .keyboardShortcut(",")
             Button("Quit MacIsland") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
-        Settings { SettingsView(settings: appDelegate.features.settings) }
         // Modules the person put in the menu bar. None are there until they choose.
         ModuleMenuBars(viewModel: appDelegate.viewModel, panels: appDelegate.panels)
     }
@@ -35,7 +33,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             timer: TimerModel(),
             stopwatch: StopwatchModel(),
             keepAwake: KeepAwake(),
-            lowPower: LowPowerMode(),
             ringLight: RingLight(),
             micMute: MicrophoneMute(),
             privacy: PrivacyMonitor(),
@@ -51,20 +48,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fileTools: FileTools(shelf: shelf, work: work),
             notes: notes,
             keyboardCleaner: KeyboardCleaner(),
-        launch: LaunchModel(),
-            rates: ExchangeRates(),
             bluetooth: BluetoothDevices(provider: IOBluetoothProvider(), work: work),
             mirror: CameraMirror(provider: AVCameraProvider()),
             screenRecorder: ScreenRecorder(recorder: SCKScreenRecorder(), shelf: shelf),
-            voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf)
+            voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf),
+            widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher())
         )
     }
 
     lazy var viewModel = IslandViewModel(features: features)
     lazy var panels = FloatingPanels(viewModel: viewModel)
-    lazy var palette = PaletteController(viewModel: viewModel)
-    lazy var urlCommands = URLCommandRunner(viewModel: viewModel) { [palette] in palette.show() }
-    private let paletteHotkey = GlobalHotkey(id: 2)
+    lazy var urlCommands = URLCommandRunner(viewModel: viewModel)
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
@@ -78,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Also covers `swift run`, where there's no Info.plist to set LSUIElement.
         NSApp.setActivationPolicy(.accessory)
+        SettingsWindowController.shared.features = features
 
         // Quit normally on SIGTERM (e.g. `pkill`) so the adapter subprocess gets stopped.
         signal(SIGTERM, SIG_IGN)
@@ -87,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sigtermSource = sigterm
 
         connectEvents()
+        features.settings.onDisplayChange = { [weak self] in self?.layout() }
 
         let panel = IslandPanel(rootView: IslandView(viewModel: viewModel))
         self.panel = panel
@@ -120,68 +116,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let features = features
 
         features.timer.onFinish = {
-            viewModel.flash(IslandAlert(
-                systemImage: "bell.fill", tint: Theme.Tint.clock, text: "Done", staysUntilSeen: true, opensTab: .clock
-            ))
+            viewModel.flash(
+                IslandAlert(
+                    systemImage: "bell.fill", tint: Theme.Tint.clock, text: "Done", staysUntilSeen: true,
+                    opensTab: .clock
+                ))
         }
 
         features.pomodoro.onPhaseEnd = { finished, next in
             let isBreak = next != .focus
-            viewModel.flash(IslandAlert(
-                systemImage: isBreak ? "cup.and.saucer.fill" : "brain.head.profile",
-                tint: Theme.Tint.clock,
-                text: finished == .longBreak ? "Done" : next.title,
-                staysUntilSeen: true,
-                opensTab: .clock
-            ))
+            viewModel.flash(
+                IslandAlert(
+                    systemImage: isBreak ? "cup.and.saucer.fill" : "brain.head.profile",
+                    tint: Theme.Tint.clock,
+                    text: finished == .longBreak ? "Done" : next.title,
+                    staysUntilSeen: true,
+                    opensTab: .clock
+                ))
         }
 
         batteryMonitor.onEvent = { event in
             switch event {
             case .charging(let percent):
-                viewModel.flash(IslandAlert(
-                    systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "\(percent)%", isCharging: true
-                ))
+                viewModel.flash(Announcements.charging(percent: percent), event: .charging)
             case .full(let percent):
-                viewModel.flash(IslandAlert(
-                    systemImage: "battery.100percent", tint: Theme.Tint.positive, text: "\(percent)%"
-                ))
+                viewModel.flash(Announcements.fullCharge(percent: percent), event: .fullCharge)
             case .low(let percent):
-                let lowPower = features.lowPower
-                viewModel.showBanner(
-                    IslandBanner(
-                        systemImage: "battery.25percent",
-                        tint: Theme.Tint.attention,
-                        title: "Low Battery",
-                        detail: "\(percent)% remaining",
-                        actions: lowPower.isOn ? [] : [.init(title: "Low Power Mode") { lowPower.toggle() }]
-                    ),
-                    for: .seconds(6),
-                    followUp: IslandAlert(
-                        systemImage: "battery.25percent", tint: Theme.Tint.attention, text: "\(percent)%",
-                        staysUntilSeen: true, opensTab: .tools
-                    )
-                )
+                let low = Announcements.lowBattery(percent: percent)
+                viewModel.showBanner(low.banner, for: .seconds(6), followUp: low.followUp, event: .lowBattery)
             }
         }
 
         batteryMonitor.fullChargeLevel = { features.settings.fullChargeLevel }
 
         accessoryMonitor.onConnect = { accessory in
-            viewModel.showBanner(IslandBanner(
-                systemImage: accessory.systemImage,
-                tint: Theme.Tint.neutral,
-                title: accessory.name,
-                detail: accessory.batterySummary ?? "Connected"
-            ))
+            viewModel.showBanner(Announcements.headphones(accessory), event: .headphones)
         }
 
         features.network.onHotspotConnect = {
-            viewModel.flash(IslandAlert(systemImage: "personalhotspot", tint: Theme.Tint.positive, text: "Hotspot"))
+            viewModel.flash(Announcements.hotspot, event: .hotspot)
         }
 
         features.transfers.onFinish = { [diskSpace] _ in
-            viewModel.flash(IslandAlert(systemImage: "arrow.down.circle.fill", tint: Theme.Tint.positive, text: "Saved"))
+            viewModel.flash(Announcements.downloadSaved, event: .download)
             diskSpace.check()
         }
 
@@ -191,10 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [diskSpace] _ in
             MainActor.assumeIsolated {
-                viewModel.flash(
-                    IslandAlert(systemImage: "touchid", tint: Theme.Tint.positive, text: "Unlocked"),
-                    for: .seconds(2)
-                )
+                viewModel.flash(Announcements.unlocked, for: .seconds(2), event: .unlocked)
                 diskSpace.check()
             }
         }
@@ -217,9 +191,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.privacy.start()
         features.transfers.start()
         features.network.start()
-        features.clipboard.start()
         volumeMonitor.start()
-        screenshotWatcher.start()
+        connectShelfChoices()
+    }
+
+    /// The Shelf's own settings: what is swept, whether screenshots arrive, and whether the clipboard is watched.
+    /// Each starts or stops its watcher, so a choice that turns something off also stops what it costs.
+    private func connectShelfChoices() {
+        let features = features
+        viewModel.sweepShelf()
+
+        let applyClipboard = {
+            features.clipboard.setCapacity(features.settings.clipboardLimit)
+        }
+        features.settings.onClipboardChange = applyClipboard
+        applyClipboard()
+
+        let applyScreenshots = { [screenshotWatcher] in
+            if features.settings.addsScreenshots {
+                screenshotWatcher.start()
+            } else {
+                screenshotWatcher.stop()
+            }
+        }
+        features.settings.onScreenshotsChange = applyScreenshots
+        applyScreenshots()
     }
 
     /// Screen recordings and voice notes: what they leave behind, and what to do when they can't start.
@@ -228,7 +224,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let features = features
 
         features.screenRecorder.onFinish = { _ in
-            viewModel.flash(IslandAlert(systemImage: "record.circle.fill", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+            viewModel.flash(
+                IslandAlert(systemImage: "record.circle.fill", tint: Theme.Tint.positive, text: "Saved"),
+                respectingFocus: false)
         }
         features.screenRecorder.onNeedsAccess = {
             viewModel.showBanner(
@@ -246,7 +244,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.screenRecorder.onFail = { reason in
             viewModel.showBanner(
                 IslandBanner(
-                    systemImage: "record.circle", tint: Theme.Tint.attention, title: "Couldn\u{2019}t Record", detail: reason
+                    systemImage: "record.circle", tint: Theme.Tint.attention, title: "Couldn\u{2019}t Record",
+                    detail: reason
                 ),
                 for: .seconds(6),
                 respectingFocus: false
@@ -254,7 +253,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         features.voice.onSaved = {
-            viewModel.flash(IslandAlert(systemImage: "waveform", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+            viewModel.flash(
+                IslandAlert(systemImage: "waveform", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
         }
         features.voice.onFail = { error in
             let denied = (error as? VoiceError) == .microphoneDenied
@@ -276,21 +276,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectDevices() {
         let viewModel = viewModel
         diskSpace.onLow = { free in
+            let low = Announcements.lowDisk(free: free)
             viewModel.showBanner(
-                IslandBanner(
-                    systemImage: "internaldrive.fill",
-                    tint: Theme.Tint.attention,
-                    title: "Low Disk Space",
-                    detail: DiskSpace.description(free: free),
-                    actions: [.init(title: "Open Storage") { DiskSpace.openStorageSettings() }]
-                ),
-                for: .seconds(6),
-                followUp: IslandAlert(
-                    systemImage: "internaldrive.fill", tint: Theme.Tint.attention,
-                    text: ByteCountFormatter.string(fromByteCount: free, countStyle: .file), staysUntilSeen: true
-                ),
-                respectingFocus: false
-            )
+                low.banner, for: .seconds(6), followUp: low.followUp, respectingFocus: false, event: .lowDisk)
         }
         features.bluetooth.onFailure = { _ in
             viewModel.flash(BluetoothDevices.failureAlert(), respectingFocus: false)
@@ -302,15 +290,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let features = features
         let apply = { features.weather.configure(city: features.settings.weatherCity) }
         features.weather.onRainSoon = { [viewModel] start in
-            viewModel.showBanner(
-                IslandBanner(
-                    systemImage: "cloud.rain.fill",
-                    tint: Theme.Tint.neutral,
-                    title: "Rain Soon",
-                    detail: "Starts around \(start.formatted(date: .omitted, time: .shortened))"
-                ),
-                for: .seconds(6)
-            )
+            viewModel.showBanner(Announcements.rainSoon(start: start), for: .seconds(6), event: .rainSoon)
         }
         features.settings.onWeatherChange = apply
         apply()
@@ -332,22 +312,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shelf = features.shelf
 
         volumeMonitor.onMount = { volume in
-            viewModel.showBanner(
-                IslandBanner(
-                    systemImage: "externaldrive.fill",
-                    tint: Theme.Tint.neutral,
-                    title: volume.name,
-                    detail: volume.detail,
-                    actions: [.init(title: "Eject") {
-                        // Off the main thread, and reported after the banner has dismissed itself.
-                        Task.detached {
-                            let reason = VolumeMonitor.eject(volume)
-                            await MainActor.run { Self.reportEject(of: volume, failure: reason, on: viewModel) }
-                        }
-                    }]
-                ),
-                for: .seconds(8)
-            )
+            let banner = Announcements.drive(volume) {
+                // Off the main thread, and reported after the banner has dismissed itself.
+                Task.detached {
+                    let reason = VolumeMonitor.eject(volume)
+                    await MainActor.run { Self.reportEject(of: volume, failure: reason, on: viewModel) }
+                }
+            }
+            viewModel.showBanner(banner, for: .seconds(8), event: .drive)
         }
 
         features.fileTools.onDone = { [diskSpace] word in
@@ -402,12 +374,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.agenda.onAnnounce = { item in
             viewModel.showBanner(
                 AgendaAction.announcement(for: item, agenda: features.agenda) { viewModel.startMirror() },
-                for: .seconds(8)
+                for: .seconds(8), event: item.kind == .event ? .meeting : .reminderDue
             )
         }
 
         let applyAgenda = {
-            features.agenda.configure(calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders)
+            features.agenda.configure(
+                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders)
         }
         features.settings.onAgendaChange = applyAgenda
         applyAgenda()
@@ -421,15 +394,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyQuiet()
     }
 
-    /// The command palette on Control-Option-K, and windows torn off the island.
+    /// Windows torn off the island, and opening Settings from it.
     private func connectReach() {
         viewModel.onOpenWindow = { [panels] module in panels.open(module) }
-        palette.onOpenSettings = {
-            NSApp.activate()
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        viewModel.onOpenSettings = { [settings = features.settings] pane, selection in
+            UserDefaults.standard.set(pane.rawValue, forKey: "settings.pane")
+            settings.requestedHomeSelection = selection
+            SettingsWindowController.shared.show()
         }
-        paletteHotkey.onPress = { [palette] in palette.toggle() }
-        paletteHotkey.register(keyCode: UInt32(kVK_ANSI_K), modifiers: UInt32(controlKey | optionKey))
+    }
+
+    /// Registers the global shortcut, and lets Settings change it: a key another app already owns is refused there,
+    /// and the old one stays.
+    private func registerShortcuts() {
+        let settings = features.settings
+        let keys: [ShortcutSlot: GlobalHotkey] = [.open: hotkey]
+        func apply(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
+            guard let key = keys[slot] else { return false }
+            guard let combo else {
+                key.unregister()
+                return true
+            }
+            if key.register(keyCode: combo.keyCode, modifiers: combo.modifiers) { return true }
+            // Taken: put the old one back.
+            if let old = settings.shortcut(slot) { key.register(keyCode: old.keyCode, modifiers: old.modifiers) }
+            return false
+        }
+        settings.shortcutRegistrar = apply
+        for slot in ShortcutSlot.allCases { _ = apply(slot, settings.shortcut(slot)) }
     }
 
     /// Control-Option-Space opens the island and gives it the keyboard: Esc closes, arrows switch tabs.
@@ -439,15 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             viewModel.toggleFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }
-        let apply: (HotkeyChoice) -> Void = { [hotkey] choice in
-            if let combo = choice.keyCombo {
-                hotkey.register(keyCode: combo.keyCode, modifiers: combo.modifiers)
-            } else {
-                hotkey.unregister()
-            }
-        }
-        features.settings.onHotkeyChange = apply
-        apply(features.settings.hotkey)
+        registerShortcuts()
 
         viewModel.onWantsKeyboard = { [weak panel] in panel?.makeKey() }
         panel.keyHandler = { keyCode in
@@ -464,7 +448,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func layout() {
         guard let panel else { return }
-        let geometry = ScreenGeometry.current()
+        let geometry = ScreenGeometry.current(display: features.settings.islandDisplay)
         viewModel.geometry = geometry
         panel.setFrame(geometry.panelFrame, display: true)
     }
@@ -535,7 +519,8 @@ struct MenuBarModuleView: View {
             )
 
             ModuleContent(module: module, viewModel: viewModel)
-                .frame(width: Theme.Metrics.detachedWidth, height: viewModel.contentHeight(for: module), alignment: .top)
+                .frame(
+                    width: Theme.Metrics.detachedWidth, height: viewModel.contentHeight(for: module), alignment: .top)
         }
         .padding(Theme.Metrics.floatPadding)
         // The menu-bar window brings its own material; ink follows the system appearance.

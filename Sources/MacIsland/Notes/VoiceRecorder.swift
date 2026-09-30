@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import Observation
 import Speech
 
@@ -183,12 +183,14 @@ final class SpeechVoiceTranscriber: Transcribing {
 
         let inputNode = engine.inputNode
         let micFormat = inputNode.outputFormat(forBus: 0)
-        let audio = try AVAudioFile(forWriting: file, settings: [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: micFormat.sampleRate,
-            AVNumberOfChannelsKey: micFormat.channelCount,
-            AVEncoderBitRateKey: 64_000,
-        ])
+        let audio = try AVAudioFile(
+            forWriting: file,
+            settings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: micFormat.sampleRate,
+                AVNumberOfChannelsKey: micFormat.channelCount,
+                AVEncoderBitRateKey: 64_000,
+            ])
         let converter = AVAudioConverter(from: micFormat, to: format)
         let meter = meter
         meter.reset()

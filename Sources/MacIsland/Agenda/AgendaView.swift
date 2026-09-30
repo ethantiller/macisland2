@@ -81,7 +81,9 @@ extension AgendaAction {
         for item: AgendaItem, agenda: AgendaMonitor, now: Date = Date(), checkCamera: @escaping @MainActor () -> Void
     ) -> IslandBanner {
         let isEvent = item.kind == .event
-        var actions = AgendaAction(item: item, agenda: agenda).map { [IslandBanner.Action(title: $0.title, perform: $0.perform)] } ?? []
+        var actions =
+            AgendaAction(item: item, agenda: agenda).map { [IslandBanner.Action(title: $0.title, perform: $0.perform)] }
+            ?? []
         if isEvent, item.joinURL != nil {
             actions.append(.init(title: "Check Camera", perform: checkCamera))
         }

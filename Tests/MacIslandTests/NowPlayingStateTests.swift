@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 struct NowPlayingStreamParserTests {
@@ -7,11 +8,13 @@ struct NowPlayingStreamParserTests {
 
     @Test func fullSnapshotReplacesState() throws {
         var parser = NowPlayingStreamParser()
-        let result = parser.consume(line: line("""
-        {"type":"data","diff":false,"payload":{"title":"Song","artist":"Band","album":"LP",
-        "playing":true,"playbackRate":1,"durationMicros":180000000,"elapsedTimeMicros":30000000,
-        "timestampEpochMicros":1700000000000000,"bundleIdentifier":"com.spotify.client"}}
-        """))
+        let result = parser.consume(
+            line: line(
+                """
+                {"type":"data","diff":false,"payload":{"title":"Song","artist":"Band","album":"LP",
+                "playing":true,"playbackRate":1,"durationMicros":180000000,"elapsedTimeMicros":30000000,
+                "timestampEpochMicros":1700000000000000,"bundleIdentifier":"com.spotify.client"}}
+                """))
         let state = try #require(result)
 
         #expect(state.title == "Song")
@@ -25,12 +28,16 @@ struct NowPlayingStreamParserTests {
 
     @Test func diffMergesAndNullRemovesKeys() throws {
         var parser = NowPlayingStreamParser()
-        _ = parser.consume(line: line("""
-        {"type":"data","diff":false,"payload":{"title":"Song","artist":"Band","playing":true}}
-        """))
-        let result = parser.consume(line: line("""
-        {"type":"data","diff":true,"payload":{"playing":false,"artist":null}}
-        """))
+        _ = parser.consume(
+            line: line(
+                """
+                {"type":"data","diff":false,"payload":{"title":"Song","artist":"Band","playing":true}}
+                """))
+        let result = parser.consume(
+            line: line(
+                """
+                {"type":"data","diff":true,"payload":{"playing":false,"artist":null}}
+                """))
         let state = try #require(result)
 
         #expect(state.title == "Song")

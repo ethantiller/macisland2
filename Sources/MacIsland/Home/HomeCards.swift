@@ -45,9 +45,11 @@ struct UpNextLabel: View {
                         Text(item.title)
                             .font(Theme.Typography.bodyEmphasized)
                             .foregroundStyle(Theme.Palette.primary)
-                        Text(AgendaRules.timeText(for: item, now: context.date) + (item.joinURL == nil ? "" : " · Join"))
-                            .font(Theme.Typography.numeral)
-                            .foregroundStyle(Theme.Palette.secondary)
+                        Text(
+                            AgendaRules.timeText(for: item, now: context.date) + (item.joinURL == nil ? "" : " · Join")
+                        )
+                        .font(Theme.Typography.numeral)
+                        .foregroundStyle(Theme.Palette.secondary)
                     }
                     .lineLimit(1)
                 }
@@ -125,8 +127,17 @@ struct QuickTimerChips: View {
             } else if viewModel.stopwatch.isActive {
                 running(CompactStopwatchText(stopwatch: viewModel.stopwatch), mode: .stopwatch)
             } else {
-                ChipButton(title: "5m", accessibilityLabel: "Start 5 Minute Timer") { viewModel.timer.start(minutes: 5) }
-                ChipButton(title: "25m", accessibilityLabel: "Start 25 Minute Timer") { viewModel.timer.start(minutes: 25) }
+                if !showsPomodoro {
+                    ChipButton(title: "1m", accessibilityLabel: "Start 1 Minute Timer") {
+                        viewModel.timer.start(minutes: 1)
+                    }
+                }
+                ChipButton(title: "5m", accessibilityLabel: "Start 5 Minute Timer") {
+                    viewModel.timer.start(minutes: 5)
+                }
+                ChipButton(title: "25m", accessibilityLabel: "Start 25 Minute Timer") {
+                    viewModel.timer.start(minutes: 25)
+                }
                 if showsPomodoro {
                     ChipButton(title: "Pomodoro", systemImage: "brain.head.profile") { viewModel.pomodoro.toggle() }
                 }
@@ -136,7 +147,9 @@ struct QuickTimerChips: View {
 
     /// A running clock, shown as its time. Opens the Clock tab.
     private func running<Content: View>(_ time: Content, mode: ClockMode) -> some View {
-        Button { viewModel.openClock(mode) } label: {
+        Button {
+            viewModel.openClock(mode)
+        } label: {
             time
                 .padding(.horizontal, 10)
                 .frame(minHeight: 24)
@@ -155,10 +168,12 @@ struct MacBatteryGlance: View {
 
     var body: some View {
         if let reading {
-            Label("\(reading.percent)%", systemImage: BatteryMonitor.symbol(percent: reading.percent, onAC: reading.onAC))
-                .font(Theme.Typography.compactNumeral)
-                .foregroundStyle(Theme.Palette.primary)
-                .accessibilityLabel("Battery \(reading.percent) percent\(reading.onAC ? ", charging" : "")")
+            Label(
+                "\(reading.percent)%", systemImage: BatteryMonitor.symbol(percent: reading.percent, onAC: reading.onAC)
+            )
+            .font(Theme.Typography.compactNumeral)
+            .foregroundStyle(Theme.Palette.primary)
+            .accessibilityLabel("Battery \(reading.percent) percent\(reading.onAC ? ", charging" : "")")
         }
     }
 }

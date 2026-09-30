@@ -20,7 +20,8 @@ enum RainRule {
     /// When the coming rain starts, or `nil` if it is raining already or none is due within half an hour.
     nonisolated static func start(samples: [RainSample], now: Date) -> Date? {
         guard !isWet(samples: samples, now: now) else { return nil }
-        return samples
+        return
+            samples
             .filter { $0.time > now && $0.time <= now.addingTimeInterval(lookahead) && $0.millimeters >= threshold }
             .map(\.time)
             .min()

@@ -7,15 +7,17 @@ enum ArtworkAccent {
 
     static func color(from image: NSImage) -> NSColor? {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
+            let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
         else { return nil }
 
         let side = 12
         var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        guard let context = CGContext(
-            data: &pixels, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-            space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: &pixels, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
         context.interpolationQuality = .medium
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
 
@@ -53,6 +55,7 @@ enum ArtworkAccent {
         func linear(_ c: CGFloat) -> CGFloat {
             c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
         }
-        return 0.2126 * linear(srgb.redComponent) + 0.7152 * linear(srgb.greenComponent) + 0.0722 * linear(srgb.blueComponent)
+        return 0.2126 * linear(srgb.redComponent) + 0.7152 * linear(srgb.greenComponent) + 0.0722
+            * linear(srgb.blueComponent)
     }
 }

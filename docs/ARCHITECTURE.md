@@ -3,11 +3,11 @@
 How MacIsland works. Back to the [README](../README.md). What it does: [FEATURES.md](FEATURES.md). Every file:
 [SCRIPTS.md](SCRIPTS.md#source-map). The design rules: [../DESIGN.md](../DESIGN.md).
 
-**Contents:** [The shape of the app](#the-shape-of-the-app) · [Startup](#startup) · [The panel and input](#the-panel-and-input) ·
-[State: the view model](#state-the-view-model) · [Presentations](#presentations) · [Activities](#activities-what-is-live) ·
-[Drawing](#drawing-container-surfaces-motion) · [Modules](#modules-and-the-tab-strip) · [Floating surfaces](#floating-surfaces) ·
-[The palette](#the-command-palette) · [Data and events](#data-and-events) · [Storage](#storage) ·
-[Permissions, network, and external commands](#permissions-network-and-external-commands) · [Testing](#testing) ·
+**Contents:** [The shape of the app](#the-shape-of-the-app) Â· [Startup](#startup) Â· [The panel and input](#the-panel-and-input) Â·
+[State: the view model](#state-the-view-model) Â· [Presentations](#presentations) Â· [Activities](#activities-what-is-live) Â·
+[Drawing](#drawing-container-surfaces-motion) Â· [Modules](#modules-and-the-tab-strip) Â· [Floating surfaces](#floating-surfaces) Â·
+[Data and events](#data-and-events) Â· [Storage](#storage) Â·
+[Permissions, network, and external commands](#permissions-network-and-external-commands) Â· [Testing](#testing) Â·
 [Gotchas and lessons](#gotchas-and-lessons)
 
 ---
@@ -32,7 +32,7 @@ flowchart LR
         T["Theme"]
     end
     subgraph Features["Feature folders"]
-        F["NowPlaying, Timer, Shelf, Tools,<br/>Agenda, Home, Weather, Notes,<br/>System, Transfers, Launch, Palette"]
+        F["NowPlaying, Timer, Shelf, Tools,<br/>Agenda, Home, Weather, Notes,<br/>System, Transfers, Widgets"]
     end
     S["Settings/<br/>AppSettings, hotkeys"]
 
@@ -65,7 +65,7 @@ Layers, from the bottom:
 
 | Scene | What |
 | --- | --- |
-| `MenuBarExtra("MacIsland")` | The always-present capsule icon: Command Palette, Settings, Quit |
+| `MenuBarExtra("MacIsland")` | The always-present capsule icon: Settings, Quit |
 | `Settings` | The Settings window |
 | `ModuleMenuBars` | One optional `MenuBarExtra` per module, inserted only when chosen in Settings |
 
@@ -77,11 +77,111 @@ Layers, from the bottom:
    downloads, unlock, agenda, drives and screenshots, file tools, lyrics, weather. Then starts the monitors.
 3. Creates the `IslandPanel` hosting `IslandView`, sizes it for the screen, and shows it.
 4. Creates the `MouseTracker`, and wires keyboard handling (Esc and arrows in the panel; the global hotkeys).
-5. `connectReach()` wires torn-off windows (`onOpenWindow`) and the ⌃⌥K palette hotkey.
+5. `connectReach()` wires torn-off windows (`onOpenWindow`) and opening Settings.
 6. Observes screen changes to re-lay-out.
 
 `AppDelegate.makeFeatures()` is the one place that builds the real `IslandFeatures`. `TestSupport.makeViewModel()` is its twin
-for tests.
+for tests, and `PreviewFeatures.make(live:scratch:)` is its twin for the Settings preview: **a new feature touches all three**.
+
+### Shelf, clipboard, and screenshot choices
+
+`ShelfModel` keeps when each file was added (`shelf.added`, by path; files from before it count from the first launch after) and
+`sweep(_:)` drops references older than the retention, run on launch and when the Shelf appears, never on a timer. The clipboard
+limit is `ClipboardHistory.setCapacity` (0, 10, 25, 50): 0 stops the 0.7 s poll and clears the history, the one standing timer the app
+had. Add New Screenshots off stops the Spotlight query (`ScreenshotWatcher.stop`), which is also what makes the first minute after
+launch busier. `AppSettings.dragTarget` gates `setFileDragActive`, the drop delegate, and the drop tiles. Show Music Beside the Notch
+off makes `compactActivities` skip `.media`. The Shelf's last mode is stored (`shelfMode`); a drop always shows Files.
+
+### The settings archive
+
+`SettingsArchive` (`{format: "MacIsland Settings", version: 1, ...}`, every field optional) holds every choice on the panes and Home
+(through a `HomeArchive`). `AppSettings.restore(_:)` checks each value (an invalid one is skipped, a layout is fitted, tabs and
+engines are repaired), gives imported custom widgets new ids, and keeps the command widgets made on this Mac. **A command widget is
+never written and never accepted**, even from a hand-edited file. Launch at Login is the system's, so it is not in the file.
+`resetAll()` restores a fresh install's values by reading them from a scratch `AppSettings`.
+
+### Ambient events
+
+`AmbientEvent` names the twelve interruptions that arrive on their own. `flash` and `showBanner` take `event:` and drop the call when
+it is muted (a banner's follow-up alert too); what the person just did (Copied, Zipped, a timer finishing) passes none and always
+shows. `Announcements` builds each event's banner or alert in one place, so the Settings preview draws exactly what the island
+does. Peek on Hover off makes `setHovering` skip the dwell task (the swell stays); `MouseTracker` ignores swipes when swiping is
+off, but the timer dial's scrubbing is not a swipe and still works.
+
+Menu Bar is a fifth `PreviewPresentation`, offered only while `IslandPreviewModel.allowsMenuBar` (set by `SettingsView` for the Tabs pane).
+`MenuBarPreview` draws a menu-bar strip with an icon per module in `menuBarModules` and, under the chosen one, that module's window on glass
+(scaled to fit; a module that is not in the menu bar is previewed as a ghost icon, since clicking a row previews without turning it on); the island is not drawn. Between Expanded and Menu Bar the two share one band (`BandSlide`, an `Animatable` view driven by `IslandPreviewModel.menuBarProgress` and the `Theme.Motion.slide` token): the island scales toward the notch and slides left, the menu bar slides in from the right, and its window opens over the second part of the slide. The island keeps its state while away, so it returns as it was, and the menu bar is not built while it is entirely off screen. `TabsPane` shows only the Menu Bar switches in that view and only the tab lists in every other.
+
+The Tabs pane makes the preview the canvas (`TabEditor`, set in `\.tabEditor`), with the tabs that are not shown in a `NotShownTray`
+directly under it, so both are on screen while you drag. `TabButton` shows its tab on a click and becomes draggable and a drop target
+(`onDrag`/`onDrop`, so the editor knows which tab is being dragged and the hint can name both). **A tab can only replace a tab**:
+`AppSettings.swapTab(_:with:)` makes two tabs trade places (across the notch or on one side), and a tray tab takes a shown tab's place and
+sends it to the tray. Dropping a tab on the tray hides it (never the last one); clicking a tray tab adds it, or says the tabs are full.
+The list rows use `placeTab(_:before:)` and `moveTab(_:toSide:)`. The picker, the circled arrows in the preview's corners, and a two-finger
+swipe (`SwipeRecognizer` in a local scroll monitor, since the preview is look-only) all call `IslandPreviewModel.step`.
+
+
+### Home widgets
+
+`Widgets/` is pure: `WidgetCatalog` describes each `BuiltInWidget` (the `sizes` it has a layout for and its `defaultSize`, what it
+reads, how it refreshes, its one tint, its tap), and `HomeLayout` (`Codable`, version 2) is an ordered list of `WidgetPlacement` (widget,
+`GridSize`, options) plus `hidden` (off Home, each keeping its options and last size). **Positions are never stored**: `HomeGridSpec.pack` puts each
+widget at the first free spot at or after the previous one in reading order on a 6 by 3 grid (CSS grid's sparse auto-flow), so removing a
+widget closes the gap and what you see is list order. `HomeGridSpec` (pure, shared by the renderer and the editor) also has the geometry
+(`width(columns:)` is 80n â 8, `height(rows:)` is 74m â 10, `frame(of:)`) and the drag maths (`cell(nearest:)`, `insertionIndex`, `nearest(to:)`).
+`HomeLayout.normalized` runs on load and every edit: a widget this build has no descriptor for, a repeat, and one that doesn't fit within 3
+rows move to `hidden`, and a missing or unsupported size becomes the nearest one; nothing is deleted and the layout is never empty. Home's height
+is computed from the rows used, not measured, like every module (`contentHeight`). A v1 layout (rows of widgets) is migrated once on read by
+`HomeLayoutMigration` (frozen: fixed widgets get a column, flexible ones share the rest; Timer Chips become Timers & Shelf). `HomeGrid` draws a layout and `HomeWidgetView` maps
+a widget to the view that already exists for it, the way `ModuleContent` maps a module. Nothing here runs on a schedule: each
+widget uses its model's existing cadence.
+
+Each widget view takes the `GridSize` it is placed at and draws that size's own layout (`HomeWidgetView` passes the packed size; the views are in `HomeWidgets.swift` and `MoreWidgets.swift`). The Music player from 3 by 2 up is `NowPlayingView(isPeek: true, inWidget: true)`: no `mediaMatch`, bars, lyric line, or output picker, so the art never flies between Home and the peek. Weather's hours and days ride the existing request (`hourly`, `daily`, `forecast_hours`, `forecast_days`) and the 30-minute refresh, and are parsed in the place's own time so labels don't shift with this Mac's zone. Today's taller sizes read `AgendaMonitor.upcoming` (the same items as Up Next). `WidgetSizeSnapshots` draws every widget at every size.
+
+The Home editor (`Settings/HomeEditor.swift`) is an `@Observable` controller over `AppSettings.setHomeLayout`: gestures, removals,
+moves, sizes, options, presets, and undo (`UndoManager`; each edit registers the previous layout). The rules are pure, in
+`HomeLayoutEditing.swift` (`inserting`, `placing`, `moving` (to a cell, or left/right/up/down), `resizing`, `removing`, `adding`, `applying`); a refused edit returns nil.
+
+Add Widgets is `WidgetGallery` (`Settings/WidgetGallery.swift`): a wrapping row of chips (`FlowLayout`, no sideways scrolling) for everything off Home, and, for the chip that is open, the widget drawn by `HomeWidgetView` on black at 1:1 from the preview's sample data (no hit testing), at one size: the size it last had, or its default, or the smallest that fits (`addedSize`). It is dragged into the island with the same `beginAdd` gesture, or added by its plus; `HomeLayout.fits(_:size:)` (an `adding` that must succeed, at a size the widget has) decides whether it says "No room". Sizes are chosen after adding, by the corner drag. The Home pane's order is Add Widgets, the selected widget's `WidgetInspector` (Size, options, Remove from Home), Layout (`HomeLayoutEditor`: presets, Save, the file menu), Up Next, Weather.
+
+The gestures are plain `DragGesture`s in one named coordinate space (`HomeEditor.space`, set on the Settings detail column), not system drag and drop.
+The views publish where Home's grid (`gridFrame`, from `HomeGrid`) and the preview band (`bandFrame`, from `IslandPreview`) are, and the editor turns the
+pointer into a target: `HomeGridSpec.cell(nearest:)` for the widget's top left, then `insertionIndex` among the others packed without it. So the target comes
+from the pointer, never from per-spot hover callbacks, and there are no timers: a new target only comes when the cell changes, and widgets that slide under the
+pointer can't flip it. `HomeEditor.live` is the layout as it would be if the drag ended here; Home draws it instead of the real one
+(`IslandViewModel.homeLayoutOverride`, set only on the preview's view model, so the real island never sees it, and its height follows), the widgets slide with
+`Theme.Motion.resize`, and nothing is saved until the drag ends, as one undo step. Inside the island's outline (`islandFrame`, at its fullest, which `IslandPreview` publishes; `dropFrame`) a widget is placed; outside it, on the wallpaper, nothing lands: a widget from Home goes back and one from Add Widgets is dropped. Removing a widget is the ⊖ badge, Delete, or the menu (it goes back to Add Widgets, which lists everything off Home), not a drag. As a safety net, a drag that still hears no end (`HomeEditor.watchesMouseUp`: a local mouse-up monitor, checked after SwiftUI has had its turn) is ended where the pointer last was, and a new drag calls off a stale one (`isMouseDown`), so the editor can't stay stuck. The resize handle is the same kind of drag (`beginResize`, `updateResize`): the box snaps to the nearest size that fits
+(`HomeGridSpec.nearest`), and a nearer size that doesn't fit says so. Keys (`HomeKey`, taken by `HomeGrid` when focused) and the context menu and VoiceOver actions
+call the same commands, so every drag has a click, a key, and a VoiceOver path. The canvas is the preview island: `IslandPreview` sets `\.homeEditor`, and
+`HomeGrid` then turns off each widget's own hit testing and draws `WidgetChrome` over it (rings, the remove badge, the resize handle, the drag, the menu),
+with `EmptyCells` for gaps, `HomeRoom` (the island's room to grow, dashed, behind it in the band), and `HomeDragLayer` (the lifted widget, over the
+whole pane). All of it is Settings chrome in the system accent color, never drawn in the island. Drags can't be rendered, so they are checked in the app
+(`ImageRenderer` draws the chrome, not the gestures). Right-click, **Edit Home…** calls `IslandViewModel.onOpenSettings`, which the app sets to write
+`settings.pane` and open the window (`AppSettings.requestedHomeSelection` carries the widget to select).
+
+### The Settings window
+
+`SettingsView` lays the window out itself, not with a `NavigationSplitView`, whose toolbar brought its own sidebar button and a title strip the panes couldn't use. `SettingsWindowConfigurator` (a background view) makes the window resizable (SwiftUI's Settings window isn't) and gives it a transparent title bar with the content running under it (`fullSizeContentView`), so the traffic lights float over the top and `chromeHeight` leaves room for them; the sidebar's search line and the preview's switcher then share the line below. The sidebar (`SettingsSidebar`) is a search field and the hide button in a 4 to 1 split (`SidebarHeader`, from a `GeometryReader`) above the panes, with a search's results in their place; it is a quarter of the window within limits (`sidebarWidth(for:)`), sits on `SidebarBackground` (the system sidebar material), and slides with `Animation.smooth` (`settings.sidebarHidden`); hidden, `SidebarToggleButton` with the pane's icon takes the hide button's place. The minimum width depends on the sidebar (the 560 pt preview needs its margins either way), and the detail column is capped at `maxContentWidth` and centered, so a wide window doesn't stretch every row. A view behind the content that only listens (`PreviewSwipe`, the configurator) returns nil from `hitTest`, so it never takes a click from the controls. `SettingsSearch` (pure) holds an entry for each setting (title, other words, and the `SettingsAnchor` of its section) and ranks by title prefix, word prefix, contains, keyword, then pane; choosing a result sets the pane and `scrollTarget`, and the detail's `ScrollViewReader` scrolls to the section header that carries `.id(anchor)`. A new setting needs an entry in `SettingsSearch.entries`. Controls are `SettingsDropdown` and `SettingsSegmented` (`Dropdown.swift`), not the system pop-up and segmented buttons.
+
+### Custom widgets
+
+`CustomWidget` (`Widgets/`) is a Shortcut, a web value, a folder, or a command, kept as JSON in `widgets.custom`. `CustomWidgetValues`
+(`IslandFeatures.widgets`) holds their values **in memory only**, like the clipboard and lyrics. Its one automatic trigger is
+`CustomWidgetView`'s `.task` (and a `TimelineView` at the widget's own age limit), so nothing is fetched while Home is hidden; at most
+one fetch per widget runs at a time; a click or Test fetches now. `LiveWidgetFetcher` does the work (`BoundedProcess`, an ephemeral
+`URLSession`, `FileManager`); tests use `StubWidgetFetcher` and the Settings preview `SampleWidgetFetcher`, which never run anything.
+Custom widgets are white; blue only while updating and red only on failure, beside their glyphs (one meaning per color).
+
+### The Settings window
+
+`SettingsView` is a `NavigationSplitView`: a sidebar of `SettingsPane`, and a detail with the preview pinned over the pane's
+`Form`. `IslandPreviewModel` owns a second `IslandViewModel` over `PreviewFeatures` (sample track, forecast, and meeting; inert
+doubles for the camera, screen, microphone, and Bluetooth; a private defaults suite and a temp folder for what it writes). It
+shares the live `AppSettings` and the read-only system monitors (audio, power, microphone, network), so a change applies at
+once and no listener is created per open, but it has its own presentation and tab, so the real panel never opens. `IslandPreview`
+draws the real `IslandView` on a neutral band with hit testing off. The model is created in `.onAppear` and torn down in
+`.onDisappear`: nothing runs while Settings is closed. Tests check that its sizes equal a real view model's for every
+presentation and tab, and that driving it never writes the real Shelf.
 
 ---
 
@@ -90,7 +190,7 @@ for tests.
 ### One panel
 
 `IslandPanel` is a borderless, non-activating `NSPanel` at level `mainMenu + 3`, on every Space and over full-screen apps.
-It is **always sized for the largest the island gets** (`ScreenGeometry.panelSize`, 560 x 260) and pinned to the top center
+It is **always sized for the largest the island gets** (`ScreenGeometry.panelSize`, 560 x 276) and pinned to the top center
 of the screen. The SwiftUI content is top-aligned inside it, so the visible island is only as big as its `size`.
 
 ### Click-through
@@ -108,11 +208,17 @@ drags, clicks, scroll).
   from mouse-down until release;
 - reports `setHovering(inside && !onCompactControl && canOpen)` to the view model. The compact play button is excluded so it can
   be clicked without opening the island;
-- turns two-finger scrolls into swipes with `SwipeRecognizer`: down opens, up closes, left and right change tabs, once per
-  gesture. Momentum after the fingers lift is ignored, and natural or traditional scrolling is honored;
+- routes scrolls with `ScrollRouting`. Two-finger swipes go through `SwipeRecognizer`: down opens, up closes, left and right
+  change tabs, once per gesture; momentum after the fingers lift is ignored, and natural or traditional scrolling is honored.
+  While a timer is being set, a **horizontal** gesture that starts over the dial (`IslandViewModel.timerDialRect`) belongs to the
+  dial for its whole life, momentum included (an `AxisLock` decides the axis in the first 4 pt), and a mouse wheel over it steps a
+  minute. Menu-bar and torn-off Clock windows install a `DialScrollCatcher` for the same calls;
 - closes a keyboard-pinned island on a click outside it.
 
 ### Screen geometry
+
+`ScreenGeometry.current(display:)` chooses the screen with a pure `choose(_:preference:mainIndex:)`: Built-in Display is the notched
+one, else any built-in, else the one in use; Primary Display is the first. Changing the setting re-lays-out the panel.
 
 `ScreenGeometry.current()` finds the screen with a notch (`safeAreaInsets.top > 0`) and measures it from the auxiliary top areas.
 Without a notch it falls back to a 200 pt "pill" as tall as the menu bar and `hasNotch == false`, which switches the island to a
@@ -121,7 +227,10 @@ glass surface that is hidden while nothing is live (its hover zone stays).
 ### Hotkeys
 
 `GlobalHotkey` wraps Carbon `RegisterEventHotKey` (no Accessibility permission). Each instance has an id and only acts on its own
-key: id 1 opens the island (⌃⌥Space, ⌃⌥I, or off; a Setting), id 2 opens the palette (⌃⌥K).
+key: id 1 opens the island (default ââ¥Space). It is recorded in Settings
+(`ShortcutRecorder`, a local key monitor; `KeyCombo` needs â, â¥, or â). `AppSettings.setShortcut` asks the app's registrar to register
+the new keys first: `RegisterEventHotKey` fails when another app owns them, and then the old keys are re-registered and the
+setting is unchanged. The old `hotkey` picker key is read once into `shortcut.open`.
 
 ---
 
@@ -153,7 +262,7 @@ replaces. Nothing polls while idle.
 stateDiagram-v2
     [*] --> Compact
     Compact --> Peek: pointer rests 120 ms
-    Compact --> Expanded: click, swipe down, ⌃⌥Space
+    Compact --> Expanded: click, swipe down, ââ¥Space
     Peek --> Expanded: click, swipe down
     Peek --> Compact: pointer away 300 ms
     Expanded --> Compact: pointer away 300 ms, Esc, swipe up
@@ -213,7 +322,7 @@ the hover swell. `IslandView` supplies what goes inside, switching by presentati
 | --- | --- | --- |
 | Island | The hardware notch | Opaque `#000000`. Never glass |
 | Glass pill | Displays with no notch | `.glassEffect(.regular)`, forced dark; hidden while nothing is live |
-| Floating | The palette, menu-bar windows, torn-off windows | `.glassEffect(.regular)` in the system appearance, with a shadow |
+| Floating | Menu-bar windows, torn-off windows | `.glassEffect(.regular)` in the system appearance, with a shadow |
 
 Glass is never used inside the island, and never on top of glass.
 
@@ -251,36 +360,14 @@ right of the notch, from known worst-case widths; it is a pure function with tes
 
 ## Floating surfaces
 
-`FloatingGlassPanel` is an `NSPanel` in two styles: **palette** (borderless, non-activating, takes the keyboard like Spotlight) and
-**window** (resizable, moved by its background, no chrome, closed by its own button). It can pin its top edge (so the palette grows
-downward) and can be kept on the desktop by dropping its level to `desktopIconWindow + 1` on every Space.
+`FloatingGlassPanel` is an `NSPanel` for a module torn off the island: resizable, moved by its background, no chrome, closed by its own button.
+It can be kept on the desktop by dropping its level to `desktopIconWindow + 1` on every Space.
 
 `FloatingPanels` owns the torn-off windows, one per module. `DetachedModuleView` is the glass window's content: a small header (title,
 Keep on Desktop, Close) over `ModuleContent`. `ModuleMenuBars` declares a `MenuBarExtra` per module, bound to
 `settings.isInMenuBar`; `MenuBarModuleView` is its window, with a header you can drag away to tear off.
 
 `\.isFloatingWindow` tells module views they are not in the island, so typing in a floating window does not pin the island open.
-
----
-
-## The command palette
-
-```mermaid
-flowchart LR
-    Q["Query text"] --> S["specialItems<br/>timer, remind, engine keyword, translate"]
-    Q --> M["matches<br/>modules, tools, apps, shortcuts, snippets, actions"]
-    M --> R["PaletteSearch.score<br/>exact > prefix > word > inside > letters"]
-    S --> L["results (max 8)"]
-    R --> L
-    Q --> D["default search row (always last)"]
-    D --> L
-    L --> V["PaletteView"]
-```
-
-`PaletteModel` builds `PaletteItem`s (title, subtitle, icon, an action closure) and ranks them; `PaletteController` owns the panel, reads the
-arrow, Return, and Esc keys in `sendEvent` (so the text field does not swallow them), and closes on resigning key. Apps and Shortcuts are
-read in the background when it opens (`LaunchModel`). Translation runs in the view through `.translationTask`, and the model moves through
-`idle`, `working`, `done`, `failed`.
 
 ---
 
@@ -298,7 +385,7 @@ sequenceDiagram
     OS->>Mon: power source changed (IOKit run loop source)
     Mon->>Mon: events(wasOnAC, last, onAC, now, fullLevel)
     Mon->>App: onEvent(.low(20))
-    App->>VM: showBanner(Low Battery, action: Low Power Mode)
+    App->>VM: showBanner(Low Battery, no action)
     VM->>VM: withAnimation(open) { banner = ... }
     VM-->>UI: @Observable change
     UI->>UI: IslandContainer animates to the banner size
@@ -315,14 +402,19 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 
 | What | Where | Key or file |
 | --- | --- | --- |
-| Open shortcut | UserDefaults | `hotkey` |
+| Open shortcut | UserDefaults | `shortcut.open` (JSON; `{"combo":null}` is off; legacy `hotkey` is read once) |
+| Peek on Hover, swiping, display | UserDefaults | `peeksOnHover`, `swipesEnabled`, `islandDisplay` |
+| Muted interruptions | UserDefaults | `mutedEvents` (`AmbientEvent` names) |
+| Shelf choices | UserDefaults | `dragTarget`, `addsScreenshots`, `shelfRetention`, `clipboardLimit`, `shelfMode`, `showsMusicCompact`, and `shelf.added` (paths to dates) |
 | Quiet in Focus | UserDefaults | `quietDuringFocus` |
 | Calendar events / due reminders in Up Next | UserDefaults | `showsCalendar`, `showsReminders` |
 | Weather city | UserDefaults | `weatherCity` |
+| Custom widgets (Home) | UserDefaults | `widgets.custom` (JSON `[CustomWidget]`; values are never stored) |
+| Home's layout | UserDefaults | `home.layout` (JSON `HomeLayout`, version 2, under 5 KB; a version 1 blob is read and migrated, and written as version 2 on the next edit; a layout that won't decode shows the default and keeps its bytes until the next edit) |
+| Saved Home layouts | UserDefaults | `home.savedPresets` (JSON `[SavedHomePreset]`: a name and a `HomeLayout` of the widgets, sizes, and options; local only, not in the settings file; cleared by Reset All) |
 | Left and right tabs | UserDefaults | `tabsLeft`, `tabsRight` (legacy `tabs` is read once) |
 | Menu-bar modules | UserDefaults | `menuBarModules` |
 | Synced lyrics on/off | UserDefaults | `showsLyrics` |
-| Default search engine, custom engines | UserDefaults | `searchEngine`, `customSearchEngines` (JSON) |
 | Full-charge level | UserDefaults | `fullChargeLevel` |
 | Tools in the row, and the pinned order | UserDefaults | `pinLimit`, `pinnedTools` |
 | Shelf files | UserDefaults | `shelf.paths` (paths only; the files stay where they are) |
@@ -347,9 +439,10 @@ macOS asks when a feature first needs access. `Support/Info.plist` holds the rea
 | Reminders (full) | Reminders tab, adding, due banners | `NSRemindersFullAccessUsageDescription` |
 | Bluetooth | Headphones banner, and connecting paired headphones from the output picker | `NSBluetoothAlwaysUsageDescription` |
 | Focus status | Quiet in Focus, Focus tool | `NSFocusStatusUsageDescription` |
-| Downloads folder | Download progress | `NSDownloadsFolderUsageDescription` |
+| Downloads folder | Download progress, and a folder widget on it | `NSDownloadsFolderUsageDescription` |
+| Desktop, Documents folders | A folder widget on one of them | `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` |
 | Automation (Apple Events) | Music and Spotify: volume, Favorite, play/pause | `NSAppleEventsUsageDescription` |
-| Accessibility | Clean Keys (an event tap), Lock Screen (posts a key) | (system prompt; no key) |
+| Accessibility | Clean Keys (an event tap) | (system prompt; no key) |
 | Camera | Mirror | `NSCameraUsageDescription` |
 | Microphone | Voice Note | `NSMicrophoneUsageDescription` |
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
@@ -364,7 +457,8 @@ again; `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
 | --- | --- | --- |
 | `geocoding-api.open-meteo.com`, `api.open-meteo.com` | Weather, and the rain forecast | The city name; then coordinates |
 | `lrclib.net` | Synced lyrics | Track name, artist, album, length (off in Settings) |
-| `api.frankfurter.dev` | Currency answers in the palette | A currency code (the base), only when a currency query is typed; cached for 12 hours |
+
+| Any HTTPS address **you** type in a web widget | That widget's value | A GET to that address, including its query, with a `User-Agent` of `MacIsland`; an ephemeral session (no cookies, no cache), 10 s, at most 256 KB, only while Home is showing and the value is stale (5 minutes or more). No custom headers, so no stored secrets. Each host is listed in Settings â Privacy |
 
 Web searches are opened in your default browser. There is no analytics and no account.
 
@@ -375,10 +469,14 @@ Web searches are opened in your default browser. There is no analytics and no ac
 | `/usr/bin/perl` running `mediaremote-adapter.pl` | Now Playing state and commands (see below) |
 | `/usr/bin/ditto` | Zip and unzip |
 | `/usr/sbin/screencapture` | The Screenshot tool |
-| `/usr/bin/shortcuts` (`list`, `run`) | Shortcuts in the palette |
+| `/usr/bin/shortcuts` (`list`, `run`) | Shortcut widgets (choosing one, and running it) |
+| `/usr/bin/shortcuts run NAME --output-path FILE` | A Shortcut widget's result: no input is passed in, a 30 s limit, 4 KB read |
+| **A file you chose** (`BoundedProcess`) | A command widget: run directly (no shell), no arguments, no input, a minimal environment (`PATH` and `LANG`), a 5 s limit (terminate, then kill), 4 KB of output. It runs as you, like Terminal. Picked with a file panel only; **never exported, imported, or started by `macisland://`**; listed in Settings â Privacy with Remove |
+
+MacIsland is ad-hoc signed and not App-Sandboxed, so a child process has your rights, and `sandbox-exec` is deprecated, so it is not
+used. The protection is that only you can create a command widget: nothing outside this Mac can add or trigger one.
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
-| `CGEvent` posting | Lock Screen (Control-Command-Q), which needs Accessibility |
-| `NSAppleScript` | Music and Spotify control, Low Power Mode (`pmset` with an admin prompt) |
+| `NSAppleScript` | Music and Spotify control |
 
 ### Now Playing
 
@@ -391,7 +489,7 @@ transport goes through AppleScript instead, addressed to the app itself. See [SC
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **321 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **514 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -419,7 +517,10 @@ Things that cost time. Read before changing the related code.
 | **ImageRenderer** | Draws a drop target as a yellow placeholder (turned off with `acceptsDrops: false` in snapshots), and skips Liquid Glass, text fields, and horizontal scroll views. Check those in the app. |
 | **Idle CPU** | Budget: about 0.1 to 0.3% with nothing live. `top`'s %CPU misleads; measure with `ps -o cputime= -p PID` over 10 s. No timers run while nothing is live, and samplers run only while their view is visible. The first minute after launch is busier (the Spotlight screenshot query gathers). |
 | **Permissions reset** | Ad-hoc signing means every rebuild forgets them. Expect prompts again. |
-| **Panel size** | `panelSize` must be at least the widest presentation (expanded is 520; the panel is 560). |
+| **The dial's rectangle** | `timerDialRect` is computed from the layout, not measured (like `compactControlRect`). If `TimerSetter`'s rows change, change it too, or the dial stops taking scrolls. |
+| **Panel size** | `panelSize` must be at least the widest presentation (expanded is 520; the panel is 560). Its height is derived: `Theme.Metrics.panelHeight` (276) is built from `homeMaxRows`, so changing the row limit changes the panel. |
+| **Banners** | A banner with no actions is an alert (`IslandBanner.isAlert`): `bannerAlertWidth` wide, content centered with nothing but the glyph and text in its row (an empty actions row would still add spacing and push it off center). Low Battery offers no Low Power Mode button because `pmset` needs an administrator each time, and the Low Power and Lock Screen tools were removed for the same reason: nothing in the island may ask for a password. `RingedGlyph` is the charging bolt and the AirPods ring. |
+| **Home's grid geometry** | It is computed once, in `HomeGridSpec`, and used by the renderer (`HomeGrid`) and the editor. Don't measure widgets or hard-code a column or row size elsewhere. A torn-off Home window keeps the size it opened at if the layout grows later. |
 | **Tab order** | Tab order is the order the person arranged, not module order; `normalized` keeps it. |
 | **Right side of the strip** | Widths are worst-case constants in `TrailingStrip`; if a new item goes there, add it to `TrailingStrip.plan` and its test, or it can reach the notch. |
 | **Blur while pinning** | Focusing a text field calls `holdOpen()`; floating windows must not (`\.isFloatingWindow`). |

@@ -21,9 +21,9 @@ final class MediaRemoteAdapter {
 
     init?(bundle: Bundle = .main) {
         guard let script = bundle.url(forResource: "mediaremote-adapter", withExtension: "pl"),
-              let framework = bundle.privateFrameworksURL?
-                  .appendingPathComponent("MediaRemoteAdapter.framework"),
-              FileManager.default.fileExists(atPath: framework.path)
+            let framework = bundle.privateFrameworksURL?
+                .appendingPathComponent("MediaRemoteAdapter.framework"),
+            FileManager.default.fileExists(atPath: framework.path)
         else { return nil }
         self.script = script
         self.framework = framework

@@ -53,8 +53,11 @@ final class FileTools {
     }
 
     func convert(_ url: URL, to target: ConversionTarget) {
-        let destination = Self.uniqueURL(for: Converters.outputName(for: url, to: target), in: url.deletingLastPathComponent())
-        run("Converting", success: "Converted") { try await Converters.convert(url, to: target, destination: destination) }
+        let destination = Self.uniqueURL(
+            for: Converters.outputName(for: url, to: target), in: url.deletingLastPathComponent())
+        run("Converting", success: "Converted") {
+            try await Converters.convert(url, to: target, destination: destination)
+        }
     }
 
     /// The images and PDFs among `urls` become one PDF, "Combined.pdf", beside the first.
@@ -78,7 +81,9 @@ final class FileTools {
             for: url.deletingPathExtension().lastPathComponent + " " + suffix + (ext.isEmpty ? "" : "." + ext),
             in: url.deletingLastPathComponent()
         )
-        runBlocking("Resizing", success: "Resized") { try Converters.resize(url, maxPixel: maxPixel, destination: destination) }
+        runBlocking("Resizing", success: "Resized") {
+            try Converters.resize(url, maxPixel: maxPixel, destination: destination)
+        }
     }
 
     func compress(_ url: URL) {
@@ -199,7 +204,9 @@ final class FileTools {
     /// `keepParent` is for folders: the archive then opens to the folder itself. On a lone file it would
     /// embed the folder the file happens to be in, so files are zipped bare.
     nonisolated static func zipArguments(_ sources: [URL], to destination: URL, keepParent: Bool) -> [String] {
-        ["-c", "-k", "--sequesterRsrc"] + (keepParent ? ["--keepParent"] : []) + sources.map(\.path) + [destination.path]
+        ["-c", "-k", "--sequesterRsrc"] + (keepParent ? ["--keepParent"] : []) + sources.map(\.path) + [
+            destination.path
+        ]
     }
 
     nonisolated static func unzipArguments(_ archive: URL, into folder: URL) -> [String] {
@@ -235,7 +242,8 @@ final class FileTools {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: scratch) }
         try ditto(unzipArguments(archive, into: scratch))
-        let contents = ((try? FileManager.default.contentsOfDirectory(at: scratch, includingPropertiesForKeys: nil)) ?? [])
+        let contents =
+            ((try? FileManager.default.contentsOfDirectory(at: scratch, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.lastPathComponent != "__MACOSX" }
         guard !contents.isEmpty else { throw FileToolError.failed("The archive is empty.") }
         do {

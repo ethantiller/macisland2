@@ -199,7 +199,8 @@ final class RegionPicker {
 
     /// The rectangle between two corners, whichever way it was dragged.
     nonisolated static func rect(from start: CGPoint, to end: CGPoint) -> CGRect {
-        CGRect(x: min(start.x, end.x), y: min(start.y, end.y), width: abs(start.x - end.x), height: abs(start.y - end.y))
+        CGRect(
+            x: min(start.x, end.x), y: min(start.y, end.y), width: abs(start.x - end.x), height: abs(start.y - end.y))
     }
 
     nonisolated static func selection(from start: CGPoint, to end: CGPoint, screenHeight: CGFloat) -> RegionSelection {

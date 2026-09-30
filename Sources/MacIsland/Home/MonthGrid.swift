@@ -5,7 +5,7 @@ enum MonthGrid {
     /// Always six weeks so the height doesn't change as months do. `nil` is a blank cell.
     static func weeks(containing date: Date, calendar: Calendar = .current) -> [[Int?]] {
         guard let month = calendar.dateInterval(of: .month, for: date),
-              let days = calendar.range(of: .day, in: .month, for: date)
+            let days = calendar.range(of: .day, in: .month, for: date)
         else { return [] }
         let leading = (calendar.component(.weekday, from: month.start) - calendar.firstWeekday + 7) % 7
         var cells: [Int?] = Array(repeating: nil, count: leading) + days.map { Optional($0) }
@@ -23,12 +23,16 @@ enum MonthGrid {
 /// One month, today filled white. The month can be moved with the arrows in Home's header.
 struct MonthGridView: View {
     let month: Date
+    /// 20 in the calendar that replaces Home; Today at 3 by 3 is taller, to fill its box.
+    var rowHeight: CGFloat = 20
 
     private let calendar = Calendar.current
 
     var body: some View {
         let weeks = MonthGrid.weeks(containing: month, calendar: calendar)
-        let today = calendar.isDate(month, equalTo: Date(), toGranularity: .month) ? calendar.component(.day, from: Date()) : nil
+        let today =
+            calendar.isDate(month, equalTo: Date(), toGranularity: .month)
+            ? calendar.component(.day, from: Date()) : nil
         Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 ForEach(Array(MonthGrid.weekdayInitials(calendar: calendar).enumerated()), id: \.offset) { _, initial in
@@ -56,7 +60,7 @@ struct MonthGridView: View {
             .foregroundStyle(isToday ? Theme.Palette.inverse : Theme.Palette.primary)
             .frame(width: 20, height: 20)
             .background(isToday ? Theme.Palette.primary : Theme.Palette.none, in: Circle())
-            .frame(maxWidth: .infinity, minHeight: 20)
+            .frame(maxWidth: .infinity, minHeight: rowHeight)
             .accessibilityLabel(day.map(String.init) ?? "")
             .accessibilityAddTraits(isToday ? .isSelected : [])
     }

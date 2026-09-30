@@ -16,8 +16,12 @@ final class NowPlayingModel {
 
     @ObservationIgnored private let adapter: MediaRemoteAdapter?
     /// How a transport command reaches Music or Spotify. Replaced in tests, so they never touch a real player.
-    @ObservationIgnored var sendToPlayer: (PlayerCommand, ScriptablePlayer) async -> Bool = { await PlayerScripting.send($0, to: $1) }
-    @ObservationIgnored var seekPlayer: (TimeInterval, ScriptablePlayer) async -> Bool = { await PlayerScripting.seek(to: $0, on: $1) }
+    @ObservationIgnored var sendToPlayer: (PlayerCommand, ScriptablePlayer) async -> Bool = {
+        await PlayerScripting.send($0, to: $1)
+    }
+    @ObservationIgnored var seekPlayer: (TimeInterval, ScriptablePlayer) async -> Bool = {
+        await PlayerScripting.seek(to: $0, on: $1)
+    }
 
     convenience init() {
         self.init(adapter: MediaRemoteAdapter())
@@ -128,7 +132,8 @@ final class NowPlayingModel {
             artwork = newState.artworkBase64
                 .flatMap { Data(base64Encoded: $0) }
                 .flatMap(NSImage.init(data:))
-            accent = artwork
+            accent =
+                artwork
                 .flatMap(ArtworkAccent.color(from:))
                 .map { Color(nsColor: $0) } ?? Theme.Tint.neutral
         }

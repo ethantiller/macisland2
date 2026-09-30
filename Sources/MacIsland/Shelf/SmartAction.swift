@@ -26,7 +26,7 @@ enum SmartAction: Equatable {
         if hexPattern.firstMatch(in: trimmed, range: whole) != nil { return color(from: trimmed) }
 
         guard let match = linkDetector.firstMatch(in: trimmed, range: whole), match.range == whole,
-              let url = match.url
+            let url = match.url
         else { return nil }
         switch url.scheme?.lowercased() {
         case "mailto": return .email(trimmed)

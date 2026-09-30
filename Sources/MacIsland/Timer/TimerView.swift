@@ -1,46 +1,45 @@
 import Charts
 import SwiftUI
 
-/// Timer, stopwatch, and Pomodoro share one tab: a ring on the leading side; on the trailing side the
-/// mode picker with play and cancel beside it, and presets or lap times below. Pomodoro adds its streak
-/// and a 7-day chart underneath.
+/// Timer, stopwatch, and Pomodoro share one tab. A timer that hasn't been set yet gets the dial; otherwise
+/// a ring on the leading side, and on the trailing side the mode picker with play and cancel beside it, and
+/// presets or lap times below. Pomodoro adds its streak and a 7-day chart underneath.
 struct ClockView: View {
     let viewModel: IslandViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: Theme.Metrics.margin) {
-                switch viewModel.clockMode {
-                case .timer: TimerRing(timer: viewModel.timer)
-                case .stopwatch: StopwatchRing(stopwatch: viewModel.stopwatch)
-                case .pomodoro: PomodoroRing(pomodoro: viewModel.pomodoro)
-                }
+            if viewModel.clockMode == .timer, !viewModel.timer.isActive {
+                TimerSetter(viewModel: viewModel)
+                    .frame(height: Theme.Metrics.timerSetter)
+            } else {
+                HStack(alignment: .center, spacing: Theme.Metrics.margin) {
+                    switch viewModel.clockMode {
+                    case .timer: TimerRing(timer: viewModel.timer)
+                    case .stopwatch: StopwatchRing(stopwatch: viewModel.stopwatch)
+                    case .pomodoro: PomodoroRing(pomodoro: viewModel.pomodoro)
+                    }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 4) {
-                        SegmentedChoice(
-                            options: ClockMode.allCases,
-                            selection: viewModel.clockMode,
-                            title: \.rawValue,
-                            onSelect: viewModel.setClockMode
-                        )
-                        .frame(width: 230)
-                        Spacer(minLength: 0)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 4) {
+                            ClockModePicker(viewModel: viewModel)
+                            Spacer(minLength: 0)
+                            switch viewModel.clockMode {
+                            case .timer: TimerActions(timer: viewModel.timer)
+                            case .stopwatch: StopwatchActions(stopwatch: viewModel.stopwatch)
+                            case .pomodoro: PomodoroActions(pomodoro: viewModel.pomodoro)
+                            }
+                        }
+
                         switch viewModel.clockMode {
-                        case .timer: TimerActions(timer: viewModel.timer)
-                        case .stopwatch: StopwatchActions(stopwatch: viewModel.stopwatch)
-                        case .pomodoro: PomodoroActions(pomodoro: viewModel.pomodoro)
+                        case .timer: TimerPresets(timer: viewModel.timer)
+                        case .stopwatch: StopwatchLaps(stopwatch: viewModel.stopwatch)
+                        case .pomodoro: PomodoroStatus(pomodoro: viewModel.pomodoro)
                         }
                     }
-
-                    switch viewModel.clockMode {
-                    case .timer: TimerPresets(timer: viewModel.timer)
-                    case .stopwatch: StopwatchLaps(stopwatch: viewModel.stopwatch)
-                    case .pomodoro: PomodoroStatus(pomodoro: viewModel.pomodoro)
-                    }
                 }
+                .frame(height: Theme.Metrics.clockRing)
             }
-            .frame(height: Theme.Metrics.clockRing)
 
             if viewModel.clockMode == .pomodoro {
                 PomodoroChart(pomodoro: viewModel.pomodoro)
@@ -48,6 +47,20 @@ struct ClockView: View {
                     .transition(.opacity)
             }
         }
+    }
+}
+
+private struct ClockModePicker: View {
+    let viewModel: IslandViewModel
+
+    var body: some View {
+        SegmentedChoice(
+            options: ClockMode.allCases,
+            selection: viewModel.clockMode,
+            title: \.rawValue,
+            onSelect: viewModel.setClockMode
+        )
+        .frame(width: 230)
     }
 }
 
@@ -105,9 +118,11 @@ private struct PomodoroStatus: View {
             Text(pomodoro.phase.title)
                 .font(Theme.Typography.bodyEmphasized)
                 .foregroundStyle(Theme.Palette.primary)
-            Text("\(min(pomodoro.focusInCycle + (pomodoro.phase == .focus ? 1 : 0), PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)")
-                .font(Theme.Typography.numeral)
-                .foregroundStyle(Theme.Palette.secondary)
+            Text(
+                "\(min(pomodoro.focusInCycle + (pomodoro.phase == .focus ? 1 : 0), PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)"
+            )
+            .font(Theme.Typography.numeral)
+            .foregroundStyle(Theme.Palette.secondary)
             if pomodoro.streak > 0 {
                 Label("\(pomodoro.streak) day streak", systemImage: "flame.fill")
                     .font(Theme.Typography.numeral)
@@ -206,6 +221,184 @@ private struct TimerActions: View {
             IconButton(systemName: "xmark", label: "Cancel Timer", action: timer.reset)
                 .opacity(timer.isActive ? 1 : 0.4)
                 .disabled(!timer.isActive)
+        }
+    }
+}
+
+// MARK: Setting a timer
+
+/// Setting a timer: the mode picker and three quick lengths, the minute dial, then Start and the length it
+/// will run for.
+private struct TimerSetter: View {
+    let viewModel: IslandViewModel
+
+    private static let quickMinutes = [1, 5, 10]
+
+    var body: some View {
+        let timer = viewModel.timer
+        let minutes = Int((timer.duration / 60).rounded())
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                ClockModePicker(viewModel: viewModel)
+                Spacer(minLength: 0)
+                ForEach(Self.quickMinutes, id: \.self) { preset in
+                    ChipButton(
+                        title: "\(preset)m",
+                        isSelected: minutes == preset,
+                        accessibilityLabel: "\(preset) Minutes"
+                    ) {
+                        withAnimation(Theme.Motion.track) { timer.setDuration(minutes: preset) }
+                    }
+                }
+            }
+            .frame(height: Theme.Metrics.clockHeaderHeight)
+
+            TimerDial(viewModel: viewModel)
+                .frame(height: Theme.Metrics.timerDial)
+
+            HStack(spacing: 10) {
+                ChipButton(title: "Start Timer", isProminent: true, action: timer.toggle)
+                Spacer(minLength: 0)
+                Text(formatTime(timer.duration))
+                    .font(Theme.Typography.largeNumeral)
+                    .foregroundStyle(Theme.Tint.clock)
+                    .contentTransition(.numericText())
+            }
+            .frame(height: Theme.Metrics.hitTarget)
+        }
+    }
+}
+
+/// A ruler of minutes that slides under a fixed marker. Drag it or scroll it sideways and the ruler follows
+/// the pointer; tap a tick and it glides under the marker. The ruler fades out toward both edges.
+private struct TimerDial: View {
+    let viewModel: IslandViewModel
+    @Environment(\.isFloatingWindow) private var isFloating
+
+    var body: some View {
+        let minutes = viewModel.timer.durationMinutes
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            DialRuler(position: viewModel.dialPosition ?? Double(minutes))
+                .frame(width: width, height: Theme.Metrics.timerDial)
+                .edgeFade(.horizontal, fraction: Theme.Metrics.dialFade)
+                .overlay(alignment: .bottom) { DialMarker() }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 2)
+                        .onChanged { viewModel.scrubDial(translation: $0.translation.width) }
+                        .onEnded { _ in viewModel.endDialScrub() }
+                        .exclusively(
+                            before: SpatialTapGesture().onEnded { tap in
+                                viewModel.setDial(
+                                    to: DialScrubber.minute(
+                                        atX: tap.location.x, markerX: width / 2, position: Double(minutes)))
+                            })
+                )
+                .background { if isFloating { DialScrollCatcher(viewModel: viewModel) } }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Timer Length")
+        .accessibilityValue(spokenMinutes(minutes))
+        .accessibilityAdjustableAction { direction in
+            viewModel.stepDial(direction == .increment ? 1 : -1)
+        }
+    }
+
+    private func spokenMinutes(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let rest = minutes % 60
+        let hourText = hours == 0 ? "" : "\(hours) \(hours == 1 ? "hour" : "hours")"
+        let minuteText = rest == 0 && hours > 0 ? "" : "\(rest) \(rest == 1 ? "minute" : "minutes")"
+        return [hourText, minuteText].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+}
+
+/// The fixed triangle under the chosen minute.
+private struct DialMarker: View {
+    var body: some View {
+        Image(systemName: "arrowtriangle.up.fill")
+            .resizable()
+            .scaledToFit()
+            .frame(width: Theme.Metrics.dialMarker, height: Theme.Metrics.dialMarker)
+            .foregroundStyle(Theme.Tint.clock)
+    }
+}
+
+/// The ticks and minute numbers, drawn in one pass for whatever `position` is under the center. `Animatable`,
+/// so a tap or a settle glides instead of jumping.
+private struct DialRuler: View, Animatable {
+    var position: Double
+
+    var animatableData: Double {
+        get { position }
+        set { position = newValue }
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let metrics = Theme.Metrics.self
+            let markerX = size.width / 2
+            let tickBottom = metrics.dialLabelHeight + metrics.dialRowSpacing + metrics.dialMajorTick
+            for minute in DialScrubber.visibleRange(position: position, width: size.width) {
+                let x = markerX + CGFloat(Double(minute) - position) * metrics.dialMinuteSpacing
+                let isFifth = minute % 5 == 0
+                let height = isFifth ? metrics.dialMajorTick : metrics.dialMinorTick
+                let tick = CGRect(
+                    x: x - metrics.dialTickWidth / 2, y: tickBottom - height, width: metrics.dialTickWidth,
+                    height: height)
+                context.fill(
+                    Path(roundedRect: tick, cornerRadius: metrics.dialTickWidth / 2),
+                    with: .style(isFifth ? Theme.Palette.secondary : Theme.Palette.tertiary))
+                if isFifth {
+                    let label = context.resolve(
+                        Text("\(minute)").font(Theme.Typography.numeral).foregroundStyle(Theme.Palette.secondary))
+                    context.draw(label, at: CGPoint(x: x, y: metrics.dialLabelHeight / 2), anchor: .center)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Menu-bar and torn-off Clock windows don't pass through the island's mouse tracker, so a scroll over their
+/// dial is caught here and goes to the same view-model calls. The island itself never installs it.
+private struct DialScrollCatcher: NSViewRepresentable {
+    let viewModel: IslandViewModel
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.viewModel = viewModel
+        return view
+    }
+
+    func updateNSView(_ view: CatcherView, context: Context) { view.viewModel = viewModel }
+
+    final class CatcherView: NSView {
+        var viewModel: IslandViewModel?
+        private var routing = ScrollRouting()
+        private var settleTask: Task<Void, Never>?
+
+        override func scrollWheel(with event: NSEvent) {
+            guard let viewModel else { return super.scrollWheel(with: event) }
+            let sample = ScrollSample(
+                dx: event.scrollingDeltaX, dy: event.scrollingDeltaY,
+                isPrecise: event.hasPreciseScrollingDeltas, isInverted: event.isDirectionInvertedFromDevice,
+                isBegan: event.phase.contains(.began), isMomentum: !event.momentumPhase.isEmpty)
+            switch routing.route(sample, overDial: true) {
+            case .scrubDial(let dx):
+                viewModel.scrubDial(byFingerDX: dx)
+                settleTask?.cancel()
+                settleTask = Task { [weak viewModel] in
+                    try? await Task.sleep(for: .milliseconds(140))
+                    guard !Task.isCancelled else { return }
+                    viewModel?.endDialScrub()
+                }
+            case .stepDial(let step):
+                viewModel.stepDial(step)
+            case .swipe, nil:
+                super.scrollWheel(with: event)
+            }
         }
     }
 }
@@ -395,9 +588,11 @@ private struct PomodoroPeekDetails: View {
                 Text(pomodoro.phase.title)
                     .font(Theme.Typography.bodyEmphasized)
                     .foregroundStyle(Theme.Palette.primary)
-                Text("\(min(finishedIncludingThis, PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)")
-                    .font(Theme.Typography.numeral)
-                    .foregroundStyle(Theme.Palette.secondary)
+                Text(
+                    "\(min(finishedIncludingThis, PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)"
+                )
+                .font(Theme.Typography.numeral)
+                .foregroundStyle(Theme.Palette.secondary)
                 if pomodoro.streak > 0 {
                     Label("\(pomodoro.streak) day streak", systemImage: "flame.fill")
                         .font(Theme.Typography.numeral)

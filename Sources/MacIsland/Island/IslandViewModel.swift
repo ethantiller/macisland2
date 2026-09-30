@@ -95,6 +95,11 @@ struct IslandBanner: Equatable {
     var detail: String?
     /// At most two; the first is prominent when there are two.
     var actions: [Action] = []
+    /// When set, the glyph sits inside a ring of this color that draws once around it, as the charging alert's does.
+    var ringTint: Color?
+
+    /// A banner with nothing to press is an alert: narrower than one with buttons, and its contents are centered.
+    var isAlert: Bool { actions.isEmpty }
 
     static func == (lhs: IslandBanner, rhs: IslandBanner) -> Bool { lhs.id == rhs.id }
 }
@@ -127,7 +132,6 @@ struct IslandFeatures {
     let timer: TimerModel
     let stopwatch: StopwatchModel
     let keepAwake: KeepAwake
-    let lowPower: LowPowerMode
     let ringLight: RingLight
     let micMute: MicrophoneMute
     let privacy: PrivacyMonitor
@@ -143,12 +147,11 @@ struct IslandFeatures {
     let fileTools: FileTools
     let notes: NotesModel
     let keyboardCleaner: KeyboardCleaner
-    let launch: LaunchModel
-    let rates: ExchangeRates
     let bluetooth: BluetoothDevices
     let mirror: CameraMirror
     let screenRecorder: ScreenRecorder
     let voice: VoiceRecorder
+    let widgets: CustomWidgetValues
 }
 
 @MainActor
@@ -168,6 +171,18 @@ final class IslandViewModel {
         didSet { if selectedTab != .tools { features.mirror.stop() } }
     }
     var clockMode: ClockMode = .timer
+    /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
+    private(set) var dialPosition: Double?
+    /// How far the ruler is stretched past 1 minute or the maximum, in points.
+    private(set) var dialOverscroll: CGFloat = 0
+    /// Where the dial's gesture would put the ruler with no limits; the value is this, held to the range.
+    @ObservationIgnored private var dialRaw: Double?
+    @ObservationIgnored private var dialAnchor = 0.0
+    @ObservationIgnored private var dialAtEnd = false
+    /// A tap on the trackpad's haptic engine. Tests replace it.
+    @ObservationIgnored var dialHaptic: (NSHapticFeedbackManager.FeedbackPattern) -> Void = {
+        NSHapticFeedbackManager.defaultPerformer.perform($0, performanceTime: .now)
+    }
     var notesMode = NotesMode.notes
     var state: State = .compact {
         didSet {
@@ -182,7 +197,7 @@ final class IslandViewModel {
     private(set) var toolsExpanded = false
     /// Home shows the month calendar instead of the agenda.
     private(set) var calendarExpanded = false
-    var shelfMode: ShelfMode = .files
+    var shelfMode: ShelfMode
     /// The Shelf file being previewed with Quick Look.
     var quickLookURL: URL?
     /// The Shelf file under the pointer, which Space previews.
@@ -198,8 +213,19 @@ final class IslandViewModel {
 
     /// Opens a module in its own window. Set by the app, which owns the windows.
     @ObservationIgnored var onOpenWindow: ((IslandModule) -> Void)?
+    /// Home's layout as the Settings editor is showing it while a widget is held over a spot. Only ever set on the preview's
+    /// view model, so the real island never sees it.
+    var homeLayoutOverride: HomeLayout?
+
+    /// The layout Home draws: the editor's preview while one is showing, otherwise the person's.
+    var homeLayout: HomeLayout { homeLayoutOverride ?? features.settings.homeLayout }
+
+    /// Opens Settings on a pane, with a Home widget selected. Set by the app, which owns the window.
+    @ObservationIgnored var onOpenSettings: ((SettingsPane, UUID?) -> Void)?
     /// Lets the person choose what to record. Tests replace it.
-    @ObservationIgnored var pickRegion: (@escaping (RegionSelection) -> Void) -> Void = { RegionPicker.shared.present(completion: $0) }
+    @ObservationIgnored var pickRegion: (@escaping (RegionSelection) -> Void) -> Void = {
+        RegionPicker.shared.present(completion: $0)
+    }
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var alertTask: Task<Void, Never>?
     @ObservationIgnored private var bannerTask: Task<Void, Never>?
@@ -210,6 +236,7 @@ final class IslandViewModel {
 
     init(features: IslandFeatures) {
         self.features = features
+        shelfMode = features.settings.shelfMode
     }
 
     subscript<T>(dynamicMember keyPath: KeyPath<IslandFeatures, T>) -> T {
@@ -231,7 +258,7 @@ final class IslandViewModel {
         if features.stopwatch.isActive { list.append(.stopwatch) }
         if let job = features.work.current { list.append(.working(job.title)) }
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
-        if features.nowPlaying.state.hasMedia { list.append(.media) }
+        if features.settings.showsMusicCompact, features.nowPlaying.state.hasMedia { list.append(.media) }
         return list
     }
 
@@ -329,6 +356,8 @@ final class IslandViewModel {
     var showsDragTarget: Bool { isFileDragActive && presentation == .compact }
 
     func setFileDragActive(_ active: Bool) {
+        // With "Do Nothing", the island stays as it is while a file is dragged.
+        let active = active && features.settings.dragTarget != .nothing
         guard active != isFileDragActive else { return }
         withAnimation(Theme.Motion.track) { isFileDragActive = active }
     }
@@ -338,11 +367,18 @@ final class IslandViewModel {
 
     func contentHeight(for tab: IslandModule) -> CGFloat {
         switch tab {
-        case .home: calendarExpanded ? Theme.Metrics.homeMonthHeight : Theme.Metrics.homeContentHeight
+        case .home:
+            calendarExpanded
+                ? Theme.Metrics.homeMonthHeight
+                : homeLayout.contentHeight(catalog: features.settings.widgetDescriptor(for:))
         case .media: mediaContentHeight(peek: false)
         case .shelf: Theme.Metrics.shelfHeight
         case .clock:
-            Theme.Metrics.clockRing + (clockMode == .pomodoro ? Theme.Metrics.pomodoroStatsHeight : 0)
+            switch clockMode {
+            case .timer: features.timer.isActive ? Theme.Metrics.clockRing : Theme.Metrics.timerSetter
+            case .stopwatch: Theme.Metrics.clockRing
+            case .pomodoro: Theme.Metrics.clockRing + Theme.Metrics.pomodoroStatsHeight
+            }
         case .tools:
             features.mirror.isOn
                 ? Theme.Metrics.mirrorHeight
@@ -361,6 +397,7 @@ final class IslandViewModel {
             if isPillHidden { return .zero }
             var size = geometry.compactSize
             size.width += 2 * compactSideWidth
+            size.height += 1
             if showsDragTarget {
                 size.width = max(size.width, geometry.compactSize.width + 2 * Theme.Metrics.dragTargetInset)
                 size.height += Theme.Metrics.dragTargetHeight
@@ -368,7 +405,7 @@ final class IslandViewModel {
             return size
         case .banner:
             return CGSize(
-                width: Theme.Metrics.bannerWidth,
+                width: banner?.isAlert == true ? Theme.Metrics.bannerAlertWidth : Theme.Metrics.bannerWidth,
                 height: geometry.notchSize.height + Theme.Metrics.bannerContentHeight
             )
         case .peek:
@@ -385,6 +422,95 @@ final class IslandViewModel {
 
     /// Area that counts as "over the island", in screen coordinates.
     var hitRect: CGRect { geometry.islandRect(for: isPillHidden ? geometry.compactSize : size) }
+
+    /// The timer is being set: the dial is on screen and takes horizontal scrolls.
+    var isSettingTimer: Bool {
+        presentation == .expanded && selectedTab == .clock && clockMode == .timer && !features.timer.isActive
+    }
+
+    /// Where the timer dial is on screen, with half a row gap of slack. Computed from the layout, not measured,
+    /// so it has to follow `TimerSetter`. Nil unless a timer is being set.
+    var timerDialRect: CGRect? {
+        guard isSettingTimer else { return nil }
+        let metrics = Theme.Metrics.self
+        let top =
+            geometry.screenFrame.maxY
+            - (geometry.notchSize.height + metrics.contentTopGap + metrics.clockHeaderHeight + 10)
+        let inset = ScreenGeometry.topFlare + metrics.margin
+        let slop = metrics.rowSpacing / 2
+        return CGRect(
+            x: geometry.screenFrame.midX - metrics.expandedWidth / 2 + inset - slop,
+            y: top - metrics.timerDial - slop,
+            width: metrics.expandedWidth - 2 * inset + 2 * slop,
+            height: metrics.timerDial + 2 * slop
+        )
+    }
+
+    // MARK: The timer dial
+
+    /// Starts scrubbing from the length now set.
+    func beginDialScrub() {
+        dialAnchor = Double(features.timer.durationMinutes)
+        dialRaw = dialAnchor
+        dialAtEnd = false
+    }
+
+    /// A drag: the ruler follows the pointer, from where the drag began.
+    func scrubDial(translation: CGFloat) {
+        if dialRaw == nil { beginDialScrub() }
+        moveDial(toRaw: DialScrubber.position(anchor: dialAnchor, translation: translation))
+    }
+
+    /// A trackpad scroll: `dx` is finger movement since the last event, so fingers left pull higher minutes in.
+    func scrubDial(byFingerDX dx: CGFloat) {
+        if dialRaw == nil { beginDialScrub() }
+        moveDial(toRaw: (dialRaw ?? dialAnchor) - Double(dx / Theme.Metrics.dialMinuteSpacing))
+    }
+
+    private func moveDial(toRaw raw: Double) {
+        guard features.timer.phase == .idle else { return }
+        dialRaw = raw
+        let resolved = DialScrubber.resolve(raw)
+        let before = features.timer.durationMinutes
+        features.timer.setDuration(minutes: Int(resolved.clamped.rounded()))
+        dialPosition = resolved.display
+        dialOverscroll = resolved.overscroll
+        let atEnd = resolved.overscroll > 0
+        if atEnd, !dialAtEnd {
+            dialHaptic(.generic)
+        } else if !atEnd, features.timer.durationMinutes != before, features.timer.durationMinutes % 5 == 0 {
+            dialHaptic(.alignment)
+        }
+        dialAtEnd = atEnd
+    }
+
+    /// The gesture is over: the ruler settles on the nearest minute.
+    func endDialScrub() {
+        guard dialRaw != nil else { return }
+        dialRaw = nil
+        dialAtEnd = false
+        withAnimation(Theme.Motion.track) {
+            dialPosition = nil
+            dialOverscroll = 0
+        }
+    }
+
+    /// A mouse wheel notch: one minute, and a tap at either end.
+    func stepDial(_ step: Int) {
+        let timer = features.timer
+        guard timer.phase == .idle else { return }
+        let target = timer.durationMinutes + step
+        guard (TimerModel.minimumDialMinutes...TimerModel.maximumDialMinutes).contains(target) else {
+            dialHaptic(.generic)
+            return
+        }
+        withAnimation(Theme.Motion.track) { timer.setDuration(minutes: target) }
+    }
+
+    /// A tap on the ruler: that tick slides under the marker.
+    func setDial(to minute: Int) {
+        withAnimation(Theme.Motion.track) { features.timer.setDuration(minutes: minute) }
+    }
 
     /// The compact play/pause control. Hovering it doesn't open the island, so it can be clicked.
     var compactControlRect: CGRect? {
@@ -422,6 +548,9 @@ final class IslandViewModel {
 
     func openWindow(_ module: IslandModule) { onOpenWindow?(module) }
 
+    /// Right-click a Home widget, Edit Home…: Settings opens on Home with that widget selected.
+    func editHome(selecting id: UUID?) { onOpenSettings?(.home, id) }
+
     /// Opens the island on a module, whether or not it is one of the tabs.
     func show(_ module: IslandModule) {
         selectedTab = module
@@ -435,7 +564,9 @@ final class IslandViewModel {
             let finished = await ShortcutsCLI.run(shortcut: name)
             features.work.end(job)
             if finished {
-                flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: "Done"), respectingFocus: false)
+                flash(
+                    IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: "Done"),
+                    respectingFocus: false)
             } else {
                 showBanner(
                     IslandBanner(
@@ -510,10 +641,12 @@ final class IslandViewModel {
                     tint: Theme.Tint.neutral,
                     title: "Mic Is Muted",
                     detail: "Unmute it to record a voice note",
-                    actions: [.init(title: "Unmute") { [weak self] in
-                        self?.features.micMute.toggle()
-                        Task { await voice.start() }
-                    }]
+                    actions: [
+                        .init(title: "Unmute") { [weak self] in
+                            self?.features.micMute.toggle()
+                            Task { await voice.start() }
+                        }
+                    ]
                 ),
                 for: .seconds(8),
                 respectingFocus: false
@@ -539,7 +672,9 @@ final class IslandViewModel {
 
     func copySnippet(_ snippet: Snippet) {
         features.clipboard.copyText(snippet.text)
-        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+        flash(
+            IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"),
+            respectingFocus: false)
     }
 
     func setCalendarExpanded(_ expanded: Bool) {
@@ -576,6 +711,7 @@ final class IslandViewModel {
 
     func setShelfMode(_ mode: ShelfMode) {
         withAnimation(Theme.Motion.resize) { shelfMode = mode }
+        features.settings.shelfMode = mode
     }
 
     func setHoveredShelfItem(_ url: URL?) {
@@ -608,33 +744,35 @@ final class IslandViewModel {
             if let url = URL(string: "mailto:\(address)") { NSWorkspace.shared.open(url) }
         case .color(_, let rgb):
             features.clipboard.copyText(rgb)
-            flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+            flash(
+                IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"),
+                respectingFocus: false)
         }
-    }
-
-    /// Copies a palette answer (a conversion, a sum) and says so.
-    func copyAnswer(_ text: String) {
-        features.clipboard.copyText(text)
-        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
     }
 
     /// Puts a text card back on the pasteboard as plain text only (no other types).
     func copyPlainText(_ entry: ClipboardEntry) {
         guard case .text(let text) = entry.content else { return }
         features.clipboard.copyText(text)
-        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+        flash(
+            IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"),
+            respectingFocus: false)
     }
 
     /// Keeps a text card as a snippet in Notes.
     func saveAsSnippet(_ entry: ClipboardEntry) {
         guard case .text(let text) = entry.content else { return }
         features.notes.saveSnippet(text: text)
-        flash(IslandAlert(systemImage: "text.badge.plus", tint: Theme.Tint.positive, text: "Saved"), respectingFocus: false)
+        flash(
+            IslandAlert(systemImage: "text.badge.plus", tint: Theme.Tint.positive, text: "Saved"),
+            respectingFocus: false)
     }
 
     func copyFromClipboardHistory(_ entry: ClipboardEntry) {
         features.clipboard.copy(entry)
-        flash(IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"), respectingFocus: false)
+        flash(
+            IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"),
+            respectingFocus: false)
     }
 
     func setClockMode(_ mode: ClockMode) {
@@ -663,6 +801,8 @@ final class IslandViewModel {
         if hovering {
             guard state == .compact else { return }
             if !isPillHidden { withAnimation(Theme.Motion.track) { isSwelling = true } }
+            // With Peek on Hover off, hovering only swells it: a click or a swipe opens it.
+            guard features.settings.peeksOnHover else { return }
             hoverTask = Task { [weak self] in
                 try? await Task.sleep(for: Theme.Timing.peekDwell)
                 guard !Task.isCancelled, let self else { return }
@@ -733,6 +873,11 @@ final class IslandViewModel {
     func leftTabs() -> [IslandModule] { features.settings.leftTabs }
     func rightTabs() -> [IslandModule] { features.settings.rightTabs }
 
+    /// Puts away Shelf files that stayed longer than the person wants. Runs on launch and when the Shelf appears.
+    func sweepShelf() {
+        features.shelf.sweep(features.settings.shelfRetention)
+    }
+
     func setDropTargeted(_ targeted: Bool) {
         guard targeted else { return }
         hoverTask?.cancel()
@@ -748,7 +893,11 @@ final class IslandViewModel {
     private var isQuiet: Bool { features.settings.quietDuringFocus && features.focus.isFocused }
 
     /// `respectingFocus: false` is for feedback to something the person just did.
-    func flash(_ alert: IslandAlert, for duration: Duration = .seconds(3), respectingFocus: Bool = true) {
+    func flash(
+        _ alert: IslandAlert, for duration: Duration = .seconds(3), respectingFocus: Bool = true,
+        event: AmbientEvent? = nil
+    ) {
+        if let event, features.settings.isMuted(event) { return }
         if respectingFocus, isQuiet, !alert.staysUntilSeen { return }
         alertTask?.cancel()
         withAnimation(Theme.Motion.open) { self.alert = alert }
@@ -765,8 +914,10 @@ final class IslandViewModel {
         _ banner: IslandBanner,
         for duration: Duration = .seconds(4),
         followUp: IslandAlert? = nil,
-        respectingFocus: Bool = true
+        respectingFocus: Bool = true,
+        event: AmbientEvent? = nil
     ) {
+        if let event, features.settings.isMuted(event) { return }
         if respectingFocus, isQuiet {
             if let followUp { flash(followUp) }
             return
@@ -796,7 +947,13 @@ final class IslandViewModel {
         }
     }
 
-    private func dismissBanner() {
+    /// Takes a short alert off the island.
+    func clearAlert() {
+        alertTask?.cancel()
+        withAnimation(Theme.Motion.close) { alert = nil }
+    }
+
+    func dismissBanner() {
         bannerTask?.cancel()
         withAnimation(Theme.Motion.close) { banner = nil }
         if let followUp = bannerFollowUp {
@@ -823,7 +980,9 @@ enum TrailingStrip {
         var pencil: Bool
     }
 
-    static func plan(available: CGFloat, rightTabs: Int, hasStatus: Bool, hasWeather: Bool, hasNotesTab: Bool = false) -> Plan {
+    static func plan(available: CGFloat, rightTabs: Int, hasStatus: Bool, hasWeather: Bool, hasNotesTab: Bool = false)
+        -> Plan
+    {
         var used = settings + CGFloat(rightTabs) * (tab + spacing) + (hasStatus ? status + spacing : 0)
         let weatherFits = hasWeather && used + weather + spacing <= available
         if weatherFits { used += weather + spacing }

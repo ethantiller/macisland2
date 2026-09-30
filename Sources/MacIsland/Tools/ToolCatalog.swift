@@ -5,7 +5,7 @@ import SwiftUI
 struct ToolItem: Identifiable {
     let id: ToolID
     let title: String
-    /// The full name where there is room for it (the palette, VoiceOver); defaults to `title`.
+    /// The full name where there is room for it (VoiceOver); defaults to `title`.
     var label: String?
     let systemImage: String
     var isOn = false
@@ -24,10 +24,6 @@ struct ToolCatalog {
             ToolItem(id: id, title: "Keep Awake", systemImage: "cup.and.saucer.fill", isOn: viewModel.keepAwake.isOn) {
                 viewModel.keepAwake.toggle()
             }
-        case .lowPower:
-            ToolItem(id: id, title: "Low Power", systemImage: "battery.25percent", isOn: viewModel.lowPower.isOn) {
-                viewModel.lowPower.toggle()
-            }
         case .ringLight:
             ToolItem(id: id, title: "Ring Light", systemImage: "lightbulb.fill", isOn: viewModel.ringLight.isOn) {
                 withAnimation(Theme.Motion.resize) { viewModel.ringLight.toggle() }
@@ -45,9 +41,10 @@ struct ToolCatalog {
                 SystemActions.pickColor { color in
                     let hex = SystemActions.hexString(for: color)
                     SystemActions.copyToClipboard(hex)
-                    viewModel.flash(IslandAlert(
-                        systemImage: "circle.fill", tint: Color(nsColor: color), text: hex, tintsText: false
-                    ), respectingFocus: false)
+                    viewModel.flash(
+                        IslandAlert(
+                            systemImage: "circle.fill", tint: Color(nsColor: color), text: hex, tintsText: false
+                        ), respectingFocus: false)
                 }
             }
         case .screenshot:
@@ -68,8 +65,6 @@ struct ToolCatalog {
             ToolItem(id: id, title: "Clean Keys", systemImage: "keyboard", isOn: viewModel.keyboardCleaner.isLocked) {
                 toggleKeyboardLock()
             }
-        case .lockScreen:
-            ToolItem(id: id, title: "Lock Screen", systemImage: "lock.fill") { lockScreen() }
         case .mirror:
             ToolItem(id: id, title: "Mirror", systemImage: "person.crop.rectangle", isOn: viewModel.mirror.isOn) {
                 viewModel.toggleMirror()
@@ -79,25 +74,6 @@ struct ToolCatalog {
                 id: id, title: "Record", label: "Record Screen", systemImage: "record.circle",
                 isOn: viewModel.screenRecorder.isRecording
             ) { viewModel.toggleScreenRecording() }
-        }
-    }
-
-    /// Locks the screen with the system shortcut, after asking for Accessibility access the first time.
-    private func lockScreen() {
-        if !SystemActions.lockScreen() {
-            // Shows the system prompt once; after that only the banner opens the pane.
-            _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
-            viewModel.showBanner(
-                IslandBanner(
-                    systemImage: "hand.raised.fill",
-                    tint: Theme.Tint.attention,
-                    title: "Accessibility Access Needed",
-                    detail: "Allow it to lock the screen",
-                    actions: [.init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }]
-                ),
-                for: .seconds(8),
-                respectingFocus: false
-            )
         }
     }
 

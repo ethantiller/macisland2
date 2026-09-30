@@ -47,7 +47,11 @@ struct IslandView: View {
             }
         }
         .environment(\.mediaNamespace, mediaNamespace)
-        .modifier(DropTarget(enabled: acceptsDrops, delegate: IslandDropDelegate(viewModel: viewModel, zone: $dropZone)))
+        .modifier(
+            DropTarget(
+                enabled: acceptsDrops && viewModel.settings.dragTarget != .nothing,
+                delegate: IslandDropDelegate(viewModel: viewModel, zone: $dropZone))
+        )
         // When the drag ends, however it ends, the drop target goes with it.
         .onChange(of: viewModel.isFileDragActive) { _, active in
             if !active { dropZone = nil }
@@ -61,8 +65,17 @@ struct IslandView: View {
             compactContent
             if viewModel.showsDragTarget {
                 HStack(spacing: 0) {
-                    dragHint("Shelf", systemImage: "tray.and.arrow.down")
-                    dragHint("AirDrop", systemImage: nil, tint: Theme.Tint.airDrop)
+                    switch viewModel.settings.dragTarget {
+                    case .shelfAndAirDrop:
+                        dragHint("Shelf", systemImage: "tray.and.arrow.down")
+                        dragHint("AirDrop", systemImage: nil, tint: Theme.Tint.airDrop)
+                    case .shelfOnly:
+                        dragHint("Shelf", systemImage: "tray.and.arrow.down")
+                    case .airDropOnly:
+                        dragHint("AirDrop", systemImage: nil, tint: Theme.Tint.airDrop)
+                    case .nothing:
+                        EmptyView()
+                    }
                 }
                 .padding(.top, notchSize.height)
                 .padding(.horizontal, edgeInset)
@@ -114,7 +127,9 @@ struct IslandView: View {
                 IconButton(systemName: "square.and.pencil", label: "New Note", size: 12) { viewModel.openQuickNote() }
             }
             ForEach(viewModel.rightTabs()) { tab in
-                TabButton(tab: tab, isSelected: viewModel.selectedTab == tab, viewModel: viewModel) { viewModel.select(tab) }
+                TabButton(tab: tab, isSelected: viewModel.selectedTab == tab, viewModel: viewModel) {
+                    viewModel.select(tab)
+                }
             }
             SettingsButton()
         }
@@ -136,9 +151,9 @@ struct IslandView: View {
             }
             Text(title)
         }
-            .font(Theme.Typography.title)
-            .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.secondary))
-            .frame(maxWidth: .infinity)
+        .font(Theme.Typography.title)
+        .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.secondary))
+        .frame(maxWidth: .infinity)
     }
 
     /// Leading and trailing halves hug the notch and describe the same activity.
@@ -280,7 +295,11 @@ private struct IslandDropDelegate: DropDelegate {
     @Binding var zone: DropZone?
 
     private func zone(for info: DropInfo) -> DropZone {
-        info.location.x > viewModel.size.width / 2 ? .airDrop : .shelf
+        DropZone.destination(
+            for: viewModel.settings.dragTarget,
+            locationX: info.location.x,
+            width: viewModel.size.width
+        )
     }
 
     func validateDrop(info: DropInfo) -> Bool {
@@ -368,12 +387,8 @@ private struct BannerContent: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: banner.systemImage)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(banner.tint)
-                .symbolEffect(.bounce, value: banner.id)
-                .frame(width: 32)
-                .accessibilityHidden(true)
+            if banner.isAlert { Spacer(minLength: 0) }
+            glyph
             VStack(alignment: .leading, spacing: 2) {
                 Text(banner.title)
                     .font(Theme.Typography.title)
@@ -386,19 +401,43 @@ private struct BannerContent: View {
             }
             .lineLimit(1)
             .accessibilityElement(children: .combine)
-            Spacer(minLength: 8)
-            // With two actions the first is the main one. The buttons keep their full names; the title gives way.
-            HStack(spacing: 6) {
-                ForEach(Array(banner.actions.prefix(2).enumerated()), id: \.offset) { index, action in
-                    ChipButton(title: action.title, isProminent: index == 0 && banner.actions.count > 1) { onAction(index) }
+            // An alert has nothing to press: its glyph and words sit in the middle of the island, not against one side.
+            Spacer(minLength: banner.isAlert ? 0 : 8)
+            // With two actions the first is the main one. The buttons keep their full names; the title gives way. (Left out
+            // when there are none: even an empty row would add its spacing, and push the centered alert off center.)
+            if !banner.actions.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(Array(banner.actions.prefix(2).enumerated()), id: \.offset) { index, action in
+                        ChipButton(title: action.title, isProminent: index == 0 && banner.actions.count > 1) {
+                            onAction(index)
+                        }
+                    }
                 }
+                .fixedSize()
+                .layoutPriority(1)
             }
-            .fixedSize()
-            .layoutPriority(1)
         }
-        .padding(.horizontal, edgeInset)
+        .padding(.horizontal, banner.isAlert ? 20 : edgeInset)
         .padding(.top, notchHeight)
         .frame(maxHeight: .infinity)
+    }
+
+    /// The symbol, in a ring that draws around it once when the banner has one (AirPods: green, or red when low).
+    @ViewBuilder
+    private var glyph: some View {
+        if let ringTint = banner.ringTint {
+            RingedGlyph(
+                systemName: banner.systemImage, ringTint: ringTint, glyphTint: nil, size: 36, label: banner.title
+            )
+            .id(banner.id)
+        } else {
+            Image(systemName: banner.systemImage)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(banner.tint)
+                .symbolEffect(.bounce, value: banner.id)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -458,9 +497,11 @@ private struct TabButton: View {
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.tabEditor) private var editor
 
     var body: some View {
-        Button(action: action) {
+        // In the Settings preview, clicking a tab shows it there instead.
+        Button(action: { if let editor { editor.select(tab) } else { action() } }) {
             Image(systemName: tab.systemImage)
                 .font(Theme.Typography.glyph)
                 .foregroundStyle(isSelected || isHovering ? Theme.Palette.primary : Theme.Palette.tertiary)
@@ -469,6 +510,7 @@ private struct TabButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(IslandButtonStyle())
+        .modifier(TabEditing(tab: tab, editor: editor))
         .onHover { isHovering = $0 }
         .help(tab.title)
         .contextMenu {
@@ -484,12 +526,9 @@ private struct TabButton: View {
 
 /// Opens the Settings window. The island is a panel over other apps, so the app is activated first.
 private struct SettingsButton: View {
-    @Environment(\.openSettings) private var openSettings
-
     var body: some View {
         IconButton(systemName: "gearshape.fill", label: "Settings", size: 12) {
-            NSApp.activate()
-            openSettings()
+            SettingsWindowController.shared.show()
         }
     }
 }

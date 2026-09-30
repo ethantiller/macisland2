@@ -1,15 +1,16 @@
 import Foundation
 import Testing
+
 @testable import MacIsland
 
 struct LRCTests {
     private let source = """
-    [ar:Someone]
-    [00:12.50] First line
-    [00:20.00] Second line
-    [00:30.00]
-    [00:35.00][01:05.25] Chorus
-    """
+        [ar:Someone]
+        [00:12.50] First line
+        [00:20.00] Second line
+        [00:30.00]
+        [00:35.00][01:05.25] Chorus
+        """
 
     @Test func parsesTimedLinesInOrderAndSkipsTags() {
         let lines = LRC.parse(source)
@@ -63,7 +64,9 @@ struct LyricsModelTests {
     @Test func doesNothingWhileOff() async throws {
         let lyrics = LyricsModel()
         var requests = 0
-        lyrics.fetch = { _ in requests += 1; return nil }
+        lyrics.fetch = { _ in
+            requests += 1; return nil
+        }
         lyrics.track(track())
         try await Task.sleep(for: .milliseconds(50))
         #expect(requests == 0 && lyrics.lines.isEmpty)
@@ -73,7 +76,9 @@ struct LyricsModelTests {
         let lyrics = LyricsModel()
         var requests = 0
         let body = response
-        lyrics.fetch = { _ in requests += 1; return body }
+        lyrics.fetch = { _ in
+            requests += 1; return body
+        }
         lyrics.setEnabled(true, for: NowPlayingState())
         lyrics.track(track())
         try await Task.sleep(for: .milliseconds(100))
@@ -157,7 +162,8 @@ struct PlayerControlsTests {
         // Music is playing now, so the player is its full height, with the lyric line.
         #expect(viewModel.contentHeight(for: .media) == viewModel.mediaContentHeight(peek: false))
         #expect(viewModel.contentHeight(for: .media) > base + Theme.Metrics.lyricsRowHeight)
-        #expect(viewModel.mediaContentHeight(peek: false) - viewModel.mediaContentHeight(peek: true)
-            == Theme.Metrics.playerArtwork - Theme.Metrics.playerPeekArtwork + Theme.Metrics.playerTopInset)
+        #expect(
+            viewModel.mediaContentHeight(peek: false) - viewModel.mediaContentHeight(peek: true)
+                == Theme.Metrics.playerArtwork - Theme.Metrics.playerPeekArtwork + Theme.Metrics.playerTopInset)
     }
 }

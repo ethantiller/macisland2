@@ -61,9 +61,9 @@ final class AudioOutputs {
         devices = ids.compactMap { id in
             let transport = Self.transportType(of: id)
             guard Self.hasOutput(id),
-                  transport != kAudioDeviceTransportTypeVirtual,
-                  transport != kAudioDeviceTransportTypeAggregate,
-                  let name = Self.name(of: id)
+                transport != kAudioDeviceTransportTypeVirtual,
+                transport != kAudioDeviceTransportTypeAggregate,
+                let name = Self.name(of: id)
             else { return nil }
             return Device(id: id, name: name, transportType: transport)
         }

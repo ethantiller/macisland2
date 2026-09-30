@@ -18,7 +18,7 @@ with changes, and run `./scripts/docs-images.sh` after a UI change.
 
 ## Commands
 
-- Build and run: `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`
+- Build and run: `make build-and-restart`
   (UI changes are only visible after this).
 - Tests: `./scripts/test.sh`
 - Visual review: `ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots`
@@ -29,7 +29,7 @@ with changes, and run `./scripts/docs-images.sh` after a UI change.
 
 - `App/`: entry point, menu bar item, wiring.
 - `Island/`: panel, geometry, hover and click-through tracking, view model, theme, shared components.
-- One folder per feature (`NowPlaying/`, `Shelf/`, `Timer/`, `Tools/`, `System/`, `Agenda/`, `Home/`, `Weather/`, `Notes/`): a model plus its view. `Palette/` (the command palette) and `Launch/` (the app and Shortcuts indexes it searches).
+- One folder per feature (`NowPlaying/`, `Shelf/`, `Timer/`, `Tools/`, `System/`, `Agenda/`, `Home/`, `Weather/`, `Notes/`, `Widgets/`): a model plus its view.
 - `Settings/`: the Settings window (a SwiftUI `Settings` scene) and `AppSettings`.
 - `Vendor/mediaremote-adapter`: Now Playing access via `/usr/bin/perl` (Apple restricts MediaRemote since macOS 15.4).
 

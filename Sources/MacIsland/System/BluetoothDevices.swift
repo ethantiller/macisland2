@@ -17,7 +17,7 @@ protocol BluetoothDeviceProviding: AnyObject {
 }
 
 /// The audio devices this Mac has paired, so headphones can be connected from the island. Read only when the
-/// output picker (or the palette) opens.
+/// output picker opens.
 @MainActor
 @Observable
 final class BluetoothDevices {
@@ -55,7 +55,8 @@ final class BluetoothDevices {
     }
 
     static func failureAlert() -> IslandAlert {
-        IslandAlert(systemImage: "exclamationmark.triangle.fill", tint: Theme.Tint.attention, text: "Couldn\u{2019}t Connect")
+        IslandAlert(
+            systemImage: "exclamationmark.triangle.fill", tint: Theme.Tint.attention, text: "Couldn\u{2019}t Connect")
     }
 }
 
@@ -69,7 +70,9 @@ final class IOBluetoothProvider: BluetoothDeviceProviding {
         return (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? [])
             .filter { $0.deviceClassMajor == audio }
             .compactMap { device in
-                device.addressString.map { PairedDevice(id: $0, name: device.name ?? "Headphones", isConnected: device.isConnected()) }
+                device.addressString.map {
+                    PairedDevice(id: $0, name: device.name ?? "Headphones", isConnected: device.isConnected())
+                }
             }
     }
 

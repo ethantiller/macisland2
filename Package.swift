@@ -8,6 +8,7 @@ let package = Package(
         .executableTarget(
             name: "MacIsland",
             path: "Sources/MacIsland",
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

@@ -73,8 +73,8 @@ struct NowPlayingStreamParser {
 
     mutating func consume(line: Data) -> NowPlayingState? {
         guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-              object["type"] as? String == "data",
-              let update = object["payload"] as? [String: Any]
+            object["type"] as? String == "data",
+            let update = object["payload"] as? [String: Any]
         else { return nil }
 
         if object["diff"] as? Bool == true {

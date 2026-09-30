@@ -40,16 +40,20 @@ struct ReminderRow: Identifiable, Equatable {
         if calendar.isDate(due, inSameDayAs: now) {
             return hasTime ? due.formatted(date: .omitted, time: .shortened) : "Today"
         }
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: due)).day ?? 0
+        let days =
+            calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: due)).day
+            ?? 0
         if days == 1 { return "Tomorrow" }
-        return days < 7 ? due.formatted(.dateTime.weekday(.abbreviated)) : due.formatted(.dateTime.month(.abbreviated).day())
+        return days < 7
+            ? due.formatted(.dateTime.weekday(.abbreviated)) : due.formatted(.dateTime.month(.abbreviated).day())
     }
 }
 
 /// Finds the video-call link in an event's location, notes, or URL.
 enum MeetingLink {
     private static let pattern = try! NSRegularExpression(
-        pattern: #"https?://[^\s<>"']*(?:zoom\.us|zoom\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com)[^\s<>"']*"#,
+        pattern:
+            #"https?://[^\s<>"']*(?:zoom\.us|zoom\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com)[^\s<>"']*"#,
         options: [.caseInsensitive]
     )
 
@@ -57,7 +61,8 @@ enum MeetingLink {
         for case let text? in texts {
             let range = NSRange(text.startIndex..., in: text)
             guard let match = pattern.firstMatch(in: text, range: range),
-                  let matched = Range(match.range, in: text) else { continue }
+                let matched = Range(match.range, in: text)
+            else { continue }
             let link = String(text[matched]).trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)>]"))
             if let url = URL(string: link) { return unwrap(url) }
         }
@@ -92,11 +97,15 @@ enum MeetingLink {
     /// The meeting app's own address for a link: Teams `msteams:/l/...` and Zoom `zoommtg://zoom.us/join?...`.
     /// `nil` for anything else. Whether the app is installed is `joinURL`'s question.
     nonisolated static func appURL(for url: URL) -> URL? {
-        guard let host = url.host?.lowercased(), let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        guard let host = url.host?.lowercased(),
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
             return nil
         }
         if host == "teams.microsoft.com", url.path.hasPrefix("/l/") {
-            return URL(string: "msteams:" + components.percentEncodedPath + (components.percentEncodedQuery.map { "?" + $0 } ?? ""))
+            return URL(
+                string: "msteams:" + components.percentEncodedPath
+                    + (components.percentEncodedQuery.map { "?" + $0 } ?? ""))
         }
         if host == "zoom.us" || host.hasSuffix(".zoom.us"), url.path.hasPrefix("/j/") {
             let id = url.path.dropFirst(3).split(separator: "/").first.map(String.init) ?? ""
@@ -141,6 +150,11 @@ enum AgendaRules {
         items.min { $0.date < $1.date }
     }
 
+    /// The soonest few, in order.
+    static func upcoming(in items: [AgendaItem], limit: Int = 4) -> [AgendaItem] {
+        Array(items.sorted { $0.date < $1.date }.prefix(limit))
+    }
+
     static func shouldAnnounce(_ item: AgendaItem, now: Date) -> Bool {
         switch item.kind {
         case .event: item.date > now - 60 && item.date <= now + eventLead
@@ -163,6 +177,8 @@ enum AgendaRules {
 @Observable
 final class AgendaMonitor {
     private(set) var next: AgendaItem?
+    /// The next few things, soonest first (up to 4), for the taller Today widgets.
+    private(set) var upcoming: [AgendaItem] = []
     /// Open reminders for the Reminders tab. Loaded while that tab is open.
     private(set) var reminderRows: [ReminderRow] = []
     /// Reminders access was refused, so the tab offers "Allow Access".
@@ -181,6 +197,13 @@ final class AgendaMonitor {
     @ObservationIgnored private var announced: Set<String> = []
     @ObservationIgnored private var timer: Timer?
 
+    /// Puts an item in Up Next without asking the calendar: for the Settings preview, which is sample data.
+    func showSample(_ item: AgendaItem?, upcoming: [AgendaItem] = [], reminders: [ReminderRow] = []) {
+        next = item
+        self.upcoming = upcoming
+        reminderRows = reminders
+    }
+
     func start() {
         guard timer == nil else { return }
         let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
@@ -188,7 +211,8 @@ final class AgendaMonitor {
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) {
+            [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
     }
@@ -226,15 +250,16 @@ final class AgendaMonitor {
         let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: nil)
         let rows: [ReminderRow] = await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).map { reminder in
-                    let components = reminder.dueDateComponents
-                    return ReminderRow(
-                        id: reminder.calendarItemIdentifier,
-                        title: reminder.title ?? "Reminder",
-                        due: components?.date,
-                        hasTime: components?.hour != nil
-                    )
-                })
+                continuation.resume(
+                    returning: (reminders ?? []).map { reminder in
+                        let components = reminder.dueDateComponents
+                        return ReminderRow(
+                            id: reminder.calendarItemIdentifier,
+                            title: reminder.title ?? "Reminder",
+                            due: components?.date,
+                            hasTime: components?.hour != nil
+                        )
+                    })
             }
         }
         withAnimation(Theme.Motion.resize) { reminderRows = ReminderRow.sorted(rows) }
@@ -250,7 +275,9 @@ final class AgendaMonitor {
     }
 
     func complete(_ item: AgendaItem) {
-        guard let id = item.reminderID, let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
+        guard let id = item.reminderID, let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
+            return
+        }
         reminder.isCompleted = true
         try? store.save(reminder, commit: true)
         refresh()
@@ -304,6 +331,7 @@ final class AgendaMonitor {
 
         let now = Date()
         next = AgendaRules.next(in: items)
+        upcoming = AgendaRules.upcoming(in: items)
 
         let due = items.filter { AgendaRules.shouldAnnounce($0, now: now) && !announced.contains($0.id) }
         announced.formUnion(due.map(\.id))
@@ -315,7 +343,8 @@ final class AgendaMonitor {
         case .fullAccess:
             return true
         case .notDetermined:
-            let granted = type == .event
+            let granted =
+                type == .event
                 ? try? await store.requestFullAccessToEvents()
                 : try? await store.requestFullAccessToReminders()
             return granted ?? false
@@ -326,7 +355,8 @@ final class AgendaMonitor {
 
     private func events() -> [AgendaItem] {
         let now = Date()
-        let predicate = store.predicateForEvents(withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: nil)
+        let predicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: nil)
         return store.events(matching: predicate)
             .filter { !$0.isAllDay && $0.status != .canceled && $0.startDate >= now.addingTimeInterval(-600) }
             .map { event in
@@ -350,7 +380,8 @@ final class AgendaMonitor {
                 let items: [AgendaItem] = (reminders ?? []).compactMap { reminder in
                     guard let due = reminder.dueDateComponents?.date else { return nil }
                     // A date-only reminder is due at the start of the day; count it from 9:00.
-                    let date = reminder.dueDateComponents?.hour == nil
+                    let date =
+                        reminder.dueDateComponents?.hour == nil
                         ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: due) ?? due
                         : due
                     return AgendaItem(
