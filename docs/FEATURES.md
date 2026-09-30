@@ -153,6 +153,16 @@ A dashboard, in two rows of boxes that share the same left and right edges.
 
 ![Calendar](images/04a-expanded-home-calendar.png)
 
+### Meetings, Outlook, and Teams
+
+Up Next and the 5-minute banner read every calendar in System Settings → Internet Accounts, so **Outlook, Microsoft 365, Exchange, and
+Google calendars appear once the account is added there** (Settings → Up Next has a button that opens it). The new Outlook for Mac
+keeps its own store, which macOS can't read; add the account to Internet Accounts as well.
+
+**Join** opens the meeting app when there is one: a Teams `https://teams.microsoft.com/l/…` link opens Teams (`msteams:`), and a Zoom
+`/j/<id>` link opens Zoom (`zoommtg:`), each only if this Mac has that app; otherwise it opens the link in your browser.
+Outlook SafeLinks and Google redirect links are unwrapped to the real address first.
+
 ### Media
 
 ![Media](images/04-expanded-media.png)
@@ -318,7 +328,7 @@ Opened from the gear, or the menu bar icon. The window scrolls and resizes.
 | Section | Choices |
 | --- | --- |
 | General | Launch at Login; Quiet in Focus; the open shortcut (⌃⌥Space, ⌃⌥I, or off) |
-| Up Next | Show Calendar events; show due Reminders |
+| Up Next | Show Calendar events; show due Reminders; a button that opens Internet Accounts |
 | Weather | City (only the name is sent to Open-Meteo) |
 | Left of the Notch / Right of the Notch / Not Shown | The tabs, dragged and switched |
 | Media | Synced Lyrics |

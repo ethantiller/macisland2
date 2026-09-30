@@ -59,9 +59,73 @@ enum MeetingLink {
             guard let match = pattern.firstMatch(in: text, range: range),
                   let matched = Range(match.range, in: text) else { continue }
             let link = String(text[matched]).trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)>]"))
-            if let url = URL(string: link) { return url }
+            if let url = URL(string: link) { return unwrap(url) }
         }
         return nil
+    }
+
+    /// The real address behind a security rewrite: Outlook's SafeLinks (`url=`) and Google's redirect (`q=`).
+    /// Anything else, including a link whose inner address is not http(s), is returned as it is.
+    nonisolated static func unwrap(_ url: URL) -> URL {
+        var current = url
+        for _ in 0..<3 {  // a rewritten link can itself be rewritten
+            guard let host = current.host?.lowercased(),
+                let components = URLComponents(url: current, resolvingAgainstBaseURL: false)
+            else { break }
+            let parameter: String?
+            if host.hasSuffix(".safelinks.protection.outlook.com") || host == "safelinks.protection.outlook.com" {
+                parameter = "url"
+            } else if (host == "google.com" || host.hasSuffix(".google.com")) && current.path == "/url" {
+                parameter = "q"
+            } else {
+                parameter = nil
+            }
+            guard let parameter,
+                let value = components.queryItems?.first(where: { $0.name == parameter })?.value,
+                let inner = URL(string: value), ["http", "https"].contains(inner.scheme?.lowercased())
+            else { break }
+            current = inner
+        }
+        return current
+    }
+
+    /// The meeting app's own address for a link: Teams `msteams:/l/...` and Zoom `zoommtg://zoom.us/join?...`.
+    /// `nil` for anything else. Whether the app is installed is `joinURL`'s question.
+    nonisolated static func appURL(for url: URL) -> URL? {
+        guard let host = url.host?.lowercased(), let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        if host == "teams.microsoft.com", url.path.hasPrefix("/l/") {
+            return URL(string: "msteams:" + components.percentEncodedPath + (components.percentEncodedQuery.map { "?" + $0 } ?? ""))
+        }
+        if host == "zoom.us" || host.hasSuffix(".zoom.us"), url.path.hasPrefix("/j/") {
+            let id = url.path.dropFirst(3).split(separator: "/").first.map(String.init) ?? ""
+            guard !id.isEmpty, id.allSatisfy(\.isNumber) else { return nil }
+            var link = URLComponents()
+            link.scheme = "zoommtg"
+            link.host = "zoom.us"
+            link.path = "/join"
+            link.queryItems = [URLQueryItem(name: "confno", value: id)]
+            if let password = components.queryItems?.first(where: { $0.name == "pwd" })?.value {
+                link.queryItems?.append(URLQueryItem(name: "pwd", value: password))
+            }
+            return link.url
+        }
+        return nil
+    }
+
+    /// What Join opens: the meeting app when the link has one and this Mac has it, otherwise the link itself.
+    @MainActor
+    static func joinURL(
+        for url: URL, hasHandler: (URL) -> Bool = { NSWorkspace.shared.urlForApplication(toOpen: $0) != nil }
+    ) -> URL {
+        if let app = appURL(for: url), hasHandler(app) { return app }
+        return url
+    }
+
+    @MainActor
+    static func join(_ url: URL) {
+        NSWorkspace.shared.open(joinURL(for: url))
     }
 }
 
@@ -209,6 +273,12 @@ final class AgendaMonitor {
 
     static func openRemindersSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    static func openInternetAccounts() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension") {
             NSWorkspace.shared.open(url)
         }
     }

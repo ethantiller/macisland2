@@ -226,3 +226,56 @@ struct DropTileTests {
         #expect(!ShelfView.showsDropTiles(zone: nil, isFileDragActive: true))
     }
 }
+
+@MainActor
+struct MeetingAppTests {
+    private func url(_ text: String) -> URL { URL(string: text)! }
+
+    @Test func aTeamsLinkBecomesTheTeamsAppAddress() {
+        let link = url("https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d")
+        #expect(MeetingLink.appURL(for: link)?.absoluteString
+            == "msteams:/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%3a%221%22%7d")
+        #expect(MeetingLink.appURL(for: url("https://teams.microsoft.com/l/meeting/x"))?.scheme == "msteams")
+        // Only the /l/ links have an app address.
+        #expect(MeetingLink.appURL(for: url("https://teams.microsoft.com/other")) == nil)
+        #expect(MeetingLink.appURL(for: url("https://teams.live.com/meet/123")) == nil)
+    }
+
+    @Test func aZoomLinkBecomesAZoomJoinAddress() {
+        #expect(MeetingLink.appURL(for: url("https://us02web.zoom.us/j/12345678?pwd=abc123"))?.absoluteString
+            == "zoommtg://zoom.us/join?confno=12345678&pwd=abc123")
+        #expect(MeetingLink.appURL(for: url("https://zoom.us/j/999"))?.absoluteString == "zoommtg://zoom.us/join?confno=999")
+        #expect(MeetingLink.appURL(for: url("https://zoom.us/j/notanumber")) == nil)
+        #expect(MeetingLink.appURL(for: url("https://zoom.us/pricing")) == nil)
+        #expect(MeetingLink.appURL(for: url("https://meet.google.com/abc-defg-hij")) == nil)
+    }
+
+    @Test func joinKeepsTheWebLinkWithoutTheApp() {
+        let web = url("https://us02web.zoom.us/j/12345?pwd=x")
+        #expect(MeetingLink.joinURL(for: web, hasHandler: { _ in false }) == web)
+        #expect(MeetingLink.joinURL(for: web, hasHandler: { $0.scheme == "zoommtg" }).scheme == "zoommtg")
+        let google = url("https://meet.google.com/abc-defg-hij")
+        #expect(MeetingLink.joinURL(for: google, hasHandler: { _ in true }) == google)
+    }
+
+    @Test func safeLinksAreUnwrapped() {
+        let wrapped = url("https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2Fabc%3Fx%3D1&data=05%7C01&sdata=zzz&reserved=0")
+        #expect(MeetingLink.unwrap(wrapped).absoluteString == "https://teams.microsoft.com/l/meetup-join/abc?x=1")
+        #expect(MeetingLink.find(in: ["Join \(wrapped.absoluteString) now"])?.host == "teams.microsoft.com")
+    }
+
+    @Test func googleRedirectsAreUnwrapped() {
+        let redirect = url("https://www.google.com/url?q=https://meet.google.com/abc-defg-hij&sa=D&source=calendar")
+        #expect(MeetingLink.unwrap(redirect).absoluteString == "https://meet.google.com/abc-defg-hij")
+    }
+
+    @Test func otherLinksAreLeftAlone() {
+        let plain = url("https://us02web.zoom.us/j/12345?pwd=abc")
+        #expect(MeetingLink.unwrap(plain) == plain)
+        let search = url("https://www.google.com/search?q=https://evil.example")
+        #expect(MeetingLink.unwrap(search) == search)
+        // An inner address that is not http(s) is not followed.
+        let scripted = url("https://eur01.safelinks.protection.outlook.com/?url=file%3A%2F%2F%2Fetc%2Fpasswd")
+        #expect(MeetingLink.unwrap(scripted) == scripted)
+    }
+}

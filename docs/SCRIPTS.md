@@ -56,7 +56,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 268 tests, about a second.
+lines; 274 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -267,7 +267,7 @@ Every Swift file in `Sources/MacIsland/` (75 files, about 10,000 lines). One fol
 
 ## Tests
 
-`Tests/MacIslandTests/`: 17 files, about 3,400 lines, **268 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 17 files, about 3,400 lines, **274 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |

@@ -19,10 +19,11 @@ struct SettingsView: View {
             Section {
                 Toggle("Calendar Events", isOn: Bindable(settings).showsCalendar)
                 Toggle("Due Reminders", isOn: Bindable(settings).showsReminders)
+                Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
             } header: {
                 Text("Up Next")
             } footer: {
-                Text("Meetings and due reminders show in Up Next on Home, and announce themselves as banners. The Reminders tab works either way.")
+                Text("Meetings and due reminders show in Up Next on Home, and announce themselves as banners. The Reminders tab works either way. Outlook, Google, and Exchange calendars come from Internet Accounts.")
             }
             Section {
                 TextField("City", text: Bindable(settings).weatherCity, prompt: Text("Paris"))

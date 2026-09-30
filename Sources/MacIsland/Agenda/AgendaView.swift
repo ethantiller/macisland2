@@ -63,7 +63,7 @@ struct AgendaAction {
     init?(item: AgendaItem, agenda: AgendaMonitor) {
         if let url = item.joinURL {
             title = "Join"
-            perform = { NSWorkspace.shared.open(url) }
+            perform = { MeetingLink.join(url) }
         } else if item.kind == .reminder {
             title = "Done"
             perform = { agenda.complete(item) }

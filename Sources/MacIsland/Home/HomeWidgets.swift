@@ -66,7 +66,7 @@ struct TimeWidget: View {
     private func openNext() {
         guard let item = viewModel.agenda.next else { return }
         if let url = item.joinURL {
-            NSWorkspace.shared.open(url)
+            MeetingLink.join(url)
         } else if item.kind == .reminder {
             viewModel.select(.reminders)
         }
