@@ -194,6 +194,33 @@ enum Theme {
         /// hit size of the badge and the resize handle.
         static let editorBadge: CGFloat = 18
         static let editorHandle: CGFloat = 28
+        /// The band of desk the Settings preview and the first-run guide's stage draw the island on: tall enough for the largest
+        /// thing the island draws there (the panel) and a little room under it.
+        static let previewBandHeight: CGFloat = panelHeight + 4
+        /// The first-run guide: the stage is the 560 pt band at 1:1, inset by the glass's padding on each side.
+        static let guideWidth: CGFloat = ScreenGeometry.panelSize.width + 2 * floatPadding
+        /// One row of the guide's access step: a 28 pt control and the spacing under it.
+        static let guideRowHeight: CGFloat = hitTarget + rowSpacing
+        /// The room under the guide's copy. The tallest step detail (three access rows and their two-line note) sets it, and every
+        /// step gets that much so the window never changes height: 3 × `guideRowHeight` (108), 8 of spacing, a two-line note (28),
+        /// and 6 to spare. Measure it in the app and adjust it with this sum.
+        static let guideDetailHeight: CGFloat = 150
+        /// The guide's step indicator: a dot, and the wider capsule that marks the current step.
+        static let stepDot: CGFloat = 6
+        static let stepDotCurrent: CGFloat = 18
+        /// A drawn key, a little taller than body text, for naming shortcuts.
+        static let keyCapHeight: CGFloat = 22
+        static let keyCapRadius: CGFloat = 6
+        /// The Settings tour's callout: wide enough for the longest copy in four lines.
+        static let tourCalloutWidth: CGFloat = 280
+        /// The callout's arrow, and the space between the ring and the arrow's tip.
+        static let tourArrow = CGSize(width: 16, height: 8)
+        static let tourGap: CGFloat = 6
+        /// The ring around the control the tour points at: how far outside it, and how thick.
+        static let tourRingInset: CGFloat = 4
+        static let tourRingWidth: CGFloat = 2
+        /// The nearest a callout comes to the Settings window's edge.
+        static let tourEdgeInset: CGFloat = 12
     }
 
     enum Timing {

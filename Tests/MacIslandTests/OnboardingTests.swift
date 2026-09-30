@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import Testing
 
@@ -307,5 +308,34 @@ struct AccessTests {
         let rows = PrivacyAccess.current()
         #expect(rows.contains { $0.id == "accessibility" })
         for kind in AccessKind.allCases { #expect(rows.contains { $0.id == kind.rawValue }) }
+    }
+}
+
+struct KeyPartsTests {
+    @Test func theDefaultShortcutIsControlOptionSpace() {
+        let parts = KeyCombo.openDefault.parts
+        #expect(parts.map(\.symbol) == ["\u{2303}", "\u{2325}", "Space"])
+        #expect(parts.map(\.spoken) == ["Control", "Option", "Space"])
+        #expect(KeyCombo.openDefault.display == "\u{2303}\u{2325}Space")
+    }
+
+    @Test func modifiersComeInMacOSOrder() {
+        let combo = KeyCombo(keyCode: 40, modifiers: UInt32(cmdKey | shiftKey), label: "K")
+        #expect(combo.parts.map(\.symbol) == ["\u{21E7}", "\u{2318}", "K"])
+        #expect(combo.parts.map(\.spoken) == ["Shift", "Command", "K"])
+        #expect(combo.display == "\u{21E7}\u{2318}K")
+    }
+
+    @Test func aFunctionKeyIsOnePart() {
+        let combo = KeyCombo(keyCode: 96, modifiers: UInt32(controlKey), label: "F5")
+        #expect(combo.parts.map(\.symbol) == ["\u{2303}", "F5"])
+        #expect(combo.display == "\u{2303}F5")
+    }
+
+    @Test func arrowsAndEscapeAreReadByName() {
+        #expect(KeyCombo.spoken("\u{2190}") == "Left Arrow")
+        #expect(KeyCombo.spoken("\u{2192}") == "Right Arrow")
+        #expect(KeyCombo.spoken("Esc") == "Escape")
+        #expect(KeyCombo.spoken("Q") == "Q")
     }
 }

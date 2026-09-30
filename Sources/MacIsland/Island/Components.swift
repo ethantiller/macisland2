@@ -275,6 +275,67 @@ struct ChargingBadge: View {
     }
 }
 
+/// Progress through a few steps: a dot for each, and a wider capsule for the current one. Not interactive.
+struct StepDots: View {
+    let count: Int
+    /// The current step, from 0.
+    let current: Int
+
+    var body: some View {
+        HStack(spacing: Theme.Metrics.rowSpacing) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(index == current ? Theme.Palette.primary : Theme.Palette.tertiary)
+                    .frame(
+                        width: index == current ? Theme.Metrics.stepDotCurrent : Theme.Metrics.stepDot,
+                        height: Theme.Metrics.stepDot)
+            }
+        }
+        .animation(Theme.Motion.resize, value: current)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(current + 1) of \(count)")
+    }
+}
+
+/// A key, drawn, for naming a shortcut in a sentence's company.
+struct KeyCap: View {
+    let symbol: String
+    let spoken: String
+
+    init(_ symbol: String, spoken: String? = nil) {
+        self.symbol = symbol
+        self.spoken = spoken ?? KeyCombo.spoken(symbol)
+    }
+
+    var body: some View {
+        Text(symbol)
+            .font(Theme.Typography.bodyEmphasized)
+            .foregroundStyle(Theme.Palette.primary)
+            .padding(.horizontal, Theme.Metrics.rowSpacing)
+            .frame(minWidth: Theme.Metrics.keyCapHeight, minHeight: Theme.Metrics.keyCapHeight)
+            .background(
+                Theme.Palette.fill,
+                in: RoundedRectangle(cornerRadius: Theme.Metrics.keyCapRadius, style: .continuous)
+            )
+            .accessibilityLabel(spoken)
+    }
+}
+
+/// A shortcut as a row of keys: each modifier and the key, as macOS writes them. Read aloud as one phrase.
+struct KeyCaps: View {
+    let combo: KeyCombo
+
+    var body: some View {
+        HStack(spacing: Theme.Metrics.rowSpacing / 2) {
+            ForEach(Array(combo.parts.enumerated()), id: \.offset) { _, part in
+                KeyCap(part.symbol, spoken: part.spoken)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(combo.parts.map(\.spoken).joined(separator: " "))
+    }
+}
+
 /// A standalone symbol in a fixed square, so glyphs of different widths (bolt, stopwatch, touchid)
 /// share one center and don't nudge their neighbors when they swap.
 struct Glyph: View {

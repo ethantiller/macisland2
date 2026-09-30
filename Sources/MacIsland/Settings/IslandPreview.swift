@@ -136,14 +136,6 @@ final class IslandPreviewModel {
 /// features would otherwise act on the real Mac. The exceptions are the editors: on Home the widgets take drags, and on Tabs
 /// the tab strip takes clicks and drags.
 struct IslandPreview: View {
-    private static let backgroundImage: NSImage? = {
-        let bundleURL = Bundle.main.resourceURL?.appendingPathComponent("MacIsland_MacIsland.bundle")
-        let appResources = bundleURL.flatMap { Bundle(path: $0.path) }
-        let bundle = appResources ?? Bundle.module
-        guard let url = bundle.url(forResource: "macos-background", withExtension: "jpg") else { return nil }
-        return NSImage(contentsOf: url)
-    }()
-
     let model: IslandPreviewModel
     /// While the Home editor is open the preview is its canvas: widgets take drags and clicks, and the rest of the
     /// island (the tab strip) still does not.
@@ -153,12 +145,6 @@ struct IslandPreview: View {
 
     private var isEditingHome: Bool {
         editor != nil && model.context.presentation == .expanded && model.context.tab == .home
-    }
-
-    private var isEditingTabs: Bool { tabEditor != nil && model.context.presentation == .expanded }
-
-    private var headerHeight: CGFloat {
-        model.viewModel.geometry.notchSize.height + Theme.Metrics.contentTopGap
     }
 
     var body: some View {
@@ -176,22 +162,7 @@ struct IslandPreview: View {
                 ),
                 accessibilityLabel: "Preview")
 
-            bandContent
-                .frame(maxWidth: .infinity)
-                .background {
-                    GeometryReader { geometry in
-                        if let backgroundImage = Self.backgroundImage {
-                            Image(nsImage: backgroundImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
-                        } else {
-                            Color(white: 0.28)
-                        }
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            PreviewBand(model: model, editor: editor, tabEditor: tabEditor)
                 .overlay(alignment: .bottomLeading) { arrow(-1) }
                 .overlay(alignment: .bottomTrailing) { arrow(1) }
                 .accessibilityElement(children: .ignore)
@@ -214,6 +185,99 @@ struct IslandPreview: View {
             })
     }
 
+    /// A circled arrow in a corner of the preview: the view before, or the next.
+    private func arrow(_ delta: Int) -> some View {
+        Button {
+            model.step(delta)
+        } label: {
+            Image(systemName: delta < 0 ? "chevron.left" : "chevron.right")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .opacity(model.canStep(delta) ? 1 : 0.35)
+        .disabled(!model.canStep(delta))
+        .padding(10)
+        .accessibilityLabel(delta < 0 ? "Previous View" : "Next View")
+    }
+
+    /// What can be done here, so it is found: swiping, and dragging where the pane allows it.
+    private var hints: some View {
+        VStack(spacing: 3) {
+            if let editor, isEditingHome {
+                HomeEditorHint(editor: editor)
+            } else {
+                Label(
+                    "Swipe left or right on the preview, or use the arrows, to change the view.",
+                    systemImage: "hand.draw")
+            }
+            if model.context.presentation == .menuBar {
+                Label(
+                    "Click an icon, or a module below, to see its window. Turn one on to give it an icon.",
+                    systemImage: "menubar.rectangle")
+            } else if tabEditor != nil {
+                Label(
+                    tabEditor?.hint ?? TabEditor.idleHint,
+                    systemImage: "arrow.left.arrow.right"
+                )
+                .foregroundStyle(tabEditor?.hint == nil ? Color.secondary : Color.accentColor)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+    }
+}
+
+/// The band of desk with the island hung from its top edge at 1:1, and nothing else: no switcher, arrows, or hints. The Settings
+/// preview puts those around it, and the first-run guide uses it alone as its stage. The island is the real `IslandView` over the
+/// model's sample features; the Home and Tabs editors, when given, make their part of it take drags and clicks.
+struct PreviewBand: View {
+    private static let backgroundImage: NSImage? = {
+        let bundleURL = Bundle.main.resourceURL?.appendingPathComponent("MacIsland_MacIsland.bundle")
+        let appResources = bundleURL.flatMap { Bundle(path: $0.path) }
+        let bundle = appResources ?? Bundle.module
+        guard let url = bundle.url(forResource: "macos-background", withExtension: "jpg") else { return nil }
+        return NSImage(contentsOf: url)
+    }()
+
+    let model: IslandPreviewModel
+    var editor: HomeEditor?
+    var tabEditor: TabEditor?
+
+    private var isEditingHome: Bool {
+        editor != nil && model.context.presentation == .expanded && model.context.tab == .home
+    }
+
+    private var isEditingTabs: Bool { tabEditor != nil && model.context.presentation == .expanded }
+
+    private var headerHeight: CGFloat {
+        model.viewModel.geometry.notchSize.height + Theme.Metrics.contentTopGap
+    }
+
+    var body: some View {
+        bandContent
+            .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { geometry in
+                    if let backgroundImage = Self.backgroundImage {
+                        Image(nsImage: backgroundImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                    } else {
+                        Color(white: 0.28)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.cardRadius, style: .continuous))
+    }
+
     /// What fills the band: the island and the menu bar, side by side in one motion. Going to the menu bar the island shrinks and
     /// slides out to the left while the menu bar slides in from the right and its window opens; going back does the opposite.
     private var bandContent: some View {
@@ -226,7 +290,7 @@ struct IslandPreview: View {
             }
         )
         .frame(maxWidth: .infinity)
-        .frame(height: Self.bandHeight)
+        .frame(height: Theme.Metrics.previewBandHeight)
         .clipped()
         .onGeometryChange(for: CGRect.self) {
             $0.frame(in: .named(HomeEditor.space))
@@ -277,58 +341,8 @@ struct IslandPreview: View {
                 }
                 .allowsHitTesting(isEditingHome || isEditingTabs)
         }
-        .frame(width: ScreenGeometry.panelSize.width, height: Self.bandHeight, alignment: .top)
+        .frame(width: ScreenGeometry.panelSize.width, height: Theme.Metrics.previewBandHeight, alignment: .top)
     }
-
-    /// A circled arrow in a corner of the preview: the view before, or the next.
-    private func arrow(_ delta: Int) -> some View {
-        Button {
-            model.step(delta)
-        } label: {
-            Image(systemName: delta < 0 ? "chevron.left" : "chevron.right")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(Color.black.opacity(0.45), in: Circle())
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .opacity(model.canStep(delta) ? 1 : 0.35)
-        .disabled(!model.canStep(delta))
-        .padding(10)
-        .accessibilityLabel(delta < 0 ? "Previous View" : "Next View")
-    }
-
-    /// What can be done here, so it is found: swiping, and dragging where the pane allows it.
-    private var hints: some View {
-        VStack(spacing: 3) {
-            if let editor, isEditingHome {
-                HomeEditorHint(editor: editor)
-            } else {
-                Label(
-                    "Swipe left or right on the preview, or use the arrows, to change the view.",
-                    systemImage: "hand.draw")
-            }
-            if model.context.presentation == .menuBar {
-                Label(
-                    "Click an icon, or a module below, to see its window. Turn one on to give it an icon.",
-                    systemImage: "menubar.rectangle")
-            } else if tabEditor != nil {
-                Label(
-                    tabEditor?.hint ?? TabEditor.idleHint,
-                    systemImage: "arrow.left.arrow.right"
-                )
-                .foregroundStyle(tabEditor?.hint == nil ? Color.secondary : Color.accentColor)
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
-    }
-
-    /// Tall enough for the largest thing the island draws in the preview.
-    static let bandHeight: CGFloat = ScreenGeometry.panelSize.height + 4
 }
 
 /// A two-finger horizontal swipe over the preview, as on the island itself. A local scroll monitor, so it hears the

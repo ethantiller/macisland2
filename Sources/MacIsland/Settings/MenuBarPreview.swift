@@ -97,7 +97,7 @@ struct MenuBarPreview: View {
         let content = viewModel.contentHeight(for: module)
         let padding = Theme.Metrics.floatPadding
         let full = Theme.Metrics.detachedChromeHeight + content + 2 * padding
-        let room = IslandPreview.bandHeight - 26 - 8 - 8 - (settings.isInMenuBar(module) ? 0 : 30)
+        let room = Theme.Metrics.previewBandHeight - 26 - 8 - 8 - (settings.isInMenuBar(module) ? 0 : 30)
         let scale = min(1, room / full)
         return VStack(spacing: Theme.Metrics.rowSpacing) {
             HStack(spacing: 4) {

@@ -31,14 +31,31 @@ struct KeyCombo: Codable, Equatable, Hashable {
 
     var isValid: Bool { modifiers & Self.requiredModifiers != 0 && !label.isEmpty }
 
+    /// The keys one at a time, in the order macOS writes them: each modifier, then the key. `symbol` is what is drawn and
+    /// `spoken` what VoiceOver says.
+    var parts: [(symbol: String, spoken: String)] {
+        var result: [(symbol: String, spoken: String)] = []
+        if modifiers & UInt32(controlKey) != 0 { result.append(("\u{2303}", "Control")) }
+        if modifiers & UInt32(optionKey) != 0 { result.append(("\u{2325}", "Option")) }
+        if modifiers & UInt32(shiftKey) != 0 { result.append(("\u{21E7}", "Shift")) }
+        if modifiers & UInt32(cmdKey) != 0 { result.append(("\u{2318}", "Command")) }
+        result.append((label, Self.spoken(label)))
+        return result
+    }
+
     /// "⌃⌥Space", in the order macOS writes them.
-    var display: String {
-        var text = ""
-        if modifiers & UInt32(controlKey) != 0 { text += "\u{2303}" }
-        if modifiers & UInt32(optionKey) != 0 { text += "\u{2325}" }
-        if modifiers & UInt32(shiftKey) != 0 { text += "\u{21E7}" }
-        if modifiers & UInt32(cmdKey) != 0 { text += "\u{2318}" }
-        return text + label
+    var display: String { parts.map(\.symbol).joined() }
+
+    /// How a key's label is read aloud: arrows and Esc have names, everything else is read as written.
+    static func spoken(_ label: String) -> String {
+        switch label {
+        case "\u{2190}": "Left Arrow"
+        case "\u{2192}": "Right Arrow"
+        case "\u{2191}": "Up Arrow"
+        case "\u{2193}": "Down Arrow"
+        case "Esc": "Escape"
+        default: label
+        }
     }
 
     static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
