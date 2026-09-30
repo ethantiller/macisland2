@@ -29,6 +29,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Format the code in place | `./scripts/format.sh` (see the warning below) |
 | Rebuild the Now Playing adapter | `./scripts/build-adapter.sh` |
 | Show the first-run guide again | `open macisland://guide` |
+| Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, and opens the app |
 | Open Settings on its tour | `open macisland://tour` |
 | See the guide as a fresh install would (debug builds) | `open 'macisland://guide?reset=1'` |
 | Forget the app's macOS permissions | `tccutil reset All com.ethantiller.MacIsland` |
@@ -40,6 +41,10 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Scripts
 
 All are Bash with `set -euo pipefail`, run from anywhere (each `cd`s to the repo root), and live in `scripts/`.
+
+### `first-run.sh` (`make first-run`)
+
+Dev only. Puts this Mac back to a true first run, to test the guide's permission steps. In this order, because the preferences daemon caches: quits MacIsland, runs `tccutil reset All com.ethantiller.MacIsland`, **writes** `onboarding.install fresh` (writing, not deleting: a deleted key would be read as an existing install), `onboarding.guide 0`, and `onboarding.settingsTour 0`, deletes `access.asked` (what the guide asked), and opens `build/MacIsland.app`. Run `make bundle` first.
 
 ### `bundle.sh`
 
@@ -64,7 +69,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 663 tests, about a second.
+lines; 675 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -154,9 +159,9 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `OnboardingState.swift` | `OnboardingState` (which guide and tour versions were seen; `onboarding.*` keys), `InstallEvidence` (existing or fresh) |
 | `OnboardingFlow.swift` | `GuideStepID`, `PracticeGoal`, `GuideStep`, `OnboardingFlow`, `GuideSetup`, `GuideCopy` (every sentence) |
 | `OnboardingModel.swift` | `OnboardingModel` (walks the steps, practice, Skip, Done, Close, Open Settings) and `GuideEnding` |
-| `OnboardingView.swift` | The guide's content (`OnboardingView`), the window's root on glass (`OnboardingRoot`), the access rows and practice line |
+| `OnboardingView.swift` | The guide's content (`OnboardingView`), the window's root on glass (`OnboardingRoot`), the permission step's status and the practice line |
 | `StageInput.swift` | `.stageInput(_:isOn:)`: makes the stage island answer to hover, a click, swipes, and a dragged file |
-| `AccessRequests.swift` | `AccessKind`, `AccessProviding`, `LiveAccess`, `AccessModel` |
+| `AccessRequests.swift` | `AccessKind` (the ten permissions), `AccessAsked`, `AccessProviding`, `LiveAccess` (every request), `AccessModel`, `AccessCenter`, `AppRelaunch` |
 | `BluetoothAccess.swift` | Asks for Bluetooth through `CBCentralManager` and returns the answer |
 
 ### `Island/` (panel, input, state, drawing)
@@ -321,7 +326,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 42 files, about 9,500 lines, **663 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 43 files, about 9,700 lines, **675 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -358,10 +363,11 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
+| `PermissionStepTests.swift` | The permission steps (Grant Permission, Not Now, the order, skipped steps, the copy), what is remembered as asked, and the Shelf not looking in protected folders at launch |
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
 | `SettingsTourTests.swift` | The tour's stops, running, anchors, placement, and visibility |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |
-| `OnboardingSnapshots.swift` | Opt-in: the guide's ten steps and the tour's sixteen stops, light and dark (`40-guide-*`, `43-tour-*`) |
+| `OnboardingSnapshots.swift` | Opt-in: the guide's steps and the tour's sixteen stops, light and dark (`40-guide-*`, `43-tour-*`) |
 
 ---
 

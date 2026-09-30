@@ -17,37 +17,55 @@ struct OnboardingFlowTests {
     // MARK: Flow
 
     @Test func everyStepForAFreshInstall() {
-        let flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: false)
+        let flow = OnboardingFlow.make(seen: 0, replay: false, settled: [])
         #expect(flow.steps.map(\.id) == GuideStepID.allCases)
-        #expect(flow.count == 10)
+        #expect(flow.count == 19)
     }
 
-    @Test func accessIsLeftOutWhenAllAllowed() {
-        let flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: true)
+    @Test func permissionStepsAreLeftOutWhenSettled() {
+        let flow = OnboardingFlow.make(seen: 0, replay: false, settled: Set(AccessKind.allCases))
         #expect(flow.count == 9)
-        #expect(!flow.steps.contains { $0.id == .access })
+        #expect(flow.steps.allSatisfy { $0.id.accessKind == nil })
+        // One settled permission leaves only its own step out, and the rest keep their order.
+        let some = OnboardingFlow.make(seen: 0, replay: false, settled: [.camera, .reminders])
+        #expect(some.count == 17)
+        #expect(!some.steps.contains { $0.id == .camera || $0.id == .reminders })
+        #expect(some.steps.contains { $0.id == .calendars } && some.steps.contains { $0.id == .microphone })
+    }
+
+    @Test func thePermissionStepsComeInTheOrderTheyAreAsked() {
+        let order = GuideStep.all.compactMap(\.id.accessKind)
+        #expect(
+            order == [
+                .calendars, .reminders, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility,
+                .focus, .automation,
+            ])
+        #expect(Set(order) == Set(AccessKind.allCases))
+        for kind in AccessKind.allCases { #expect(GuideStepID(kind).accessKind == kind) }
+        // They sit between the tour of the island and the last step.
+        #expect(GuideStep.all.first?.id == .welcome && GuideStep.all.last?.id == .finish)
     }
 
     @Test func replayShowsEveryStep() {
-        let flow = OnboardingFlow.make(seen: 1, replay: true, allAccessAllowed: false)
+        let flow = OnboardingFlow.make(seen: 1, replay: true, settled: [])
         #expect(flow.steps.map(\.id) == GuideStepID.allCases)
     }
 
     @Test func aRerunShowsOnlyWhatIsNewThenTheLastStep() {
         // Nothing has `since` above 1 yet, so someone who saw version 1 sees just the last step.
-        let flow = OnboardingFlow.make(seen: 1, replay: false, allAccessAllowed: false)
+        let flow = OnboardingFlow.make(seen: 1, replay: false, settled: [])
         #expect(flow.steps.map(\.id) == [.finish])
         #expect(flow.isFirst && flow.isLast)
     }
 
     @Test func nextAndBackClamp() {
-        var flow = OnboardingFlow.make(seen: 0, replay: false, allAccessAllowed: false)
+        var flow = OnboardingFlow.make(seen: 0, replay: false, settled: [])
         flow.back()
         #expect(flow.isFirst && flow.current.id == .welcome)
         for _ in 0..<20 { flow.next() }
         #expect(flow.isLast && flow.current.id == .finish)
         flow.back()
-        #expect(flow.current.id == .access)
+        #expect(flow.current.id == .automation)
     }
 
     @Test func everyStepHasItsStage() {
@@ -396,7 +414,7 @@ struct OnboardingModelTests {
     @Test func aPictureStageLeavesTheKeysToTheRealIsland() {
         let rig = makeRig()
         defer { rig.model.stop() }
-        while rig.model.step.id != .access { rig.model.next() }
+        while rig.model.step.id != .calendars { rig.model.next() }
         #expect(!rig.model.step.stageIsInteractive)
         #expect(!rig.model.toggleStageFromKeyboard())
         #expect(!rig.model.handleKey(UInt16(kVK_LeftArrow)))
@@ -474,7 +492,11 @@ struct OnboardingModelTests {
         await rig.model.skip()
         #expect(rig.ends.list == [.skipped])
         #expect(!rig.state.needsGuide)
-        #expect(rig.access.requests == [.calendars, .bluetooth])
+        #expect(
+            rig.access.requests == [
+                .calendars, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility, .focus,
+                .automation,
+            ])
         #expect(rig.monitorStarts.count == 1)
     }
 
@@ -484,7 +506,7 @@ struct OnboardingModelTests {
         while !rig.model.flow.isLast { rig.model.advance() }
         rig.model.advance()
         #expect(rig.access.requests.isEmpty)
-        #expect(rig.model.flow.count == 10)
+        #expect(rig.model.flow.count == 19)
     }
 
     @Test func endingTwiceDoesNothingTheSecondTime() {

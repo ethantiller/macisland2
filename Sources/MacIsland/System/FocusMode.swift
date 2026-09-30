@@ -19,6 +19,9 @@ final class FocusMode {
 
     @ObservationIgnored private var timer: Timer?
 
+    /// Whether the person has already allowed it, read without asking. The launch starts Focus only when this is true.
+    static var isAuthorized: Bool { INFocusStatusCenter.default.authorizationStatus == .authorized }
+
     /// Starts watching. Asks for permission the first time; call only once it's needed.
     func start() {
         guard timer == nil else { return }

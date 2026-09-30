@@ -70,7 +70,10 @@ struct ShelfView: View {
                 }
             }
             .quickLookPreview(quickLook, in: shelf.items)
-            .onAppear { viewModel.sweepShelf() }
+            .onAppear {
+                viewModel.sweepShelf()
+                shelf.verify()
+            }
         }
     }
 

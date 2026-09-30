@@ -194,13 +194,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectDevices()
         connectCapture()
 
-        // A fresh install's first launches hold back what would prompt on its own (Bluetooth, Downloads): the guide asks at a
-        // moment of its own, and starts them when it ends.
-        let holdsPrompts = onboarding.holdsLaunchPrompts
+        // Nothing prompts at launch, on any install. What has a permission starts only once the person has allowed it (Bluetooth) or
+        // been asked (Downloads, which the system won't say): the guide, Settings \u{2192} Privacy, or first use asks.
         batteryMonitor.start()
-        if !holdsPrompts { accessoryMonitor.start() }
         features.privacy.start()
-        if !holdsPrompts { features.transfers.start() }
+        startPermittedMonitors()
         features.network.start()
         volumeMonitor.start()
         connectShelfChoices()
@@ -400,20 +398,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        let applyAgenda = {
+        // Turning a setting on is the choice to be asked, so its prompt may show. The launch only reads what macOS has decided.
+        let applyAgenda = { (mayAsk: Bool) in
             features.agenda.configure(
-                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders)
+                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders, mayAsk: mayAsk)
         }
-        features.settings.onAgendaChange = applyAgenda
-        applyAgenda()
+        features.settings.onAgendaChange = { applyAgenda(true) }
+        applyAgenda(false)
         features.agenda.start()
 
-        // Focus is only read once something needs it, so macOS asks at a moment that makes sense.
-        let applyQuiet = {
-            if features.settings.quietDuringFocus { features.focus.start() }
+        // Focus is only read once something needs it, so macOS asks at a moment that makes sense: when Quiet in Focus is turned on.
+        // At launch it starts only if it was already allowed.
+        let applyQuiet = { (atLaunch: Bool) in
+            guard features.settings.quietDuringFocus, !atLaunch || FocusMode.isAuthorized else { return }
+            features.focus.start()
         }
-        features.settings.onQuietChange = applyQuiet
-        applyQuiet()
+        features.settings.onQuietChange = { applyQuiet(false) }
+        applyQuiet(true)
     }
 
     /// The first-run guide: what it needs from the app, its links, and showing it at the end of launch when this install hasn't
@@ -421,10 +422,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectOnboarding() {
         let onboarding = onboarding
         SettingsWindowController.shared.onboarding = onboarding
+        let access = LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess, transfers: features.transfers)
+        // Settings \u{2192} Privacy asks through this one, so a grant there does what a grant in the guide does.
+        AccessCenter.model = AccessModel(
+            provider: access, settings: features.settings,
+            onBluetoothAllowed: { [weak self] in self?.accessoryMonitor.start() })
         OnboardingWindowController.shared.context = OnboardingContext(
             features: features, island: viewModel, state: onboarding,
-            access: LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess),
-            startDeferredMonitors: { [weak self] in self?.startDeferredMonitors() },
+            access: access,
+            startDeferredMonitors: { [weak self] in self?.startPermittedMonitors() },
             startAccessoryMonitor: { [weak self] in self?.accessoryMonitor.start() },
             openSettings: { SettingsWindowController.shared.show() })
         urlCommands.onGuide = { reset in
@@ -440,10 +446,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if onboarding.needsGuide { OnboardingWindowController.shared.show(replay: false) }
     }
 
-    /// Starts what `connectEvents` starts, for anything it held back. Safe to call again.
-    private func startDeferredMonitors() {
-        accessoryMonitor.start()
-        features.transfers.start()
+    /// Starts the monitors that have a permission, for the ones whose permission is already settled, and never prompts: Bluetooth
+    /// when it is allowed, Downloads once it has been asked. Run at launch and again when the guide ends. Safe to call again.
+    private func startPermittedMonitors() {
+        if BluetoothAccess.isAllowed { accessoryMonitor.start() }
+        if AccessAsked.contains(.downloads) { features.transfers.start() }
     }
 
     /// Windows torn off the island, and opening Settings from it.

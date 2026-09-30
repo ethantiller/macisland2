@@ -1,7 +1,42 @@
 import Foundation
 
+/// The guide's steps in order. After the tour of the island comes one step for each permission, each optional.
 enum GuideStepID: String, CaseIterable {
-    case welcome, peek, open, tabs, close, modules, drop, menuBar, access, finish
+    case welcome, peek, open, tabs, close, modules, drop, menuBar
+    case calendars, reminders, bluetooth, downloads, camera, microphone, screenRecording, accessibility, focus, automation
+    case finish
+
+    /// The permission a step is about, or nil for the rest.
+    var accessKind: AccessKind? {
+        switch self {
+        case .calendars: .calendars
+        case .reminders: .reminders
+        case .bluetooth: .bluetooth
+        case .downloads: .downloads
+        case .camera: .camera
+        case .microphone: .microphone
+        case .screenRecording: .screenRecording
+        case .accessibility: .accessibility
+        case .focus: .focus
+        case .automation: .automation
+        default: nil
+        }
+    }
+
+    init(_ kind: AccessKind) {
+        switch kind {
+        case .calendars: self = .calendars
+        case .reminders: self = .reminders
+        case .bluetooth: self = .bluetooth
+        case .downloads: self = .downloads
+        case .camera: self = .camera
+        case .microphone: self = .microphone
+        case .screenRecording: self = .screenRecording
+        case .accessibility: self = .accessibility
+        case .focus: self = .focus
+        case .automation: self = .automation
+        }
+    }
 }
 
 /// What a practice line waits for on the stage island, the one in the guide's window.
@@ -50,7 +85,7 @@ struct GuideStep: Equatable {
 
     /// Whether the stage answers to the pointer, a click, swipes, a dragged file, and the keys. The menu bar and the banner are
     /// pictures.
-    var stageIsInteractive: Bool { id != .menuBar && id != .access }
+    var stageIsInteractive: Bool { id != .menuBar && id.accessKind == nil }
 
     static let all: [GuideStep] = [
         GuideStep(id: .welcome, since: 1, practice: nil, stage: PreviewContext(presentation: .compact)),
@@ -65,8 +100,26 @@ struct GuideStep: Equatable {
             id: .modules, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .home)),
         GuideStep(id: .drop, since: 1, practice: .dropFile, stage: PreviewContext(presentation: .compact)),
         GuideStep(id: .menuBar, since: 1, practice: nil, stage: nil),
+        // One step for each permission, each showing what it gives. None is required: Not Now goes on.
+        GuideStep(id: .calendars, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .meeting)),
         GuideStep(
-            id: .access, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .meeting)),
+            id: .reminders, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .reminderDue)),
+        GuideStep(
+            id: .bluetooth, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .headphones)),
+        GuideStep(
+            id: .downloads, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .download)),
+        GuideStep(
+            id: .camera, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .tools)),
+        GuideStep(
+            id: .microphone, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .notes)),
+        GuideStep(
+            id: .screenRecording, since: 1, practice: nil,
+            stage: PreviewContext(presentation: .expanded, tab: .tools)),
+        GuideStep(
+            id: .accessibility, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .tools)),
+        GuideStep(id: .focus, since: 1, practice: nil, stage: PreviewContext(presentation: .compact)),
+        GuideStep(
+            id: .automation, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .media)),
         GuideStep(
             id: .finish, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .home)),
     ]
@@ -77,11 +130,11 @@ struct OnboardingFlow: Equatable {
     private(set) var steps: [GuideStep]
     private(set) var index = 0
 
-    /// Every step for a fresh install or a replay; for a re-run, the steps newer than `seen`, then `finish`. `access` is left
-    /// out when every permission it offers is already allowed.
-    static func make(seen: Int, replay: Bool, allAccessAllowed: Bool) -> OnboardingFlow {
+    /// Every step for a fresh install or a replay; for a re-run, the steps newer than `seen`, then `finish`. A permission's step is
+    /// left out when it is `settled` (allowed, or asked once), so there is nothing to ask.
+    static func make(seen: Int, replay: Bool, settled: Set<AccessKind>) -> OnboardingFlow {
         var steps = GuideStep.all.filter { replay || seen == 0 || $0.since > seen || $0.id == .finish }
-        if allAccessAllowed { steps.removeAll { $0.id == .access } }
+        steps.removeAll { step in step.id.accessKind.map(settled.contains) ?? false }
         return OnboardingFlow(steps: steps)
     }
 
@@ -120,7 +173,16 @@ enum GuideCopy {
         case .modules: "Seven Modules"
         case .drop: "Drop Files on It"
         case .menuBar: "Keep a Module Close"
-        case .access: "Allow What You\u{2019}ll Use"
+        case .calendars: "See Your Next Meeting"
+        case .reminders: "See What\u{2019}s Due"
+        case .bluetooth: "Know When Headphones Connect"
+        case .downloads: "Watch Your Downloads"
+        case .camera: "Check Yourself in Mirror"
+        case .microphone: "Record Voice Notes"
+        case .screenRecording: "Record Your Screen"
+        case .accessibility: "Clean Your Keyboard"
+        case .focus: "Stay Quiet in Focus"
+        case .automation: "Control Music and Spotify"
         case .finish: "Make It Yours"
         }
     }
@@ -153,8 +215,26 @@ enum GuideCopy {
             return dropBody(setup)
         case .menuBar:
             return "Right-click a tab and choose Show in Menu Bar to give that module its own icon. Drag its window\u{2019}s header away to pop it out, and pin it there with Keep on Desktop."
-        case .access:
-            return "Each is optional, and you can change it later in System Settings. Settings \u{2192} Privacy shows where each one stands."
+        case .calendars:
+            return "We need Calendars to show your next meeting in Up Next and a banner before it starts. Without it, your meetings stay out of the island."
+        case .reminders:
+            return "We need Reminders to show what\u{2019}s due in its tab and a banner when something is. Without it, the Reminders tab stays empty."
+        case .bluetooth:
+            return "We need Bluetooth to show you a notification when your AirPods connect, with their battery. Without it, there are no headphone banners and no device switcher."
+        case .downloads:
+            return "We need your Downloads folder to show progress while a file downloads and to tell you when it lands. Without it, downloads go unseen."
+        case .camera:
+            return "We need the camera for Mirror, a quick look at yourself before a call. Without it, Mirror stays off. Nothing is recorded or kept."
+        case .microphone:
+            return "We need the microphone and speech recognition for Voice Notes, which turn what you say into text on this Mac. Without them, a voice note can\u{2019}t be recorded."
+        case .screenRecording:
+            return "We need Screen Recording for Record Screen, which saves a movie of a region or your whole display. Without it, recording can\u{2019}t start. macOS asks you to reopen MacIsland afterward."
+        case .accessibility:
+            return "We need Accessibility for Clean Keys, which holds the keyboard still for 30 seconds while you wipe it. Without it, Clean Keys can\u{2019}t start."
+        case .focus:
+            return "We need Focus access so Quiet in Focus can hold banners back while a Focus is on. Without it, that setting does nothing."
+        case .automation:
+            return "We need permission to control Music and Spotify, so play, pause, and Favorite reach the right app. Open the one you use first; macOS can only ask about an app that is running."
         case .finish:
             return "Choose your tabs, arrange Home, and pick what may interrupt you in Settings. The gear beside the tabs opens it."
         }
@@ -182,6 +262,28 @@ enum GuideCopy {
             return "Drag a file toward \(setup.notch). Drop it on the island to AirDrop it." + screenshots
         case .nothing:
             return "Dragging files to the island is off. Turn it on in Settings \u{2192} Shelf."
+        }
+    }
+
+    /// What a permission step says once the person has answered, or before they have if the system won't say.
+    static func outcome(_ kind: AccessKind, state: PrivacyAccess.State) -> String {
+        switch state {
+        case .notAsked:
+            return "Not asked yet. You can allow it now, or later in Settings \u{2192} Privacy."
+        case .allowed:
+            return kind == .calendars || kind == .reminders
+                ? "Allowed, and turned on in Settings." : "Allowed."
+        case .asked:
+            return "Asked. If you said no, turn it on in System Settings."
+        case .denied:
+            switch kind {
+            case .screenRecording:
+                return "Turn on MacIsland in System Settings \u{2192} Privacy & Security \u{2192} Screen Recording, then reopen MacIsland."
+            case .accessibility:
+                return "Turn on MacIsland in System Settings \u{2192} Privacy & Security \u{2192} Accessibility. It takes effect at once."
+            default:
+                return "It\u{2019}s off, and macOS won\u{2019}t ask again. Turn it on in System Settings."
+            }
         }
     }
 

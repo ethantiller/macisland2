@@ -193,6 +193,9 @@ final class AgendaMonitor {
     @ObservationIgnored private let store = EKEventStore()
     @ObservationIgnored private var wantsCalendar = false
     @ObservationIgnored private var wantsReminders = false
+    /// Whether loading in the background may show the system prompt. False at launch: a permission macOS hasn't decided is only
+    /// read, never asked for, until the person turns a setting on or opens the Reminders tab.
+    @ObservationIgnored private var mayAsk = false
     @ObservationIgnored private var listIsShown = false
     @ObservationIgnored private var announced: Set<String> = []
     @ObservationIgnored private var timer: Timer?
@@ -217,9 +220,12 @@ final class AgendaMonitor {
         }
     }
 
-    func configure(calendar: Bool, reminders: Bool) {
+    /// `mayAsk` is false for the launch, so a permission that was reset (every rebuild resets them) isn't asked for until the person
+    /// chooses; true when a setting is changed, which is the choice.
+    func configure(calendar: Bool, reminders: Bool, mayAsk: Bool = true) {
         wantsCalendar = calendar
         wantsReminders = reminders
+        self.mayAsk = mayAsk
         refresh()
     }
 
@@ -241,7 +247,7 @@ final class AgendaMonitor {
     }
 
     private func loadReminderRows() async {
-        guard await hasAccess(.reminder) else {
+        guard await hasAccess(.reminder, asking: true) else {
             remindersDenied = true
             reminderRows = []
             return
@@ -285,7 +291,7 @@ final class AgendaMonitor {
 
     /// Adds a reminder to the default list. Asks for access the first time.
     func addReminder(title: String) async -> Bool {
-        guard await hasAccess(.reminder) else { return false }
+        guard await hasAccess(.reminder, asking: true) else { return false }
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
         reminder.calendar = store.defaultCalendarForNewReminders()
@@ -322,10 +328,10 @@ final class AgendaMonitor {
         var items: [AgendaItem] = []
         var denied = false
         if wantsCalendar {
-            if await hasAccess(.event) { items += events() } else { denied = true }
+            if await hasAccess(.event, asking: mayAsk) { items += events() } else { denied = true }
         }
         if wantsReminders {
-            if await hasAccess(.reminder) { items += await reminders() } else { denied = true }
+            if await hasAccess(.reminder, asking: mayAsk) { items += await reminders() } else { denied = true }
         }
         isDenied = denied
 
@@ -340,13 +346,15 @@ final class AgendaMonitor {
 
     /// Asks for access to `type` if it was never asked, and says whether it is allowed. The same request the Calendar and
     /// Reminders switches and the Reminders tab make; the first-run guide calls it so a person is asked in one place.
-    func requestAccess(to type: EKEntityType) async -> Bool { await hasAccess(type) }
+    func requestAccess(to type: EKEntityType) async -> Bool { await hasAccess(type, asking: true) }
 
-    private func hasAccess(_ type: EKEntityType) async -> Bool {
+    /// Whether `type` is allowed. Shows the system prompt only when `asking` and it was never asked.
+    private func hasAccess(_ type: EKEntityType, asking: Bool) async -> Bool {
         switch EKEventStore.authorizationStatus(for: type) {
         case .fullAccess:
             return true
         case .notDetermined:
+            guard asking else { return false }
             let granted =
                 type == .event
                 ? try? await store.requestFullAccessToEvents()

@@ -1,4 +1,4 @@
-.PHONY: lint format bundle restart build-and-restart
+.PHONY: lint format bundle restart build-and-restart first-run
 
 lint:
 	./scripts/lint.sh
@@ -15,3 +15,7 @@ restart:
 
 build-and-restart: bundle
 	$(MAKE) restart
+
+# Dev only: back to a first run (resets permissions, marks the install fresh, opens the guide). Run `make bundle` first.
+first-run:
+	./scripts/first-run.sh

@@ -375,7 +375,7 @@ Note picks a note. Right-click any widget on the real island and choose **Edit H
 ## First run
 
 The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it by its header or its edge), with an island you can
-use as its stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
+use as its stage (drawn from sample data, as in Settings). It has nineteen steps (a permission step is left out when that permission is already allowed), and the window never changes height:
 
 | # | Step | What it shows |
 | --- | --- | --- |
@@ -387,8 +387,8 @@ use as its stage (drawn from sample data, as in Settings). It has ten steps, and
 | 6 | Seven Modules | A chip per module; the stage shows the one you choose |
 | 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line |
 | 8 | Keep a Module Close | The menu bar sliding in |
-| 9 | Allow What You'll Use | Calendars, Reminders, and Bluetooth rows (Allow, Allowed, or Open Settings), and a note on what is asked later. Left out when all three are already allowed |
-| 10 | Make It Yours | Open at Login, Open Settings, Done |
+| 9 to 18 | One step per permission: See Your Next Meeting (Calendars), See What's Due (Reminders), Know When Headphones Connect (Bluetooth), Watch Your Downloads (Downloads), Check Yourself in Mirror (Camera), Record Voice Notes (Microphone and Speech), Record Your Screen (Screen Recording), Clean Your Keyboard (Accessibility), Stay Quiet in Focus (Focus), Control Music and Spotify (Automation) | What it gives and what you lose without it, in a banner or tab picture on the stage, and its state: Not asked yet, Allowed (green check), Asked, or Off (red) with **Open System Settings**. While it is waiting, the footer offers **Not Now** (goes on, asks nothing) and **Grant Permission** (the system prompt appears only now); after an answer it is Continue. Screen Recording also offers **Reopen MacIsland**. Left out when already allowed |
+| 19 | Make It Yours | Open at Login, Open Settings, Done |
 
 The **practice lines** ("Try it: ...") watch the island in the window and turn green, beside a check, when you do it there (hover, click or swipe it, drag a file over it, or use Esc, the arrows, or your open shortcut, which goes to it while the guide is up); a file dragged over it is never dropped. They never block
 Continue. The words follow your setup: with no open shortcut the key caps and the keyboard sentences go, the drop step follows
@@ -396,11 +396,10 @@ Continue. The words follow your setup: with no open shortcut the key caps and th
 guide**, which ends only by its own buttons.
 
 Granting Calendars turns on Calendar Events in Up Next, and Reminders turns on Due Reminders. Bluetooth starts the headphones
-monitor. Camera, Microphone and Speech, Screen Recording, Accessibility, and Focus are still asked the first time you use what
-needs them. On a fresh install the headphones and Downloads monitors wait until the guide ends.
+monitor, and Downloads starts the download monitor. **Nothing asks at launch, on any install:** a monitor with a permission starts only once it is allowed (Bluetooth) or asked (Downloads, which macOS won't say), and the Shelf doesn't look inside Desktop, Documents, or Downloads until it is shown. Settings → Privacy has a **Grant** for anything not yet asked.
 
 The ⊗, Done, Open Settings, and Skip each count the guide as seen; quitting with it open does not. **Skip** is temporary: it ends the
-guide at once and then asks every permission not yet asked, one after another. Someone who updates from a build they already used
+guide at once and then asks every permission not yet asked, one after another (ten of them now). Someone who updates from a build they already used
 sees neither the guide nor the tour. **Replay** them from Settings → General → Guide, or with `macisland://guide` and `macisland://tour`.
 
 Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-guide-09-access.png`.

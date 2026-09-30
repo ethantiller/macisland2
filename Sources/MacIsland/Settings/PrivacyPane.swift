@@ -78,6 +78,19 @@ struct PrivacyPane: View {
                         Spacer()
                         Text(item.state.rawValue)
                             .foregroundStyle(.secondary)
+                        // Nothing has asked yet: this is where to ask, at a moment of your own choosing. Speech Recognition is asked
+                        // with the Microphone.
+                        if item.state == .notAsked,
+                            let kind = AccessKind(rawValue: item.id == "speech" ? AccessKind.microphone.rawValue : item.id)
+                        {
+                            Button("Grant") {
+                                Task {
+                                    await AccessCenter.model?.allow(kind)
+                                    access = PrivacyAccess.current()
+                                }
+                            }
+                            .buttonStyle(.borderless)
+                        }
                         Button("Open System Settings") { NSWorkspace.shared.open(item.settingsURL) }
                             .buttonStyle(.borderless)
                     }
@@ -87,7 +100,9 @@ struct PrivacyPane: View {
             } header: {
                 Text("Access").id(SettingsAnchor.access)
             } footer: {
-                Text("Read without asking. A permission is asked for only when you use what needs it.")
+                Text(
+                    "Read without asking. Grant asks for one now; nothing is asked at launch, only here, in the welcome guide, or when you use what needs it."
+                )
             }
         }
         .formStyle(.grouped)

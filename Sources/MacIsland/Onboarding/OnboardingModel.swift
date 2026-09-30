@@ -50,7 +50,7 @@ final class OnboardingModel {
         openSettingsWindow = openSettings
         self.onEnd = onEnd
         lastIsland = PracticeGoal.Island(preview.viewModel)
-        flow = OnboardingFlow.make(seen: state.guideSeen, replay: replay, allAccessAllowed: access.allAllowed)
+        flow = OnboardingFlow.make(seen: state.guideSeen, replay: replay, settled: access.settled)
         showStage(animated: false)
     }
 
@@ -71,6 +71,29 @@ final class OnboardingModel {
     var practice: PracticeGoal? { GuideCopy.practice(for: step, setup: setup) }
     var isPracticeMet: Bool { practiceMet.contains(step.id) }
     var primaryTitle: String { GuideCopy.primaryTitle(step.id, isLast: flow.isLast) }
+
+    // MARK: Permissions
+
+    /// The permission this step is about, if it is one.
+    var accessKind: AccessKind? { step.id.accessKind }
+
+    /// Where that permission stands now.
+    var accessState: PrivacyAccess.State? { accessKind.map { access.state(of: $0) } }
+
+    /// A permission step that is still waiting for an answer: it offers **Grant Permission** and **Not Now** instead of Continue.
+    var isAskingPermission: Bool { accessState == .notAsked }
+
+    /// **Grant Permission**: the system prompt appears only now. The step stays, showing how it was answered.
+    func grant() async {
+        guard let kind = accessKind else { return }
+        await access.allow(kind)
+    }
+
+    /// **Not Now**: nothing is asked, and the guide goes on. The permission is asked for at first use, or from Settings \u{2192} Privacy.
+    func notNow() {
+        guard accessKind != nil else { return }
+        next()
+    }
 
     // MARK: Moving
 

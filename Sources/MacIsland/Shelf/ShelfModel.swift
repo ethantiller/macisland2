@@ -53,9 +53,11 @@ final class ShelfModel {
         self.ownedFolder = ownedFolder
         self.trash = trash
         let paths = defaults.stringArray(forKey: defaultsKey) ?? []
+        // Looking for a file in Desktop, Documents, or Downloads makes macOS ask for that folder, so those are taken on trust here and
+        // checked when the Shelf is shown (`verify()`): nothing prompts at launch.
         let existing =
             paths
-            .filter { FileManager.default.fileExists(atPath: $0) }
+            .filter { Self.isInProtectedFolder($0) || FileManager.default.fileExists(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
         let stored = defaults.dictionary(forKey: addedKey) as? [String: Date] ?? [:]
         let start = now()
@@ -72,6 +74,23 @@ final class ShelfModel {
             added[url.path] = now()
         }
         save()
+    }
+
+    /// Whether `path` is inside Desktop, Documents, or Downloads, where looking for a file can show a system prompt.
+    nonisolated static func isInProtectedFolder(_ path: String) -> Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["Desktop", "Documents", "Downloads"].contains { path.hasPrefix(home + "/" + $0 + "/") }
+    }
+
+    /// Takes off what is no longer there. Run when the Shelf appears, which is a use, and so a fine moment for a folder prompt.
+    @discardableResult
+    func verify() -> Int {
+        let gone = items.filter { !FileManager.default.fileExists(atPath: $0.path) }
+        guard !gone.isEmpty else { return 0 }
+        items.removeAll { gone.contains($0) }
+        for url in gone { added[url.path] = nil }
+        save()
+        return gone.count
     }
 
     /// `~/Library/Application Support/MacIsland/Shelf Results`.

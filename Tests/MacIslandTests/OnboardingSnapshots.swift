@@ -98,7 +98,7 @@ struct OnboardingSnapshots {
         let guide = makeGuide(access: StubAccess(states: [.calendars: .allowed, .reminders: .denied]))
         defer { guide.model.stop() }
         try await Task.sleep(for: .milliseconds(150))
-        while guide.model.step.id != .access { guide.model.next(animated: false) }
+        while guide.model.step.id != .calendars { guide.model.next(animated: false) }
         renderGuide(guide, "40-guide-09-access-mixed")
     }
 

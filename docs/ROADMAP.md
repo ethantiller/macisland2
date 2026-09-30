@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (663 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (675 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -35,7 +35,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
-- **First run:** a ten-step guide (floating glass in the middle of the screen, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a sixteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
+- **First run:** a guide (floating glass in the middle of the screen, the real island as its stage, practice checks, then one step per permission with Grant Permission and Not Now) and a sixteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
@@ -68,11 +68,11 @@ Where the app ended up differently from what was first planned, and why. The des
 | `expandedWidth` stays 520; the right side gets one tab | Fits without widening |
 | Agents is an idea, not a module | The user moved to everyday features: see [Next](#next) and [Ideas](#ideas) |
 | **The first-run guide is floating glass, centered on the screen and draggable**, with the real island as its stage; the tour is a black callout with an accent ring | The island is too small, folds when the pointer leaves, and would block the practice steps. A standard window reads as a template. It first hung below the island; it is centered (asked for), and the open island covers its top while it is practised on |
-| **The guide asks for Calendars, Reminders, and Bluetooth** (Skip asks for all three); everything else is still asked on first use | Those power things that arrive on their own, so there is no first use to ask at. The rest send the person to System Settings, which is best next to the feature |
+| **The guide asks for each permission in turn** (ten steps, each optional; Skip asks for all of them), and **nothing asks at launch, on any install** | Those power things that arrive on their own, so there is no first use to ask at. The rest send the person to System Settings, which is best next to the feature |
 | **Existing installs skip both the guide and the tour**; closing the guide with ⊗ counts as seen | An updater knows the app; the state is written once because every clean quit writes `notes.json` |
 | Granting Calendars or Reminders in the guide also turns on its Up Next switch | The permission and the choice it serves are one step |
 | The guide does not teach the palette | It was removed on 2026-09-30 |
-| Launch-time Bluetooth and Downloads monitors wait for the guide on a fresh install | They can show system prompts over the guide. Checkpoint 0 (measuring which prompts appear at launch) was not done, so this is precautionary; if none appear, delete `OnboardingState.holdsLaunchPrompts` and what uses it |
+| Launch-time monitors with a permission start only once it is allowed or asked (`startPermittedMonitors`), on every install | Every rebuild resets permissions, so the prompts used to appear at launch on an existing install too. `OnboardingState.holdsLaunchPrompts` is no longer used by the launch and can be deleted |
 | AirDrop blue (`Tint.airDrop`) is an exception to "one meaning per color" | It marks the AirDrop target, beside `AirDropGlyph`, so it reads as AirDrop and not as storage |
 
 ---
@@ -420,6 +420,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Seven Modules: every chip shows its tab at 1:1. Drag a Finder file toward the notch: the drop step turns green. The menu bar step slides to the menu bar and comes back on Back
 - [ ] Access (after `tccutil reset Calendar`, `Reminders`, and `BluetoothAlways` for `com.ethantiller.MacIsland`): each Allow shows its prompt once, above the guide; Allowed and Off draw as specified; granting Calendars turns on Calendar Events in Settings → Home → Up Next. The step is left out when all three are allowed
 - [ ] On a fresh install, no Bluetooth or Downloads prompt appears before the guide; both work after it ends. Note any prompt that does appear at launch
+- [ ] The permission steps (written, not run): run `make bundle && make first-run` (quits the app, resets permissions, writes the fresh-install state, opens it); each of the ten steps shows its reason and **Not Now** and **Grant Permission**; nothing prompts until Grant is pressed; Not Now on all ten completes the guide; Grant shows Allowed (green) or Off with **Open System Settings**; Screen Recording shows what to do and **Reopen MacIsland**; Automation works with Music or Spotify open (and says to open one); a step for something already allowed is skipped
+- [ ] Nothing prompts at launch: after `make first-run`, then a later rebuild with `make build-and-restart` (which resets permissions), no system prompt appears until something is used or **Grant** is pressed in Settings → Privacy, with Calendar Events, Quiet in Focus, and a Shelf with files in Downloads all on. If one still appears, note which and what it was doing
 - [ ] Skip (temporary) on step 1 closes the guide and then shows the pending prompts one after another
 - [ ] Open at Login toggles (from the bundle); Open Settings closes the guide, opens Settings, and starts the tour
 - [ ] The tour: the ring follows the Shortcut row while scrolling General and while resizing the window from 830 × 600 to large (if it doesn't, use the fallback in ARCHITECTURE's gotchas); all 16 stops at the minimum size and a large size, in light and dark; clicking a pane in the sidebar mid-tour jumps; closing the window ends it and it doesn't come back; scrolling the target away docks the callout with Show Me; hiding the sidebar on stop 1 docks it too
