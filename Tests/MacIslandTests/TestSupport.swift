@@ -15,7 +15,8 @@ enum TestSupport {
         let suite = "MacIslandTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let shelf = ShelfModel(defaults: defaults)
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let shelf = ShelfModel(defaults: defaults, ownedFolder: scratch.appendingPathComponent("Shelf Results"))
         let work = WorkTracker()
         let notes = NotesModel(
             directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
@@ -45,7 +46,8 @@ enum TestSupport {
                 weather: WeatherModel(),
                 fileTools: FileTools(
                     shelf: shelf, work: work, recognizer: StubRecognizer(),
-                    pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+                    pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString)),
+                    stagingRoot: scratch.appendingPathComponent("Staging")
                 ),
                 notes: notes,
                 keyboardCleaner: KeyboardCleaner(),

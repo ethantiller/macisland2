@@ -214,10 +214,10 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 A **Files / Clipboard** choice.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
-  kept; files stay where they are. Double-click opens, drag out to use, hover for an ✕. **Space** over an item previews it with
+  kept; files stay where they are. Each file shows its own preview (QuickLook thumbnails, kept in memory only; the file's icon until one arrives), centered in the row. Double-click opens, drag out to copy it where you drop it (the original never moves), hover for an ✕ that takes it off the Shelf. **Space** over an item previews it with
   Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text from Image* or *Copy Text from PDF*, *Zip*, *Unzip*,
   *Convert To*, *Resize* and *Compress* (images), or *Show in Finder*. **Zip All** zips everything; **Combine into PDF** joins
-  two or more images and PDFs. Results land on the Shelf. New screenshots are added automatically.
+  two or more images and PDFs. **A result asks where it goes.** Zip, Unzip, Convert To, Resize, Compress, and Combine make their file in a temporary staging folder, and the Shelf shows it with three choices: **Add to Shelf** (the file moves into `~/Library/Application Support/MacIsland/Shelf Results`, and goes to the Trash if you later take it off the Shelf), **Replace** (it takes the original's place on the Shelf; the original file on disk is never touched), or **Save to Folder…** (the system save panel; cancelling it leaves the choice waiting). The ✕ throws it away. If the island folds first, the result keeps waiting, and a green alert stays until you open the island on the Shelf. New screenshots, recordings, and voice notes still go straight to the Shelf.
   - **Copy Text from Image** (and from a PDF) reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
     first; only pages without text are read as images, up to 10. It says *Copied*, or *No Text Found*.
   - **Convert To** is offered for every kind, and never lists the format the file already is:

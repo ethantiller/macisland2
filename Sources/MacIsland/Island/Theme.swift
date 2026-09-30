@@ -135,6 +135,11 @@ enum Theme {
         static let shelfChoiceWidth: CGFloat = 150
         /// The Shelf: a Files or Clipboard choice, and cards tall enough for a smart action.
         static let shelfHeight: CGFloat = 96
+        /// A file's preview on the Shelf: as large as the row allows under the header, with its name below.
+        static let shelfThumbnail: CGFloat = 42
+        /// The ✕ that takes a file off the Shelf: its disc, and the larger area that takes the click.
+        static let shelfRemove: CGFloat = 16
+        static let shelfRemoveHit: CGFloat = 24
         /// Notes: the mode picker, then a list and editor (or the prompter and its controls).
         static let notesHeight: CGFloat = 28 + 8 + 112
         /// Reminders: the add field, then four rows of the list.

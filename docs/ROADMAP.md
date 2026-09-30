@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (652 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (663 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -98,7 +98,7 @@ packages in order, and tick each one when it lands (with its hand checks added t
 ### N1: Shelf and files
 
 **Goal:** everything you'd do to a file on the Shelf, on-device, run like Zip already runs: `FileTools.run`, the blue
-"working" activity, and the result added to the Shelf.
+"working" activity, and the result waiting for a choice (Add to Shelf, Replace, or Save to Folder), no longer added automatically.
 
 | Feature | Where | How |
 | --- | --- | --- |
@@ -426,6 +426,14 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**The Shelf's files (written, not run)**
+- [ ] Previews: images, PDFs, movies, and documents show their own thumbnail (the icon until it arrives); a file with no preview keeps its icon; scrolling a long Shelf stays smooth and idle CPU is unchanged
+- [ ] The row is centered under the header for one file and for many, and the empty state and the Clipboard row agree
+- [ ] The ✕ on a hovered file is a clean disc, easy to click, and labelled for VoiceOver; it never shows the gray glyph
+- [ ] Dragging out (*cause unconfirmed: my guess is that the NSURL provider let Finder move the file and that the double-click gesture delayed the drag*): drag a file to the Desktop, Finder, Mail, and a browser upload; the original stays where it was (copy, never move); the item stays on the Shelf; the island doesn't fold mid-drag and closes shortly after; the drop target doesn't get stuck. If it is still glitchy, replace `onDrag` with an AppKit `NSDraggingSource`
+- [ ] Zip, Convert To, Resize, Compress, Combine, Unzip: a strip with **Add to Shelf**, **Replace**, **Save to Folder…** and ✕ appears, with nothing written beside the original; each outcome works; Save to Folder opens the save panel and the island stays open behind it; cancelling the panel leaves the choice; folding the island first leaves it waiting and a green alert; quitting leaves no `MacIsland Results` in the temp folder
+- [ ] Removing or clearing a result added to the Shelf moves that file to the Trash; a file saved to a folder, or an original, is never touched
 
 **The island stays open (written, not run)**
 - [ ] Right-click a Shelf file and move into the menu, then into **Convert To** and **Resize**: the island stays open; when the menu closes with the pointer outside, it folds after a moment. The same for the clipboard card, the tab strip, Home's widget menu, the Tools pin menu, the Media output chip's menu, and Notes' Delete

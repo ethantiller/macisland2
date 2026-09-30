@@ -494,6 +494,24 @@ change with nothing wired. A phase that is running, or paused, keeps `startedLen
 it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
 against the new number.
 
+### The Shelf's results
+
+A job that makes a file (`FileTools.zip`, `unzip`, `convert`, `combinePDF`, `resize`, `compress`) writes into its own folder under
+`$TMPDIR/MacIsland Results/<uuid>/` and ends as a `ShelfResult` in `FileTools.pending` (which is `@Observable`; the Shelf shows the first in
+`ShelfResultStrip`). Nothing else is written until a choice: `addToShelf` moves the file into `ShelfModel.ownedFolder`
+(`~/Library/Application Support/MacIsland/Shelf Results`) and adds the entry; `replaceInShelf` does the same and swaps the entry for
+the sources' (`ShelfModel.replace`); `saveToFolder` asks `chooseDestination` (the system save panel, replaced in tests) and moves the
+file there, and a cancelled panel leaves it pending; `discard` removes the staging folder. `cleanUpStaging()` removes the whole root at
+launch and on quit. **A file is only ever trashed from `ownedFolder`**: when an entry whose file is in it leaves the Shelf (removed,
+cleared, swept, or replaced) it goes to the Trash; files anywhere else, including the originals and anything saved to a folder, are
+never touched. The save panel runs under `IslandViewModel.holding(.panel)`. Screenshots, recordings, and voice notes bypass all this
+and go straight to the Shelf. A result that nobody answers stays pending for the life of the app only (it is not persisted).
+
+**Dragging out** uses `.onDrag` with `NSItemProvider(contentsOf:)` (a file provider, so a drop copies and never moves the original) and the
+thumbnail as the preview; the double click is a `simultaneousGesture` so it can't hold back the start of a drag. The cause of the earlier
+glitches was not confirmed by running; fall back to an `NSDraggingSource` if they persist. **Thumbnails** are `ShelfThumbnails`: QuickLook
+Thumbnailing, in an `NSCache` of 64, keyed by path, modification date, and size, asked from `.task(id:)` so a departing item cancels its work.
+
 ### Holds: what keeps the island open
 
 `IslandHold` names the reasons the island stays open while the pointer is elsewhere: `.menu`, `.quickLook`, `.panel`, `.textFocus`, and `.mirror`.
@@ -567,7 +585,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **652 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **663 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

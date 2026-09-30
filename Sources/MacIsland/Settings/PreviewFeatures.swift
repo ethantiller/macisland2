@@ -26,7 +26,8 @@ enum PreviewFeatures {
     /// hold listeners that must not be created and dropped every time Settings opens.
     static func make(live: IslandFeatures, scratch: Scratch) -> IslandFeatures {
         let defaults = scratch.defaults
-        let shelf = ShelfModel(defaults: defaults)
+        let shelf = ShelfModel(
+            defaults: defaults, ownedFolder: scratch.directory.appendingPathComponent("Shelf Results"))
         let work = WorkTracker()
         let notes = NotesModel(directory: scratch.directory.appendingPathComponent("Notes"))
         let note = notes.addNote()
@@ -65,7 +66,8 @@ enum PreviewFeatures {
             weather: weather,
             fileTools: FileTools(
                 shelf: shelf, work: work, recognizer: InertRecognizer(),
-                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString)),
+                stagingRoot: scratch.directory.appendingPathComponent("Staging")
             ),
             notes: notes,
             keyboardCleaner: KeyboardCleaner(),

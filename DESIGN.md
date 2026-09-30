@@ -172,7 +172,7 @@ does not get a setting. A widget's size on Home's grid is arrangement, like its 
 - **Clock.** Timer, Stopwatch, and Pomodoro share the tab. Pomodoro chains focus sessions (four by default) with short
   breaks and a long break, then stops; the lengths are a personal choice (Settings → Clock), 25, 5, 15, and 4 until changed. Its streak and 7-day chart live under the ring. Setting a timer uses a minute dial: a ruler of 8 pt-pitch ticks that slides under a fixed orange marker (the `dial*` tokens), fading toward both edges like the Prompter, with no lit or unlit side. It follows a drag 1:1 and stretches with resistance past its ends.
 - **Shelf.** Right-click an item to preview, share, copy its text, zip, unzip, convert, resize, compress, or show it in Finder. These
-  run as the blue "in progress" activity; the result is added to the Shelf. Clipboard text that is only a link,
+  run as the blue "in progress" activity; the result waits in a strip that takes the Shelf's row, with **Add to Shelf**, **Replace**, and **Save to Folder…** (an inline choice, not a banner, because a banner has at most two actions) and a ✕ to discard it. Files show their own thumbnail (`shelfThumbnail`), the row is centered under the header, and the ✕ on a hovered file is an inverse glyph on a primary disc (`shelfRemove`). Clipboard text that is only a link,
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.

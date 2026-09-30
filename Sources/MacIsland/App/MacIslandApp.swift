@@ -114,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        features.fileTools.cleanUpStaging()
         features.notes.save()
         features.nowPlaying.stop()
     }
@@ -334,6 +335,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         features.fileTools.onDone = { [diskSpace] word in
             viewModel.flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: word))
+            diskSpace.check()
+        }
+        // A stale staging folder from a run that didn't quit cleanly goes now; nothing pending survives a launch.
+        features.fileTools.cleanUpStaging()
+        // A result waits in the Shelf for a choice; the alert stays until the island is opened, on the Shelf.
+        features.fileTools.onResult = { [diskSpace] result in
+            viewModel.flash(
+                IslandAlert(
+                    systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: result.verb,
+                    staysUntilSeen: true, opensTab: .shelf),
+                respectingFocus: false)
             diskSpace.check()
         }
         features.fileTools.onNote = { note in viewModel.flash(note, respectingFocus: false) }

@@ -64,7 +64,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 652 tests, about a second.
+lines; 663 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -232,11 +232,12 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 
 | File | Contains |
 | --- | --- |
-| `ShelfModel.swift` | The files on the Shelf (paths only) and AirDrop |
+| `ShelfModel.swift` | The files on the Shelf (paths only, plus the folder MacIsland owns for results) and AirDrop |
+| `ShelfThumbnails.swift` | QuickLook thumbnails for Shelf files, cached in memory |
 | `ShelfView.swift` | The Files and Clipboard views, drop tiles, item and card views with their menus |
 | `ClipboardHistory.swift` | The pasteboard poller and the memory-only history (0, 10, 25, or 50 items) |
 | `SmartAction.swift` | Detects a lone link, address, or `#hex` color and names the action |
-| `FileTools.swift` | Zip, unzip, and the Shelf jobs (convert, combine, resize, compress, Copy Text), unique names |
+| `FileTools.swift` | Zip, unzip, and the Shelf jobs (convert, combine, resize, compress, Copy Text): staged results and the choice of where they go, unique names |
 | `Converters.swift` | `FileKind`, `ConversionTarget`, and every converter: images, documents, PDF, video, audio, plus `MarkdownText` |
 | `TextRecognizer.swift` | `RecognizedText`, `TextRecognizing`, and the Vision recognizer |
 | `ScreenshotWatcher.swift` | A Spotlight query for new screenshots |
@@ -320,12 +321,13 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 41 files, about 9,200 lines, **652 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 42 files, about 9,500 lines, **663 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
 | `TestSupport.swift` | `makeViewModel()`: a view model from test doubles |
 | `KeyboardTests.swift` | Hotkey pinning, arrow tabs, banners |
+| `ShelfResultTests.swift` | Staged results and their three outcomes, what is trashed, previews' cache key |
 | `HoldTests.swift` | The named holds (menu, Quick Look, panel, text focus, Mirror): what they block and when the close resumes |
 | `SettingsPreviewTests.swift`, `SettingsSnapshots.swift` | The Settings preview: size parity, isolation, sample data; its opt-in renders |
 | `CustomWidgetTests.swift` | Web values, freshness and overlap, `BoundedProcess` (timeout, cap, environment), custom widgets in settings |

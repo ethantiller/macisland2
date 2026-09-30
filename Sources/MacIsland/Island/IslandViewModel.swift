@@ -812,6 +812,25 @@ final class IslandViewModel {
         quickLookURL = url
     }
 
+    // MARK: Shelf results
+
+    func addResultToShelf(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { _ = features.fileTools.addToShelf(result) }
+    }
+
+    func replaceWithResult(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { _ = features.fileTools.replaceInShelf(result) }
+    }
+
+    /// The save panel is the island's own: it stays open behind it (the `.panel` hold), and the choice waits if the panel is cancelled.
+    func saveResultToFolder(_ result: ShelfResult) {
+        Task { _ = await holding(.panel) { await features.fileTools.saveToFolder(result) } }
+    }
+
+    func discardResult(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { features.fileTools.discard(result) }
+    }
+
     /// Space over a Shelf file. Returns `false` when there is nothing to preview, so the key passes on.
     func quickLookHoveredItem() -> Bool {
         guard state == .expanded, selectedTab == .shelf, shelfMode == .files, let url = hoveredShelfItem,
