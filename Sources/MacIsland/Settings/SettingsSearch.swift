@@ -32,6 +32,7 @@ enum SettingsAnchor {
     static let rowOrder = "tools.roworder"
     static let shortcutTools = "tools.shortcuts"
     static let interruptions = "notifications.interruptions"
+    static let volumeHUD = "notifications.volume"
     static let power = "notifications.power"
     static let devices = "notifications.devices"
     static let yourDay = "notifications.day"
@@ -177,6 +178,10 @@ enum SettingsSearch {
                 pane: .tools, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
                 anchor: SettingsAnchor.rowOrder),
             // Notifications
+            .init(
+                pane: .notifications, title: "Replace the Volume HUD",
+                keywords: ["volume", "sound", "keys", "hud", "speaker", "mute", "accessibility"],
+                anchor: SettingsAnchor.volumeHUD),
             .init(
                 pane: .notifications, title: "Quiet in Focus", keywords: ["do not disturb", "dnd", "silence", "mute"],
                 anchor: SettingsAnchor.interruptions),

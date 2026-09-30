@@ -17,6 +17,18 @@ struct NotificationsPane: View {
                     "While a Focus is on, banners and alerts wait. Anything that needs you still shows. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows."
                 )
             }
+            Section {
+                Toggle("Replace the Volume HUD", isOn: Bindable(settings).replacesVolumeHUD)
+                    .onChange(of: settings.replacesVolumeHUD) {
+                        preview?.show(PreviewContext(presentation: .banner, showsVolume: true))
+                    }
+            } header: {
+                Text("Volume").id(SettingsAnchor.volumeHUD)
+            } footer: {
+                Text(
+                    "Shows the volume in the island instead of the system\u{2019}s square. MacIsland takes the volume and mute keys, which needs Accessibility access: turning this on asks, and stays off until it is allowed. Turning it off, or taking the access away, gives the keys back at once. Only while the island is folded; open, or with an alert that needs you, the system shows its own. An output that has no volume (some HDMI and DisplayPort displays) is left to the system."
+                )
+            }
             ForEach(AmbientEvent.Group.allCases) { group in
                 Section {
                     ForEach(AmbientEvent.allCases.filter { $0.group == group }) { event in

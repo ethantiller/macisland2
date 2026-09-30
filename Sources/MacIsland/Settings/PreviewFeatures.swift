@@ -84,6 +84,9 @@ enum PreviewFeatures {
 
 /// What the preview shows: a track, a forecast, a meeting.
 enum PreviewSamples {
+    /// The level the volume HUD shows in the preview.
+    static let volume = VolumeLevel(fraction: 0.62, isMuted: false)
+
     static func track() -> NowPlayingState {
         var state = NowPlayingState()
         state.title = "Midnight City"

@@ -60,6 +60,8 @@ final class AppSettings {
     @ObservationIgnored var onWeatherChange: (() -> Void)?
     /// Synced Lyrics was turned on or off.
     @ObservationIgnored var onLyricsChange: (() -> Void)?
+    /// Replace the Volume HUD was turned on or off.
+    @ObservationIgnored var onVolumeHUDChange: (() -> Void)?
 
     private(set) var launchAtLogin: Bool
 
@@ -229,6 +231,15 @@ final class AppSettings {
         }
     }
 
+    /// The island's volume HUD instead of the system's: MacIsland takes the volume keys, which needs Accessibility access, so it is off
+    /// until turned on and stays off until that is granted.
+    var replacesVolumeHUD: Bool {
+        didSet {
+            defaults.set(replacesVolumeHUD, forKey: Key.volumeHUD)
+            onVolumeHUDChange?()
+        }
+    }
+
     var pinLimit: PinLimit {
         didSet { defaults.set(pinLimit.rawValue, forKey: Key.pinLimit) }
     }
@@ -308,6 +319,7 @@ final class AppSettings {
         static let pinLimit = "pinLimit"
         static let fullCharge = "fullChargeLevel"
         static let lyrics = "showsLyrics"
+        static let volumeHUD = "replacesVolumeHUD"
         static let pomodoroFocus = "pomodoroFocus"
         static let pomodoroShortBreak = "pomodoroShortBreak"
         static let pomodoroLongBreak = "pomodoroLongBreak"
@@ -340,6 +352,7 @@ final class AppSettings {
         showsReminders = defaults.bool(forKey: Key.reminders)
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
         showsLyrics = defaults.object(forKey: Key.lyrics) as? Bool ?? true
+        replacesVolumeHUD = defaults.bool(forKey: Key.volumeHUD)
         let storedFull = defaults.integer(forKey: Key.fullCharge)
         fullChargeLevel = Self.fullChargeRange.contains(storedFull) ? storedFull : 100
         // Absent (or 0) is never chosen: the default. A stored value outside its range is pulled in.

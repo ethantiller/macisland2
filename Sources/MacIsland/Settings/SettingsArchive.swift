@@ -28,6 +28,7 @@ struct SettingsArchive: Codable, Equatable {
     var clipboardLimit: Int?
     var shelfMode: String?
     var showsLyrics: Bool?
+    var replacesVolumeHUD: Bool?
     var showsMusicCompact: Bool?
     var pinLimit: Int?
     var pinnedTools: [String]?
@@ -74,6 +75,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.clipboardLimit = settings.clipboardLimit
         archive.shelfMode = settings.shelfMode.rawValue
         archive.showsLyrics = settings.showsLyrics
+        archive.replacesVolumeHUD = settings.replacesVolumeHUD
         archive.showsMusicCompact = settings.showsMusicCompact
         archive.pinLimit = settings.pinLimit.rawValue
         archive.pinnedTools = settings.pinnedTools.map(\.rawValue)
@@ -143,6 +145,7 @@ extension AppSettings {
         if let value = archive.clipboardLimit, ClipboardHistory.limits.contains(value) { clipboardLimit = value }
         if let value = archive.shelfMode.flatMap(ShelfMode.init) { shelfMode = value }
         if let value = archive.showsLyrics { showsLyrics = value }
+        if let value = archive.replacesVolumeHUD, value != replacesVolumeHUD { replacesVolumeHUD = value }
         if let value = archive.showsMusicCompact { showsMusicCompact = value }
         if let value = archive.pinLimit.flatMap(PinLimit.init) { pinLimit = value }
         // Before the row, which may name them.

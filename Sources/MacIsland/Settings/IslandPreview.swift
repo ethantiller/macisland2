@@ -21,6 +21,8 @@ struct PreviewContext: Equatable {
     var menuBarTab: IslandModule = .home
     /// The ambient event whose banner or alert the Banner presentation shows.
     var event: AmbientEvent?
+    /// The volume HUD's alert, as the compact island shows it.
+    var showsVolume = false
     /// A file is being dragged toward the island: the compact preview shows the drop target the setting chose.
     var fileDrag = false
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
@@ -106,6 +108,12 @@ final class IslandPreviewModel {
             case .peek:
                 clearAnnouncements()
                 viewModel.state = .peek
+            case .banner where context.showsVolume:
+                clearAnnouncements()
+                viewModel.state = .compact
+                var alert = Announcements.volume(PreviewSamples.volume)
+                alert.staysUntilSeen = true
+                viewModel.flash(alert, respectingFocus: false)
             case .banner:
                 clearAnnouncements()
                 let announcement =

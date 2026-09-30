@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
     private var menuHold: MenuHoldObserver?
+    private let volumeHUD = VolumeHUDController()
     private var sigtermSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -190,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectAgenda()
         connectWeather()
         connectLyrics()
+        connectVolumeHUD()
         connectStorage()
         connectDevices()
         connectCapture()
@@ -313,6 +315,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         features.settings.onLyricsChange = apply
         apply()
+    }
+
+    /// The island's own volume HUD, while Replace the Volume HUD is on. The tap exists only then.
+    private func connectVolumeHUD() {
+        let hud = volumeHUD
+        let features = features
+        let viewModel = viewModel
+        hud.canShow = { viewModel.canShowVolumeHUD }
+        // Clean Keys holds its own tap, and has the keys to itself while it does.
+        hud.isSuspended = { features.keyboardCleaner.isLocked }
+        hud.onShow = { viewModel.showVolume($0) }
+        hud.onLostAccess = { [weak self] in
+            // The permission was taken away: the tap is gone and the system's HUD is back. The setting follows, and says so.
+            self?.features.settings.replacesVolumeHUD = false
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "speaker.wave.2.fill", tint: Theme.Tint.attention, title: "Volume HUD Turned Off",
+                    detail: "Accessibility access was turned off"),
+                for: .seconds(6), respectingFocus: false)
+        }
+        features.settings.onVolumeHUDChange = { [weak self] in self?.applyVolumeHUD(userInitiated: true) }
+        // Back from System Settings, it tries again without asking.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyVolumeHUD(userInitiated: false) }
+        }
+        applyVolumeHUD(userInitiated: false)
+    }
+
+    /// Starts or stops the tap to match the setting. At launch, and on coming back to the app, it never asks for anything: without
+    /// Accessibility it waits, and the system's HUD stays. Turning the setting on is the person's choice to be asked, so then it asks, leaves
+    /// the setting off, and says what to do.
+    private func applyVolumeHUD(userInitiated: Bool) {
+        let settings = features.settings
+        guard settings.replacesVolumeHUD else {
+            volumeHUD.stop()
+            return
+        }
+        switch volumeHUD.start() {
+        case .started:
+            break
+        case .needsAccess:
+            guard userInitiated else { return }
+            settings.replacesVolumeHUD = false
+            Task { await AccessCenter.model?.allow(.accessibility) }
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "hand.raised.fill", tint: Theme.Tint.attention, title: "Accessibility Access Needed",
+                    detail: "Allow MacIsland in Accessibility, then turn this on again",
+                    actions: [.init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }]),
+                for: .seconds(8), respectingFocus: false)
+        case .failed:
+            guard userInitiated else { return }
+            settings.replacesVolumeHUD = false
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "speaker.wave.2.fill", tint: Theme.Tint.attention,
+                    title: "Couldn\u{2019}t Take the Volume Keys", detail: "The system HUD is still in use"),
+                for: .seconds(6), respectingFocus: false)
+        }
     }
 
     /// Drives offer Eject when they mount; new screenshots land on the Shelf.

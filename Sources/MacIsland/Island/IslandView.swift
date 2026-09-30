@@ -239,11 +239,28 @@ struct IslandView: View {
     private var compactTrailing: some View {
         switch viewModel.compactActivity {
         case .alert(let alert):
-            Text(alert.text)
-                .font(Theme.Typography.compactNumeral)
-                .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            if let level = alert.volume {
+                HStack(spacing: 6) {
+                    LevelBar(fraction: level.shown, tint: level.isSilent ? Theme.Tint.attention : nil)
+                        .frame(width: Theme.Metrics.levelBarWidth)
+                    Text(alert.text)
+                        .font(Theme.Typography.compactNumeral)
+                        .foregroundStyle(
+                            level.isSilent ? AnyShapeStyle(Theme.Tint.attention) : AnyShapeStyle(Theme.Palette.primary)
+                        )
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                }
+                .animation(Theme.Motion.track, value: level)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(level.isMuted ? "Volume muted" : "Volume \(level.percent) percent")
+            } else {
+                Text(alert.text)
+                    .font(Theme.Typography.compactNumeral)
+                    .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         case .recording(let kind):
             if let since = kind == .screen ? viewModel.screenRecorder.startedAt : viewModel.voice.startedAt {
                 ElapsedText(since: since, tint: Theme.Tint.working)

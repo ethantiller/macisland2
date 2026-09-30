@@ -494,6 +494,20 @@ change with nothing wired. A phase that is running, or paused, keeps `startedLen
 it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
 against the new number.
 
+### The volume HUD
+
+`VolumeHUDController` (`System/VolumeHUD.swift`) owns an event tap only while Replace the Volume HUD is on (`applyVolumeHUD` in `AppDelegate`).
+`SystemMediaKeyTap` taps `NX_SYSDEFINED` (type 14) at the head of the session, reads the key from `data1` (sound up 0, down 1, mute 7; down when
+bits 8 to 15 are 0xA), and consumes the event only when the controller says so. `handle(_:)` consumes a press when the tap is active, Clean Keys
+is not locked (`isSuspended`), the island can show it (`canShow` → `IslandViewModel.canShowVolumeHUD`: folded, no banner, no alert that stays
+until seen), the default output can be set (`CoreAudioVolume.canSetVolume`), and the write succeeded; otherwise the key passes to the system and its
+HUD. `VolumeStep` is the math (16 steps, a quarter step with Option and Shift, mute toggles, a step unmutes). The HUD is an `IslandAlert` with a
+`volume` (`Announcements.volume`), drawn by `compactTrailing` as a `LevelBar` and the percent, in a compact side of `volumeHUDSide`; `flash` times it
+out after `Timing.volumeHUD`, and `setHovering` holds it while the pointer is on it. The tap is turned back on after `tapDisabledByTimeout`; after
+`tapDisabledByUserInput` (what revoking Accessibility is expected to produce, unverified) the controller stops, the setting is turned off, and a banner
+says so. At launch and on becoming active it never asks for Accessibility; turning the setting on does, through `AccessCenter`, and leaves it off
+until granted. Not done: the feedback sound, a side-of-screen HUD, brightness. See [plans/volume-hud.md](plans/volume-hud.md).
+
 ### Shortcut tools
 
 `ToolID` is a struct over a string, not an enum: a built-in's own name (`keepAwake`, stored exactly as before, so nothing already saved
@@ -597,7 +611,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **694 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **718 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

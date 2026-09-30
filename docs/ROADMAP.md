@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (694 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (718 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -371,7 +371,7 @@ struct IslandBanner { /* … */ var actions: [Action] = [] }                    
 | --- | --- |
 | Island on the lock screen | Private SkyLight API; still Dropped for good unless the user asks for a test build first |
 | Away summary on unlock, walk-away lock, meeting countdown, world clocks, music sleep timer | Not picked this round (walk-away lock would break the idle budget) |
-| Custom volume and brightness HUDs, camera-in-use pill | Dropped for good: the HUD can't be suppressed; macOS draws its own dots |
+| Custom brightness HUD, camera-in-use pill | Dropped for good: brightness has no public API (private DisplayServices; DDC is private on Apple silicon), and macOS draws its own dots. **The volume HUD is built** (Phase 6, below): the earlier reason, that the HUD can't be suppressed, was wrong, because taking the key with an event tap stops the system drawing it |
 | Hide desktop icons | Needs `defaults write com.apple.finder CreateDesktop` and relaunching Finder |
 | 20-20-20 eye breaks | Needs a standing timer while nothing is live |
 | Microsoft Graph calendar | See N4 |
@@ -428,6 +428,13 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**Volume HUD (written, not run)**
+- [ ] Settings → Notifications → Replace the Volume HUD: turning it on without Accessibility leaves it off, shows the prompt and a banner with **Open Settings**; after allowing it, turning it on again works; the preview shows the HUD
+- [ ] On: volume up, down, and mute change the volume and show a speaker, a thin bar, and the percent beside the notch for about 1.5 s; holding a key repeats; Option+Shift is a quarter step; muted or zero shows the slashed speaker in red; pointer on the HUD holds it
+- [ ] Off (or turning Accessibility off while it is on): the system HUD is back at once, and the setting turns itself off with a banner if access was taken away
+- [ ] With the island open, with an alert that needs you showing, with Clean Keys locked, and on an HDMI or DisplayPort output: the system handles the key and draws its own HUD
+- [ ] Idle CPU is unchanged with it on and off (`ps -o cputime= -p PID` over 10 s); nothing is asked at launch
 
 **Shortcut tools (written, not run)**
 - [ ] Settings → Tools → **Add Shortcut Tool…**: the list shows your Shortcuts, choosing one names the tool, the symbol preview and the sixteen buttons work, **Test** runs it, **Save** adds it; a third is refused with the button dimmed; Edit and Remove work
@@ -578,7 +585,7 @@ Considered during planning and ruled out, each for a concrete reason. Check here
 | Keyboard Backlight | Private CoreBrightness |
 | External Display Control | DDC/CI is private on Apple silicon |
 | Sound Mixer, EQ, Live Audio Spectrum | Audio process taps; breaks the idle budget |
-| System HUDs, Alt HUD Styles, Caps Lock HUD | The system HUD can't be suppressed |
+| Alt HUD Styles, Caps Lock HUD, a brightness HUD | Brightness: no public API. The system volume HUD **can** be replaced by taking the key (see [plans/volume-hud.md](plans/volume-hud.md) and Replace the Volume HUD in Settings → Notifications), so the old reason no longer stands for volume |
 | Keystroke HUD | Input Monitoring for a niche use |
 | Window Snapping | A separate product |
 | Menu Bar Icon Hiding | Fragile on macOS 26 and later |

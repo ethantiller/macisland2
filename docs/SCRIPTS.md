@@ -69,7 +69,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 694 tests, about a second.
+lines; 718 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -288,6 +288,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | --- | --- |
 | `System/BatteryMonitor.swift` | Charger, 20% and 10%, and the full-charge level; the battery glyph |
 | `System/VolumeMonitor.swift` | External drive mounts, and eject |
+| `System/VolumeHUD.swift` | The volume HUD: the keys' math, CoreAudio volume, the media-key event tap, and the controller |
 | `System/AudioAccessoryMonitor.swift` | Bluetooth headphones connecting, and their battery |
 | `System/PrivacyMonitor.swift` | Which app is using the microphone |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
@@ -326,7 +327,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 44 files, about 10,000 lines, **694 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 45 files, about 10,300 lines, **718 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -363,6 +364,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
+| `VolumeHUDTests.swift` | The volume keys' math and speaker, the controller over a stub tap and volume, the island alert, and the setting |
 | `ShortcutToolTests.swift` | Shortcut tools: identity, storage and the cap, the pinned row, the archive, dimming, running and failing with a stub runner |
 | `PermissionStepTests.swift` | The permission steps (Grant Permission, Not Now, the order, skipped steps, the copy), what is remembered as asked, and the Shelf not looking in protected folders at launch |
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |

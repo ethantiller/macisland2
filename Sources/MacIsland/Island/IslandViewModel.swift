@@ -99,6 +99,8 @@ struct IslandAlert: Equatable {
     var opensTab: IslandModule?
     /// The glyph is drawn as a `ChargingBadge`, with a ring circling the bolt.
     var isCharging = false
+    /// The volume HUD: a level bar and its percent take the place of the text.
+    var volume: VolumeLevel?
 }
 
 /// A wider, momentary announcement below the notch, with at most two actions. With two, the first is the main one.
@@ -338,7 +340,7 @@ final class IslandViewModel {
         if compactPair != nil { return geometry.notchSize.height + 8 }
         switch compactActivity {
         case .banner, .none: return 0
-        case .alert: return 64
+        case .alert(let alert): return alert.volume == nil ? 64 : Theme.Metrics.volumeHUDSide
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .transfer: return 52
         case .working, .recording: return 64
@@ -950,6 +952,11 @@ final class IslandViewModel {
         isHovering = hovering
         hoverTask?.cancel()
 
+        // The volume HUD holds still while the pointer is on it, then leaves as it would have.
+        if alert?.volume != nil {
+            if hovering { alertTask?.cancel() } else { scheduleAlertDismissal(after: Theme.Timing.volumeHUD) }
+        }
+
         // A banner holds still while the pointer is on it, then leaves shortly after.
         if banner != nil {
             if hovering {
@@ -1103,11 +1110,29 @@ final class IslandViewModel {
         alertTask?.cancel()
         withAnimation(Theme.Motion.open) { self.alert = alert }
         guard !alert.staysUntilSeen else { return }
+        scheduleAlertDismissal(after: duration)
+    }
+
+    private func scheduleAlertDismissal(after duration: Duration) {
+        alertTask?.cancel()
         alertTask = Task { [weak self] in
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled, let self else { return }
             withAnimation(Theme.Motion.close) { self.alert = nil }
         }
+    }
+
+    // MARK: Volume HUD
+
+    /// Whether the volume HUD may take the stage: the island is folded, and nothing that needs the person is showing. It is never queued
+    /// behind one: the key goes to the system's own HUD instead.
+    var canShowVolumeHUD: Bool {
+        state == .compact && banner == nil && alert?.staysUntilSeen != true
+    }
+
+    /// Shows the volume in the island for a moment. Each press shows it again, and the pointer on it holds it.
+    func showVolume(_ level: VolumeLevel) {
+        flash(Announcements.volume(level), for: Theme.Timing.volumeHUD, respectingFocus: false)
     }
 
     /// Shows a banner, then optionally leaves `followUp` as a compact alert.

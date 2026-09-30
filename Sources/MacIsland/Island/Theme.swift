@@ -131,6 +131,10 @@ enum Theme {
         static let widgetRadius: CGFloat = innerRadius
         /// What sits inside a widget: artwork, a hovered segment.
         static let nestedRadius: CGFloat = artworkRadius
+        /// The volume HUD: each side of the notch is wider than for other alerts, to hold a level bar and a percent.
+        static let volumeHUDSide: CGFloat = 100
+        static let levelBarWidth: CGFloat = 36
+        static let levelBarHeight: CGFloat = 4
         static let clipboardCardWidth: CGFloat = 108
         static let shelfChoiceWidth: CGFloat = 150
         /// The Shelf: a Files or Clipboard choice, and cards tall enough for a smart action.
@@ -236,6 +240,8 @@ enum Theme {
         static let peekDwell: Duration = .milliseconds(120)
         /// Pointer gone before the island folds back in.
         static let closeDelay: Duration = .milliseconds(300)
+        /// How long the volume HUD stays after the last key press. The pointer on it holds it.
+        static let volumeHUD: Duration = .milliseconds(1500)
     }
 
     enum Motion {

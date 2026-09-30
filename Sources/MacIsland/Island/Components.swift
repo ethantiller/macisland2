@@ -54,6 +54,28 @@ struct IconButton: View {
     }
 }
 
+/// A level that is only looked at: a thin capsule filled from the leading edge. The volume HUD's bar. `tint` is for a live color (nil is
+/// the primary ink); a level above zero always shows a little, so it never reads as empty.
+struct LevelBar: View {
+    let fraction: Double
+    var tint: Color?
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.Palette.fill)
+                Capsule()
+                    .fill(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
+                    .frame(
+                        width: fraction > 0
+                            ? max(proxy.size.width * min(fraction, 1), Theme.Metrics.levelBarHeight) : 0)
+            }
+        }
+        .frame(height: Theme.Metrics.levelBarHeight)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Small capsule button: presets and choices. Selected state is white fill with black text.
 struct ChipButton: View {
     let title: String
