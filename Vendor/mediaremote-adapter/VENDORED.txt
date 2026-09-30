@@ -1,0 +1,2 @@
+Vendored from https://github.com/ungive/mediaremote-adapter at commit 73f14ab (BSD-3-Clause, see LICENSE).
+Built by scripts/build-adapter.sh.

@@ -1,0 +1,161 @@
+# MacIsland
+
+A Dynamic Island for the MacBook notch. It is part of the hardware: it grows out of the notch to show what is live
+(music, a timer, a download), then folds back in. Click it and it opens into a small dashboard of everyday tools.
+
+It is a native macOS app written in Swift and SwiftUI, built as a Swift package with only the Command Line Tools (no Xcode
+project). One borderless `NSPanel` hosts the whole island.
+
+![The Home tab](docs/images/04a-expanded-home.png)
+
+> The pictures in these docs are renders of the real SwiftUI views (`./scripts/docs-images.sh`). They show layout, type, and
+> color, but not Liquid Glass, text fields, or scrolling lists, and the sound bars are frozen mid-rest. See
+> [Regenerating the pictures](docs/SCRIPTS.md#docs-imagessh).
+
+## Contents
+
+| Read this | For |
+| --- | --- |
+| **This file** | What it is, how to run it, a tour, how it works in brief |
+| [docs/FEATURES.md](docs/FEATURES.md) | Every feature, module by module, with pictures and exact behavior |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: layers, state, windows, input, data, permissions, gotchas |
+| [docs/SCRIPTS.md](docs/SCRIPTS.md) | Every script and config file, and a map of every source file |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is built, what is next (Phase 6), what has not been tried by hand |
+| [DESIGN.md](DESIGN.md) | The design system: surfaces, presentations, color, type, motion, metrics |
+| [docs/plan-v2.md](docs/plan-v2.md) | The original phased plan, saved as written |
+| [NOTES.md](NOTES.md) | An older working log (partly out of date; kept for the findings) |
+| [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code sessions in this repo |
+
+## Quick start
+
+Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
+
+```sh
+./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
+./scripts/test.sh                                                     # 215 tests, under a second
+ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
+```
+
+UI changes only show after the bundle step. The app has no Dock icon; look for the notch, and the capsule icon in the
+menu bar (Command Palette, Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
+
+## How you use it
+
+| Do this | Get this |
+| --- | --- |
+| Something is live | The **compact** island: one activity split around the notch, or two as a pair |
+| Rest the pointer on it | A brief swell, then the **peek** (after 120 ms): the top activity at full size |
+| Click, swipe two fingers down, or press **⌃⌥Space** | The **expanded** island: a tab strip and the selected module |
+| ← / → , or a two-finger horizontal swipe | Previous or next tab |
+| Esc, or move the pointer away for 300 ms | Fold back in |
+| **⌃⌥K** | The **command palette** |
+| Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |
+
+## A tour
+
+### Compact: what is live, beside the notch
+
+| | |
+| --- | --- |
+| ![Music](docs/images/03-compact-media-playing.png) | Music: artwork and sound bars (the bars bounce in the app) |
+| ![Pair](docs/images/09b-compact-pair-timer-media.png) | Two activities at once, as a minimal pair: the higher rank leads |
+| ![Alert](docs/images/13-compact-charging.png) | An alert: a glyph and a number, colored by what it means |
+
+### Banners: an event worth noticing once
+
+| | |
+| --- | --- |
+| ![AirPods](docs/images/11-banner-airpods.png) | A device connecting |
+| ![Low battery](docs/images/12-banner-low-battery.png) | A problem, with one action |
+
+### Peeks: hover for the top activity
+
+| | |
+| --- | --- |
+| ![Music peek](docs/images/03b-peek-media.png) | Music, in the Dynamic Island's own layout |
+| ![Idle peek](docs/images/03e-peek-idle-weather.png) | Nothing live: the day, the weather, the everyday tools |
+| ![Timer peek](docs/images/03f-peek-timer-compact.png) | A timer, with when it ends and quick extensions |
+
+### Expanded: seven modules
+
+Up to **five tabs left of the notch and one right of it**, arranged in Settings.
+
+| Home | Media |
+| --- | --- |
+| ![Home](docs/images/04a-expanded-home.png) | ![Media](docs/images/04-expanded-media.png) |
+| **Clock** | **Tools** |
+| ![Clock](docs/images/06b-expanded-pomodoro.png) | ![Tools](docs/images/08c-expanded-tools-eight.png) |
+| **Reminders** | **Notes** |
+| ![Reminders](docs/images/04c-expanded-reminders.png) | ![Notes](docs/images/08d-expanded-notes.png) |
+
+Also **Shelf** (files and clipboard). An eighth module, Agents, is Phase 6. Everything is in [docs/FEATURES.md](docs/FEATURES.md).
+
+## How it works, in brief
+
+```mermaid
+flowchart TB
+    subgraph System["macOS"]
+        MR["Now Playing<br/>(MediaRemote via perl)"]
+        EK["EventKit<br/>(Calendar, Reminders)"]
+        IO["IOKit, CoreAudio,<br/>Bluetooth, Spotlight, mounts"]
+        NET["Open-Meteo, LRCLIB"]
+    end
+    subgraph Models["Feature models (@Observable)"]
+        F["NowPlaying, Timer, Pomodoro, Shelf,<br/>Agenda, Weather, Notes, Tools, ..."]
+    end
+    VM["IslandViewModel<br/>state, presentation, activities, heights"]
+    subgraph UI["SwiftUI"]
+        IC["IslandContainer<br/>shape, surface, size, motion"]
+        MC["ModuleContent<br/>one view per module"]
+    end
+    P["IslandPanel (NSPanel)<br/>+ MouseTracker"]
+    W["Floating windows:<br/>palette, menu-bar extras, torn-off panels"]
+
+    MR --> F
+    EK --> F
+    IO --> F
+    NET --> F
+    F --> VM
+    VM --> IC
+    IC --> MC
+    MC --> P
+    MC --> W
+    P -- "hover, click, swipe" --> VM
+```
+
+- **One panel, always there.** A borderless `NSPanel` is pinned to the top center of the screen, always as big as the
+  largest the island gets (560 x 260). It ignores the mouse except over the visible island, so it never blocks anything.
+- **State lives in `IslandViewModel`.** It holds the presentation (compact, banner, peek, expanded), which tab is
+  selected, the alert and banner, and works out the ranked list of live activities and the size of everything. Views are
+  thin and read from it.
+- **Features are separate models.** Each is a small `@Observable` class (a timer, the weather, the Shelf) that
+  the view model reads. They are bundled in one `IslandFeatures` struct, which tests replace with doubles.
+- **One design system.** Colors, type, metrics, and motion all come from `Theme.swift`. Color means one thing each
+  (music, time, in progress, done, needs you); everything else is black and white. See [DESIGN.md](DESIGN.md).
+- **The same views draw on the island and on glass.** `Theme.Palette` follows the surface it is on, so modules render
+  in the menu bar, in torn-off windows, and on the island from one `ModuleContent` view.
+
+The full story, with state machines, data flow, and the lessons learned, is in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Privacy and permissions
+
+Nothing leaves the Mac except: the **city name** you type in Settings (to Open-Meteo, for weather), and the **track's
+name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off). Clipboard history stays in memory.
+Web searches open in your browser.
+
+macOS asks for access only when a feature first needs it: Calendar and Reminders, Bluetooth, Focus status, the Downloads
+folder, Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys). The app is signed
+ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
+Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
+
+## Status
+
+Phases 1 to 5 of the [plan](docs/plan-v2.md) are built. Phase 6 (agents: a local API, approvals, usage, shell activity) is
+next. What is done, what changed from the plan, and what still needs a hand test: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Third-party code
+
+`Vendor/mediaremote-adapter` is [ungive/mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) at commit
+`73f14ab`, BSD-3-Clause (see its `LICENSE` and `VENDORED.txt`). It gives Now Playing access on macOS 15.4 and later,
+where Apple restricts MediaRemote to its own binaries, by running inside `/usr/bin/perl`.

@@ -1,0 +1,322 @@
+import AppKit
+import SwiftUI
+
+/// Where a dragged file is about to land, decided by which half of the island it's over.
+enum DropZone {
+    case shelf, airDrop
+}
+
+enum ShelfMode: String, CaseIterable, Identifiable {
+    case files = "Files"
+    case clipboard = "Clipboard"
+
+    var id: Self { self }
+}
+
+struct ShelfView: View {
+    let viewModel: IslandViewModel
+    let dropZone: DropZone?
+
+    private var shelf: ShelfModel { viewModel.shelf }
+    private var clipboard: ClipboardHistory { viewModel.clipboard }
+
+    /// The split drop target shows only while a file is actually being dragged, so a missed exit
+    /// can never leave it covering the Shelf.
+    static func showsDropTiles(zone: DropZone?, isFileDragActive: Bool) -> Bool {
+        zone != nil && isFileDragActive
+    }
+
+    var body: some View {
+        if let dropZone, Self.showsDropTiles(zone: dropZone, isFileDragActive: viewModel.isFileDragActive) {
+            HStack(spacing: 8) {
+                DropTile(title: "Add to Shelf", systemImage: "tray.and.arrow.down", isTargeted: dropZone == .shelf)
+                DropTile(title: "AirDrop", systemImage: "airdrop", isTargeted: dropZone == .airDrop)
+            }
+        } else {
+            VStack(spacing: 6) {
+                header
+                switch viewModel.shelfMode {
+                case .files: files
+                case .clipboard: clipboardList
+                }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            SegmentedChoice(options: ShelfMode.allCases, selection: viewModel.shelfMode, title: \.rawValue) {
+                viewModel.setShelfMode($0)
+            }
+            .frame(width: Theme.Metrics.shelfChoiceWidth)
+            Spacer()
+            switch viewModel.shelfMode {
+            case .files where !shelf.items.isEmpty:
+                if shelf.items.count > 1 {
+                    ShelfTextButton(title: "Zip All") { viewModel.fileTools.zip(shelf.items) }
+                }
+                ShelfTextButton(title: "Clear All", action: shelf.clear)
+            case .clipboard where !clipboard.entries.isEmpty:
+                ShelfTextButton(title: "Clear All", action: clipboard.clear)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var files: some View {
+        if shelf.items.isEmpty {
+            emptyState("Drop files here to keep them handy", systemImage: "tray.and.arrow.down")
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(shelf.items, id: \.self) { url in
+                        ShelfItemView(url: url, tools: viewModel.fileTools) { shelf.remove(url) }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var clipboardList: some View {
+        if clipboard.entries.isEmpty {
+            emptyState("Things you copy show up here", systemImage: "doc.on.clipboard")
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(clipboard.entries) { entry in
+                        ClipboardCard(entry: entry, onAction: viewModel.perform) {
+                            viewModel.copyFromClipboardHistory(entry)
+                        } onRemove: {
+                            clipboard.remove(entry)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func emptyState(_ title: String, systemImage: String) -> some View {
+        RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
+            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+            .foregroundStyle(Theme.Palette.tertiary)
+            .overlay {
+                Label(title, systemImage: systemImage)
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+    }
+}
+
+/// A copied text or image. Click to copy it again, drag it out to use it. Text that is a link, an
+/// address, or a color adds one action along the bottom.
+private struct ClipboardCard: View {
+    let entry: ClipboardEntry
+    let onAction: (SmartAction) -> Void
+    let onCopy: () -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovering = false
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Theme.Metrics.cardRadius, style: .continuous)
+    }
+
+    private var action: SmartAction? {
+        if case .text(let text) = entry.content { SmartAction.detect(in: text) } else { nil }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Button(action: onCopy) {
+                content
+                    .frame(width: Theme.Metrics.clipboardCardWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(isHovering ? Theme.Palette.fillHover : Theme.Palette.fill, in: shape)
+                    .clipShape(shape)
+                    .contentShape(shape)
+            }
+            .buttonStyle(IslandButtonStyle())
+            .onHover { isHovering = $0 }
+            .onDrag { provider }
+            .contextMenu { Button("Remove", action: onRemove) }
+            .help("Click to copy again. Drag out to use it.")
+            .accessibilityLabel(accessibilityText)
+            .accessibilityAction(named: "Remove", onRemove)
+
+            if let action {
+                ChipButton(title: action.title) { onAction(action) }
+                    .padding(6)
+            }
+        }
+        .frame(width: Theme.Metrics.clipboardCardWidth)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch entry.content {
+        case .text(let text):
+            Text(text.trimmingCharacters(in: .whitespacesAndNewlines))
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Palette.primary)
+                .multilineTextAlignment(.leading)
+                .lineLimit(action == nil ? 3 : 2)
+                .padding(.leading, 8)
+                .padding(.trailing, hasSwatch ? 28 : 8)
+                .padding(.top, 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .overlay(alignment: .topTrailing) { swatch }
+        case .image(let image):
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+        }
+    }
+
+    private var hasSwatch: Bool {
+        if case .color = action { true } else { false }
+    }
+
+    /// The color itself, beside its hex code. The swatch is arbitrary content, not a status tint.
+    @ViewBuilder
+    private var swatch: some View {
+        if case .color(let hex, _) = action, let color = Color(hex: hex) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(color)
+                .frame(width: 18, height: 18)
+                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Theme.Palette.secondary, lineWidth: 1))
+                .padding(6)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var provider: NSItemProvider {
+        switch entry.content {
+        case .text(let text): NSItemProvider(object: text as NSString)
+        case .image(let image): NSItemProvider(object: image)
+        }
+    }
+
+    private var accessibilityText: String {
+        switch entry.content {
+        case .text(let text): "Copy again: \(text.prefix(60))"
+        case .image: "Copy image again"
+        }
+    }
+}
+
+private extension Color {
+    /// `#RRGGBB` only, which is what `SmartAction` produces.
+    init?(hex: String) {
+        guard hex.hasPrefix("#"), hex.count == 7, let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255
+        )
+    }
+}
+
+/// One half of the drop target. The selected half is filled white, like other "on" states.
+private struct DropTile: View {
+    let title: String
+    let systemImage: String
+    let isTargeted: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
+            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: isTargeted ? [] : [5, 4]))
+            .foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.tertiary)
+            .background(
+                isTargeted ? Theme.Palette.fill : Theme.Palette.none,
+                in: RoundedRectangle(cornerRadius: Theme.Metrics.innerRadius, style: .continuous)
+            )
+            .overlay {
+                Label(title, systemImage: systemImage)
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(isTargeted ? Theme.Palette.primary : Theme.Palette.secondary)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+    }
+}
+
+private struct ShelfTextButton: View {
+    let title: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(title, action: action)
+            .font(Theme.Typography.bodyEmphasized)
+            .foregroundStyle(isHovering ? Theme.Palette.primary : Theme.Palette.secondary)
+            .buttonStyle(IslandButtonStyle())
+            .onHover { isHovering = $0 }
+    }
+}
+
+private struct ShelfItemView: View {
+    let url: URL
+    let tools: FileTools
+    let onRemove: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .frame(width: 36, height: 36)
+            Text(url.lastPathComponent)
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Palette.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .frame(width: 64)
+        .overlay(alignment: .topTrailing) {
+            if isHovering {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.Palette.primary, Color.gray)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(IslandButtonStyle())
+                .offset(x: -2, y: -4)
+                .accessibilityLabel("Remove \(url.lastPathComponent)")
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
+        .onDrag { NSItemProvider(object: url as NSURL) }
+        .contextMenu {
+            Button("Zip") { tools.zip([url]) }
+            if FileTools.isZip(url) {
+                Button("Unzip") { tools.unzip(url) }
+            }
+            let formats = FileTools.conversions(for: url)
+            if !formats.isEmpty {
+                Menu("Convert To") {
+                    ForEach(formats) { format in
+                        Button(format.rawValue) { tools.convert(url, to: format) }
+                    }
+                }
+            }
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            Divider()
+            Button("Remove", action: onRemove)
+        }
+        .help("\(url.lastPathComponent)\nDouble-click to open. Drag out to use it. Right-click to zip or convert.")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(url.lastPathComponent)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Open") { NSWorkspace.shared.open(url) }
+        .accessibilityAction(named: "Remove", onRemove)
+    }
+}

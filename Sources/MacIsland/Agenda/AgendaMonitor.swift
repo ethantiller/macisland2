@@ -1,0 +1,298 @@
+import AppKit
+import EventKit
+import Observation
+import SwiftUI
+
+/// One upcoming event or due reminder.
+struct AgendaItem: Equatable, Identifiable {
+    enum Kind { case event, reminder }
+
+    /// Unique per occurrence, so a repeating event announces each time.
+    let id: String
+    let kind: Kind
+    let title: String
+    let date: Date
+    /// The reminder's identifier in the store, to mark it done.
+    var reminderID: String?
+    /// A Zoom, Meet, Teams, or Webex link found in the event.
+    var joinURL: URL?
+}
+
+/// One open reminder in the Reminders tab.
+struct ReminderRow: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let due: Date?
+    /// Whether the due date names a time, or only a day.
+    let hasTime: Bool
+
+    /// Dated reminders first, soonest (or most overdue) at the top; undated ones after, in the order given.
+    static func sorted(_ rows: [ReminderRow]) -> [ReminderRow] {
+        let dated = rows.filter { $0.due != nil }.sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
+        return dated + rows.filter { $0.due == nil }
+    }
+
+    /// "Overdue", the time if it's today, the weekday within a week, otherwise the date. Empty without a due date.
+    func dueText(now: Date, calendar: Calendar = .current) -> String {
+        guard let due else { return "" }
+        if hasTime, due < now { return "Overdue" }
+        if !hasTime, calendar.startOfDay(for: due) < calendar.startOfDay(for: now) { return "Overdue" }
+        if calendar.isDate(due, inSameDayAs: now) {
+            return hasTime ? due.formatted(date: .omitted, time: .shortened) : "Today"
+        }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: due)).day ?? 0
+        if days == 1 { return "Tomorrow" }
+        return days < 7 ? due.formatted(.dateTime.weekday(.abbreviated)) : due.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
+/// Finds the video-call link in an event's location, notes, or URL.
+enum MeetingLink {
+    private static let pattern = try! NSRegularExpression(
+        pattern: #"https?://[^\s<>"']*(?:zoom\.us|zoom\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com)[^\s<>"']*"#,
+        options: [.caseInsensitive]
+    )
+
+    static func find(in texts: [String?]) -> URL? {
+        for case let text? in texts {
+            let range = NSRange(text.startIndex..., in: text)
+            guard let match = pattern.firstMatch(in: text, range: range),
+                  let matched = Range(match.range, in: text) else { continue }
+            let link = String(text[matched]).trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)>]"))
+            if let url = URL(string: link) { return url }
+        }
+        return nil
+    }
+}
+
+/// The timing rules, separate from EventKit so they can be tested.
+enum AgendaRules {
+    /// A banner this long before an event starts.
+    static let eventLead: TimeInterval = 5 * 60
+    /// Reminders that came due while the island was off aren't announced later than this.
+    static let reminderGrace: TimeInterval = 10 * 60
+
+    /// Whichever comes first.
+    static func next(in items: [AgendaItem]) -> AgendaItem? {
+        items.min { $0.date < $1.date }
+    }
+
+    static func shouldAnnounce(_ item: AgendaItem, now: Date) -> Bool {
+        switch item.kind {
+        case .event: item.date > now - 60 && item.date <= now + eventLead
+        case .reminder: item.date <= now + 60 && item.date > now - reminderGrace
+        }
+    }
+
+    static func timeText(for item: AgendaItem, now: Date) -> String {
+        let interval = item.date.timeIntervalSince(now)
+        if interval < -60 { return item.kind == .reminder ? "Overdue" : "Started" }
+        if interval < 60 { return "Now" }
+        if interval < 3600 { return "in \(Int((interval / 60).rounded(.up))) min" }
+        return item.date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+/// Watches the calendar and Reminders for the next thing, and announces it when it's close.
+/// Each source is asked for access only once it's turned on in Settings.
+@MainActor
+@Observable
+final class AgendaMonitor {
+    private(set) var next: AgendaItem?
+    /// Open reminders for the Reminders tab. Loaded while that tab is open.
+    private(set) var reminderRows: [ReminderRow] = []
+    /// Reminders access was refused, so the tab offers "Allow Access".
+    private(set) var remindersDenied = false
+
+    /// A source is on but macOS access was refused; the empty state offers "Allow Access".
+    private(set) var isDenied = false
+
+    /// Called once per item when it's about to start or has just come due.
+    @ObservationIgnored var onAnnounce: ((AgendaItem) -> Void)?
+
+    @ObservationIgnored private let store = EKEventStore()
+    @ObservationIgnored private var wantsCalendar = false
+    @ObservationIgnored private var wantsReminders = false
+    @ObservationIgnored private var listIsShown = false
+    @ObservationIgnored private var announced: Set<String> = []
+    @ObservationIgnored private var timer: Timer?
+
+    func start() {
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+    }
+
+    func configure(calendar: Bool, reminders: Bool) {
+        wantsCalendar = calendar
+        wantsReminders = reminders
+        refresh()
+    }
+
+    func refresh() {
+        Task {
+            await reload()
+            if listIsShown { await loadReminderRows() }
+        }
+    }
+
+    /// Loads the Reminders tab's list, asking for access the first time. Call when the tab appears.
+    func showReminderList() async {
+        listIsShown = true
+        await loadReminderRows()
+    }
+
+    func hideReminderList() {
+        listIsShown = false
+    }
+
+    private func loadReminderRows() async {
+        guard await hasAccess(.reminder) else {
+            remindersDenied = true
+            reminderRows = []
+            return
+        }
+        remindersDenied = false
+        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: nil)
+        let rows: [ReminderRow] = await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { reminders in
+                continuation.resume(returning: (reminders ?? []).map { reminder in
+                    let components = reminder.dueDateComponents
+                    return ReminderRow(
+                        id: reminder.calendarItemIdentifier,
+                        title: reminder.title ?? "Reminder",
+                        due: components?.date,
+                        hasTime: components?.hour != nil
+                    )
+                })
+            }
+        }
+        withAnimation(Theme.Motion.resize) { reminderRows = ReminderRow.sorted(rows) }
+    }
+
+    /// Marks a reminder done from the list.
+    func complete(reminderID id: String) {
+        guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
+        reminder.isCompleted = true
+        try? store.save(reminder, commit: true)
+        withAnimation(Theme.Motion.resize) { reminderRows.removeAll { $0.id == id } }
+        refresh()
+    }
+
+    func complete(_ item: AgendaItem) {
+        guard let id = item.reminderID, let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
+        reminder.isCompleted = true
+        try? store.save(reminder, commit: true)
+        refresh()
+    }
+
+    /// Adds a reminder to the default list. Asks for access the first time.
+    func addReminder(title: String) async -> Bool {
+        guard await hasAccess(.reminder) else { return false }
+        let reminder = EKReminder(eventStore: store)
+        reminder.title = title
+        reminder.calendar = store.defaultCalendarForNewReminders()
+        do {
+            try store.save(reminder, commit: true)
+        } catch {
+            return false
+        }
+        refresh()
+        return true
+    }
+
+    static func openRemindersSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    static func openPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: Loading
+
+    private func reload() async {
+        var items: [AgendaItem] = []
+        var denied = false
+        if wantsCalendar {
+            if await hasAccess(.event) { items += events() } else { denied = true }
+        }
+        if wantsReminders {
+            if await hasAccess(.reminder) { items += await reminders() } else { denied = true }
+        }
+        isDenied = denied
+
+        let now = Date()
+        next = AgendaRules.next(in: items)
+
+        let due = items.filter { AgendaRules.shouldAnnounce($0, now: now) && !announced.contains($0.id) }
+        announced.formUnion(due.map(\.id))
+        if let first = AgendaRules.next(in: due) { onAnnounce?(first) }
+    }
+
+    private func hasAccess(_ type: EKEntityType) async -> Bool {
+        switch EKEventStore.authorizationStatus(for: type) {
+        case .fullAccess:
+            return true
+        case .notDetermined:
+            let granted = type == .event
+                ? try? await store.requestFullAccessToEvents()
+                : try? await store.requestFullAccessToReminders()
+            return granted ?? false
+        default:
+            return false
+        }
+    }
+
+    private func events() -> [AgendaItem] {
+        let now = Date()
+        let predicate = store.predicateForEvents(withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: nil)
+        return store.events(matching: predicate)
+            .filter { !$0.isAllDay && $0.status != .canceled && $0.startDate >= now.addingTimeInterval(-600) }
+            .map { event in
+                AgendaItem(
+                    id: "\(event.eventIdentifier ?? event.title ?? "event")@\(event.startDate.timeIntervalSince1970)",
+                    kind: .event,
+                    title: event.title ?? "Event",
+                    date: event.startDate,
+                    joinURL: MeetingLink.find(in: [event.location, event.notes, event.url?.absoluteString])
+                )
+            }
+    }
+
+    private func reminders() async -> [AgendaItem] {
+        let now = Date()
+        let predicate = store.predicateForIncompleteReminders(
+            withDueDateStarting: now.addingTimeInterval(-86_400), ending: now.addingTimeInterval(86_400), calendars: nil
+        )
+        return await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { reminders in
+                let items: [AgendaItem] = (reminders ?? []).compactMap { reminder in
+                    guard let due = reminder.dueDateComponents?.date else { return nil }
+                    // A date-only reminder is due at the start of the day; count it from 9:00.
+                    let date = reminder.dueDateComponents?.hour == nil
+                        ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: due) ?? due
+                        : due
+                    return AgendaItem(
+                        id: "\(reminder.calendarItemIdentifier)@\(date.timeIntervalSince1970)",
+                        kind: .reminder,
+                        title: reminder.title ?? "Reminder",
+                        date: date,
+                        reminderID: reminder.calendarItemIdentifier
+                    )
+                }
+                continuation.resume(returning: items)
+            }
+        }
+    }
+}

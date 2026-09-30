@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.ethantiller.MacIsland</string>
+    <key>CFBundleName</key>
+    <string>MacIsland</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacIsland</string>
+    <key>CFBundleExecutable</key>
+    <string>MacIsland</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>MacIsland shows your headphones and their battery levels when they connect.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>MacIsland shows your next meeting and lets you join it from the notch.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>MacIsland shows reminders when they are due and lets you mark them done.</string>
+    <key>NSFocusStatusUsageDescription</key>
+    <string>MacIsland can stay quiet while a Focus is on and shows whether one is active.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>MacIsland shows the progress of files arriving in Downloads, including AirDrop.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MacIsland can change the volume and Favorite in Music and Spotify from the notch.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
