@@ -215,10 +215,10 @@ A **Files / Clipboard** choice.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
   kept; files stay where they are. Double-click opens, drag out to use, hover for an ✕. **Space** over an item previews it with
-  Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text* (images and PDFs), *Zip*, *Unzip*,
+  Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text from Image* or *Copy Text from PDF*, *Zip*, *Unzip*,
   *Convert To*, *Resize* and *Compress* (images), or *Show in Finder*. **Zip All** zips everything; **Combine into PDF** joins
   two or more images and PDFs. Results land on the Shelf. New screenshots are added automatically.
-  - **Copy Text** reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
+  - **Copy Text from Image** (and from a PDF) reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
     first; only pages without text are read as images, up to 10. It says *Copied*, or *No Text Found*.
   - **Convert To** is offered for every kind, and never lists the format the file already is:
 
@@ -237,7 +237,7 @@ A **Files / Clipboard** choice.
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
-  image card gets **Read Text** (it reads the text in the picture with Vision and copies it; the label says *Read*, not *Copy*, so it doesn't look like the picture is text). Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
+  image card shows the picture and nothing over it; right-click it for *Copy Text from Image* (Vision, on this Mac). Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
   Snippet* (kept in Notes, and written to disk because you chose to). History itself stays in memory.
 
 ### Clock

@@ -102,7 +102,7 @@ packages in order, and tick each one when it lands (with its hand checks added t
 
 | Feature | Where | How |
 | --- | --- | --- |
-| Copy Text | File menu (images, PDFs) → **Copy Text**; Clipboard image card → **Read Text** chip | Vision `RecognizeTextRequest` (`.accurate`, language correction, automatic language) plus `DetectBarcodesRequest` (QR payloads appended). For a PDF, try `PDFDocument.string` first and OCR only pages with no text, up to 10 pages. The text goes to the pasteboard, then `flash(IslandAlert("doc.on.clipboard.fill", .neutral, "Copied"))`; an empty result flashes "No Text Found" |
+| Copy Text | File menu (images, PDFs) → **Copy Text**; Clipboard image card → right-click → **Copy Text from Image** | Vision `RecognizeTextRequest` (`.accurate`, language correction, automatic language) plus `DetectBarcodesRequest` (QR payloads appended). For a PDF, try `PDFDocument.string` first and OCR only pages with no text, up to 10 pages. The text goes to the pasteboard, then `flash(IslandAlert("doc.on.clipboard.fill", .neutral, "Copied"))`; an empty result flashes "No Text Found" |
 | Quick Look | File menu → **Quick Look**; Space while an item is hovered | SwiftUI `.quickLookPreview($previewURL, in: shelf.items)` on `ShelfView`. The panel is non-activating, so check in the app that Quick Look takes the keyboard. If it doesn't, call `NSApp.activate()` first |
 | Share | File menu → **Share** | `ShareLink(items: [url])` inside the context menu (the system share submenu) |
 | Combine into PDF | `ShelfTextButton` next to **Zip All** when there are 2 or more images or PDFs | PDFKit: each image becomes a page, and PDFs append their pages. Output "Combined.pdf" |
@@ -128,7 +128,7 @@ The converters (all native Swift; `Convert To` never lists the format the file i
   - new `Shelf/Converters.swift`, holding `ConversionTarget`, which replaces `ImageFormat`, and `FileKind`;
   - new `Shelf/TextRecognizer.swift`;
   - `Shelf/FileTools.swift` (the new entry points);
-  - `Shelf/ShelfView.swift` (menus, the Combine button, the Space key, the Read Text chip);
+  - `Shelf/ShelfView.swift` (menus, the Combine button, the Space key, the Copy Text from Image menu entry);
   - `Island/IslandPanel.swift` (Space).
 
 ```swift
@@ -458,7 +458,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] **Clean Keys**: asks for Accessibility, swallows keys for 30 s, the banner and status glyph, Unlock works
 - [ ] Keep Awake durations; Ring Light; Mute Mic; Focus with and without the shortcuts
 - [ ] Right-click a file: Quick Look opens and takes Space and Esc (Space while hovering also opens it); Share shows the system menu
-- [ ] Copy Text on a screenshot, a scanned PDF, and a QR code; a picture without text says *No Text Found*; a Clipboard image card has a **Read Text** chip (written, not run: check it fits the 108 pt card and VoiceOver says "Copy Text from Image")
+- [ ] Copy Text on a screenshot, a scanned PDF, and a QR code; a picture without text says *No Text Found*; a Clipboard image card has no chip over it, and its right-click menu has **Copy Text from Image** (written, not run); the Shelf file menu says *Copy Text from Image* for an image and *Copy Text from PDF* for a PDF
 - [ ] Convert To on a DOCX (to PDF), a Markdown file (to HTML), a PDF (to TXT and to PNG pages), a MOV (to MP4, M4A, GIF), and a WAV or MP3 (to M4A)
 - [ ] Resize and Compress an image; Combine into PDF appears with two or more images or PDFs
 - [ ] Right-click a text Clipboard card: Copy as Plain Text and Save as Snippet (the snippet appears in Notes)
