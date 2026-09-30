@@ -70,6 +70,10 @@ final class OnboardingState {
         tourSeen = defaults.integer(forKey: Key.tour)
     }
 
+    /// A fresh install whose guide hasn't ended holds back what would show a system prompt at launch (Bluetooth, Downloads), so
+    /// the guide asks at a moment of its own. An existing install, and every later launch, starts everything as before.
+    var holdsLaunchPrompts: Bool { install == .fresh && needsGuide }
+
     var needsGuide: Bool { guideSeen < currentGuide }
     var needsTour: Bool { tourSeen < currentTour }
 

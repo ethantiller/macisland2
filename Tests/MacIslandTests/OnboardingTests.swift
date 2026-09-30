@@ -339,3 +339,31 @@ struct KeyPartsTests {
         #expect(KeyCombo.spoken("Q") == "Q")
     }
 }
+
+@MainActor
+struct LaunchPromptTests {
+    private func makeState(existing: Bool) -> OnboardingState {
+        let suite = "MacIslandLaunch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return OnboardingState(defaults: defaults, isExistingInstall: { existing })
+    }
+
+    @Test func aFreshInstallHoldsLaunchPromptsUntilTheGuideEnds() {
+        let state = makeState(existing: false)
+        #expect(state.holdsLaunchPrompts)
+        state.finishGuide()
+        #expect(!state.holdsLaunchPrompts)
+    }
+
+    @Test func anExistingInstallNeverHoldsThem() {
+        #expect(!makeState(existing: true).holdsLaunchPrompts)
+    }
+
+    @Test func everyAccessKindHasItsWordsAndItsPane() {
+        for kind in AccessKind.allCases {
+            #expect(!kind.title.isEmpty && !kind.reason.isEmpty && !kind.symbol.isEmpty)
+            #expect(kind.settingsURL != nil, "\(kind)")
+        }
+    }
+}

@@ -20,6 +20,8 @@ struct OnboardingContext {
     let access: AccessProviding
     /// Starts what a fresh install held back until the guide ended.
     let startDeferredMonitors: () -> Void
+    /// Starts the headphones monitor alone, when Bluetooth is allowed in the guide.
+    let startAccessoryMonitor: () -> Void
     let openSettings: () -> Void
 }
 
@@ -50,7 +52,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         preview.allowsMenuBar = true
         let access = AccessModel(
             provider: context.access, settings: context.features.settings,
-            onBluetoothAllowed: context.startDeferredMonitors)
+            onBluetoothAllowed: context.startAccessoryMonitor)
         let island = context.island
         let model = OnboardingModel(
             state: context.state, settings: context.features.settings, geometry: { island.geometry },

@@ -8,6 +8,37 @@ enum AccessKind: String, CaseIterable {
     case calendars, reminders, bluetooth
 }
 
+extension AccessKind {
+    var symbol: String {
+        switch self {
+        case .calendars: "calendar"
+        case .reminders: "checklist"
+        case .bluetooth: "headphones"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .calendars: "Calendars"
+        case .reminders: "Reminders"
+        case .bluetooth: "Bluetooth"
+        }
+    }
+
+    /// Why MacIsland asks, in terms of what the person gets.
+    var reason: String {
+        switch self {
+        case .calendars: "Your next meeting in Up Next, and a banner before it starts"
+        case .reminders: "Your reminders in their tab, and a banner when one is due"
+        case .bluetooth: "Your headphones and their battery when they connect"
+        }
+    }
+
+    /// The System Settings pane where a denied permission is turned back on.
+    @MainActor
+    var settingsURL: URL? { PrivacyAccess.current().first { $0.id == rawValue }?.settingsURL }
+}
+
 @MainActor
 protocol AccessProviding: AnyObject {
     func state(of kind: AccessKind) -> PrivacyAccess.State

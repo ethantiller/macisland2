@@ -94,12 +94,43 @@ struct OnboardingView: View {
             practiceDetail
         case .modules:
             modulesDetail
+        case .access:
+            accessDetail
         case .finish:
             ChipButton(
                 title: "Open at Login", systemImage: "power", isSelected: model.launchAtLogin
             ) { model.toggleLaunchAtLogin() }
         default:
             EmptyView()
+        }
+    }
+
+    /// One row for each permission the guide asks for, and a note on the rest.
+    private var accessDetail: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(AccessKind.allCases, id: \.self) { kind in
+                AccessRow(
+                    kind: kind, state: model.access.state(of: kind), isAsking: model.access.asking == kind
+                ) {
+                    Task { await model.access.allow(kind) }
+                }
+                .frame(height: Theme.Metrics.guideRowHeight, alignment: .top)
+            }
+            Text(
+                "Camera, Microphone, Screen Recording, and Accessibility are asked for the first time you use Mirror, Voice Note, Record Screen, or Clean Keys."
+            )
+            .font(Theme.Typography.caption)
+            .foregroundStyle(Theme.Palette.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        // A system prompt closing, or coming back from System Settings, may have changed an answer.
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification).filter {
+                $0.object is OnboardingPanel
+            }
+        ) { _ in model.access.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.access.refresh()
         }
     }
 
@@ -147,6 +178,10 @@ struct OnboardingView: View {
 
     private var footer: some View {
         HStack(spacing: Theme.Metrics.rowSpacing) {
+            // TEMPORARY (onboarding Skip): remove before release, with OnboardingModel.showsSkip.
+            if OnboardingModel.showsSkip, !model.flow.isLast {
+                ChipButton(title: "Skip") { Task { await model.skip() } }
+            }
             Spacer()
             if !model.flow.isFirst {
                 ChipButton(title: "Back") { withAnimation(Theme.Motion.resize) { model.back() } }
@@ -165,6 +200,57 @@ struct OnboardingView: View {
         AccessibilityNotification.Announcement(
             "\(model.title). Step \(model.flow.index + 1) of \(model.flow.count)."
         ).post()
+    }
+}
+
+/// One permission: what it gives, and its state. `notAsked` offers Allow; `allowed` and `denied` say so (a denied permission can't
+/// be asked again, so it offers System Settings instead).
+private struct AccessRow: View {
+    let kind: AccessKind
+    let state: PrivacyAccess.State
+    let isAsking: Bool
+    let allow: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Metrics.rowSpacing) {
+            Glyph(systemName: kind.symbol)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(kind.title)
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(Theme.Palette.primary)
+                Text(kind.reason)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+            Spacer(minLength: Theme.Metrics.rowSpacing)
+            trailing
+        }
+        .frame(height: Theme.Metrics.hitTarget)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var trailing: some View {
+        switch state {
+        case .notAsked:
+            ChipButton(title: "Allow", accessibilityLabel: "Allow \(kind.title)", action: allow)
+                .disabled(isAsking)
+                .opacity(isAsking ? 0.5 : 1)
+        case .allowed:
+            HStack(spacing: 4) {
+                Glyph(systemName: "checkmark.circle.fill", tint: Theme.Tint.positive)
+                Text("Allowed")
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+            .accessibilityElement(children: .combine)
+        case .denied:
+            HStack(spacing: Theme.Metrics.rowSpacing) {
+                Glyph(systemName: "exclamationmark.circle.fill", tint: Theme.Tint.attention)
+                ChipButton(title: "Open Settings", accessibilityLabel: "Open \(kind.title) in System Settings") {
+                    if let url = kind.settingsURL { NSWorkspace.shared.open(url) }
+                }
+            }
+        }
     }
 }
 

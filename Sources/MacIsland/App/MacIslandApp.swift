@@ -190,10 +190,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectDevices()
         connectCapture()
 
+        // A fresh install's first launches hold back what would prompt on its own (Bluetooth, Downloads): the guide asks at a
+        // moment of its own, and starts them when it ends.
+        let holdsPrompts = onboarding.holdsLaunchPrompts
         batteryMonitor.start()
-        accessoryMonitor.start()
+        if !holdsPrompts { accessoryMonitor.start() }
         features.privacy.start()
-        features.transfers.start()
+        if !holdsPrompts { features.transfers.start() }
         features.network.start()
         volumeMonitor.start()
         connectShelfChoices()
@@ -406,6 +409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             features: features, island: viewModel, state: onboarding,
             access: LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess),
             startDeferredMonitors: { [weak self] in self?.startDeferredMonitors() },
+            startAccessoryMonitor: { [weak self] in self?.accessoryMonitor.start() },
             openSettings: { SettingsWindowController.shared.show() })
         urlCommands.onGuide = { reset in
             #if DEBUG
