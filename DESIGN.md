@@ -176,7 +176,7 @@ does not get a setting. A widget's size on Home's grid is arrangement, like its 
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.
-- **Tools.** Nine tools and Less fill the grid, two rows of six; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
+- **Tools.** Nine built-in tools, up to two of the person's own (each made from one of their Shortcuts, with an SF Symbol they pick), and Less fill the grid, two rows of six; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
   for 30 seconds (the mouse still works) and needs Accessibility access. Nothing in the island asks for an administrator's password: a tool that would (Low Power, Lock Screen) is not offered.
   The Mirror replaces the row or grid with a 16:9 camera view (clipped to `widgetRadius`) and a column of Ring Light and **Done**.
 

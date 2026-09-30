@@ -31,6 +31,8 @@ struct SettingsArchive: Codable, Equatable {
     var showsMusicCompact: Bool?
     var pinLimit: Int?
     var pinnedTools: [String]?
+    /// Tools made from Shortcuts. A Shortcut's name is fine to export; the Shortcut itself is not.
+    var shortcutTools: [ShortcutTool]?
     var quietDuringFocus: Bool?
     var fullChargeLevel: Int?
     var mutedEvents: [String]?
@@ -75,6 +77,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.showsMusicCompact = settings.showsMusicCompact
         archive.pinLimit = settings.pinLimit.rawValue
         archive.pinnedTools = settings.pinnedTools.map(\.rawValue)
+        archive.shortcutTools = settings.shortcutTools
         archive.quietDuringFocus = settings.quietDuringFocus
         archive.fullChargeLevel = settings.fullChargeLevel
         archive.mutedEvents = settings.mutedEvents.map(\.rawValue).sorted()
@@ -142,6 +145,8 @@ extension AppSettings {
         if let value = archive.showsLyrics { showsLyrics = value }
         if let value = archive.showsMusicCompact { showsMusicCompact = value }
         if let value = archive.pinLimit.flatMap(PinLimit.init) { pinLimit = value }
+        // Before the row, which may name them.
+        if let tools = archive.shortcutTools { replaceShortcutTools(tools) }
         if let names = archive.pinnedTools {
             var seen = Set<ToolID>()
             replacePinned(names.compactMap(ToolID.init).filter { seen.insert($0).inserted })

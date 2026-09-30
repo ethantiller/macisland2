@@ -199,9 +199,11 @@ struct QuickActionsGrid: View {
     var chosen: [ToolID]?
     var size = GridSize(1, 1)
 
-    /// How many tools a size shows. 6 by 2 shows them all.
-    static func toolCount(for size: GridSize) -> Int {
-        if size.rows >= 2 { return ToolID.allCases.count }
+    /// How many tools a size shows. 6 by 2 shows them all (`total`, which includes the person's own).
+    static func toolCount(for size: GridSize) -> Int { toolCount(for: size, total: ToolID.allCases.count) }
+
+    static func toolCount(for size: GridSize, total: Int) -> Int {
+        if size.rows >= 2 { return total }
         switch size.columns {
         case ...2: return 4
         case 3: return 6
@@ -211,16 +213,20 @@ struct QuickActionsGrid: View {
 
     /// The tools a size shows: the person's (or the Tools row's) first, then others to fill it. 6 by 2 is the Tools
     /// tab's own order.
-    static func tools(for size: GridSize, chosen: [ToolID]?, pinned: [ToolID]) -> [ToolID] {
-        if size.rows >= 2 { return ToolID.allCases }
-        let first = chosen ?? pinned
-        let rest = ToolID.allCases.filter { !first.contains($0) }
-        return Array((first + rest).prefix(toolCount(for: size)))
+    /// `all` is every tool there is (`AppSettings.allTools`); a chosen tool that isn't in it (a Shortcut tool since removed) is left out.
+    static func tools(
+        for size: GridSize, chosen: [ToolID]?, pinned: [ToolID], all: [ToolID] = ToolID.allCases
+    ) -> [ToolID] {
+        if size.rows >= 2 { return all }
+        let first = (chosen ?? pinned).filter(all.contains)
+        let rest = all.filter { !first.contains($0) }
+        return Array((first + rest).prefix(toolCount(for: size, total: all.count)))
     }
 
     var body: some View {
         let catalog = ToolCatalog(viewModel: viewModel)
-        let tools = Self.tools(for: size, chosen: chosen, pinned: viewModel.settings.visiblePinned)
+        let tools = Self.tools(
+            for: size, chosen: chosen, pinned: viewModel.settings.visiblePinned, all: viewModel.settings.allTools)
         Group {
             switch (size.columns, size.rows) {
             case (1, _):

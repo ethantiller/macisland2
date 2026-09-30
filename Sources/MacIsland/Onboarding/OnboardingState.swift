@@ -116,7 +116,7 @@ enum InstallEvidence {
         "islandDisplay", "mutedEvents", "dragTarget", "addsScreenshots", "shelfRetention", "clipboardLimit", "shelfMode",
         "showsMusicCompact", "quietDuringFocus", "showsCalendar", "showsReminders", "pinLimit", "fullChargeLevel",
         "showsLyrics", "pomodoroFocus", "pomodoroShortBreak", "pomodoroLongBreak", "pomodoroSessions", "weatherCity",
-        "pinnedTools", "home.layout", "home.savedPresets", "widgets.custom",
+        "pinnedTools", "tools.shortcuts", "home.layout", "home.savedPresets", "widgets.custom",
         // Stored elsewhere.
         "shelf.paths", "shelf.added", "pomodoro.history", "settings.pane", "settings.sidebarHidden",
         // AppKit's frame autosave for `SettingsWindowController.frameName`.

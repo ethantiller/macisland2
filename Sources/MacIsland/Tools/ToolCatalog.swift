@@ -74,7 +74,23 @@ struct ToolCatalog {
                 id: id, title: "Record", label: "Record Screen", systemImage: "record.circle",
                 isOn: viewModel.screenRecorder.isRecording
             ) { viewModel.toggleScreenRecording() }
+        default:
+            shortcutItem(for: id)
         }
+    }
+
+    /// A tool the person made from a Shortcut: pressing it runs the Shortcut. It is dimmed, with nothing to press, when the Shortcut
+    /// is no longer in Shortcuts (deleted or renamed); right-click it to edit or remove the tool.
+    private func shortcutItem(for id: ToolID) -> ToolItem {
+        guard let tool = viewModel.settings.shortcutTool(for: id) else {
+            return ToolItem(id: id, title: "Missing", systemImage: "questionmark.square.dashed", isAvailable: false) {}
+        }
+        let installed = viewModel.installedShortcuts
+        return ToolItem(
+            id: id, title: tool.title, label: "Run \(tool.shortcut)", systemImage: tool.systemImage,
+            isOn: viewModel.runningShortcutTools.contains(tool.id),
+            isAvailable: installed?.contains(tool.shortcut) ?? true
+        ) { viewModel.runShortcutTool(tool) }
     }
 
     /// Locks every key for 30 seconds, after asking for Accessibility access the first time.

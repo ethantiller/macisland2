@@ -30,6 +30,7 @@ enum SettingsAnchor {
     static let pomodoro = "clock.pomodoro"
     static let toolsRow = "tools.row"
     static let rowOrder = "tools.roworder"
+    static let shortcutTools = "tools.shortcuts"
     static let interruptions = "notifications.interruptions"
     static let power = "notifications.power"
     static let devices = "notifications.devices"
@@ -168,6 +169,10 @@ enum SettingsSearch {
                 pane: .tools, title: "Tools in the Row",
                 keywords: ["pin", "pinned", "4", "6", "8", "count", "how many"],
                 anchor: SettingsAnchor.toolsRow),
+            .init(
+                pane: .tools, title: "Shortcut Tools",
+                keywords: ["shortcuts", "automation", "run", "custom", "tool", "icon", "symbol", "add"],
+                anchor: SettingsAnchor.shortcutTools),
             .init(
                 pane: .tools, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
                 anchor: SettingsAnchor.rowOrder),

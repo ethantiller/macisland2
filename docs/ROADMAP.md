@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (675 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (694 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -428,6 +428,12 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**Shortcut tools (written, not run)**
+- [ ] Settings → Tools → **Add Shortcut Tool…**: the list shows your Shortcuts, choosing one names the tool, the symbol preview and the sixteen buttons work, **Test** runs it, **Save** adds it; a third is refused with the button dimmed; Edit and Remove work
+- [ ] In the Tools tab it is in the grid, can be pinned to the row, and is in Quick Tools (6 by 2 shows it); pressing it shows the blue working activity, then a green *Done*; a Shortcut that fails shows a red banner; right-click → Edit or Remove works
+- [ ] Rename or delete the Shortcut in the Shortcuts app, reopen the Tools tab: the tool is dimmed and the banner offers **Edit Tool**
+- [ ] Export and Import carry the tools; Reset All removes them. The icon note: confirm you are happy to pick the symbol, or see docs/plans/shortcut-icons.md for what to check on a real Mac
 
 **The Shelf's files (written, not run)**
 - [ ] Previews: images, PDFs, movies, and documents show their own thumbnail (the icon until it arrives); a file with no preview keeps its icon; scrolling a long Shelf stays smooth and idle CPU is unchanged

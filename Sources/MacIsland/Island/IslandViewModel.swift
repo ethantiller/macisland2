@@ -588,11 +588,72 @@ final class IslandViewModel {
         open()
     }
 
+    /// The names of the Shortcuts that exist, or nil until they have been listed. A Shortcut tool whose Shortcut isn't in it is dimmed.
+    private(set) var installedShortcuts: Set<String>?
+    /// The Shortcut tools that are running now.
+    private(set) var runningShortcutTools: Set<UUID> = []
+    /// Runs a Shortcut by name and says whether it finished, and lists them. Tests replace them.
+    @ObservationIgnored var shortcutRunner: (String) async -> Bool = { await ShortcutsCLI.run(shortcut: $0) }
+    @ObservationIgnored var shortcutLister: () async -> [String] = { await ShortcutsCLI.list() }
+
+    /// Lists the Shortcuts again: when the Tools tab appears, and after a Shortcut tool is saved.
+    func refreshInstalledShortcuts() {
+        guard !features.settings.shortcutTools.isEmpty else { return }
+        Task {
+            let names = await shortcutLister()
+            // An empty list is `shortcuts` failing to answer as often as it is a person with none; say nothing then.
+            installedShortcuts = names.isEmpty ? nil : Set(names)
+        }
+    }
+
+    /// Runs a tool made from a Shortcut: the blue working activity while it runs, a green alert when it finishes, and a red banner
+    /// with the reason when it doesn't. A Shortcut that is no longer there says so, and offers to edit the tool.
+    func runShortcutTool(_ tool: ShortcutTool) {
+        guard !runningShortcutTools.contains(tool.id) else { return }
+        if let installed = installedShortcuts, !installed.contains(tool.shortcut) {
+            showBanner(
+                IslandBanner(
+                    systemImage: "questionmark.square.dashed", tint: Theme.Tint.attention,
+                    title: "\u{201C}\(tool.shortcut)\u{201D} Isn\u{2019}t There",
+                    detail: "It may have been renamed or deleted",
+                    actions: [
+                        .init(title: "Edit Tool") { [weak self] in self?.editShortcutTool(tool.id) }
+                    ]),
+                for: .seconds(8), respectingFocus: false)
+            return
+        }
+        runningShortcutTools.insert(tool.id)
+        let job = features.work.begin("Running")
+        Task {
+            let finished = await shortcutRunner(tool.shortcut)
+            features.work.end(job)
+            runningShortcutTools.remove(tool.id)
+            if finished {
+                flash(
+                    IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: "Done"),
+                    respectingFocus: false)
+            } else {
+                showBanner(
+                    IslandBanner(
+                        systemImage: "square.2.layers.3d", tint: Theme.Tint.attention,
+                        title: "\u{201C}\(tool.shortcut)\u{201D} Didn\u{2019}t Finish",
+                        detail: "Open it in Shortcuts to see why"),
+                    for: .seconds(6), respectingFocus: false)
+            }
+        }
+    }
+
+    /// Opens Settings on the Tools pane with this tool's sheet showing.
+    func editShortcutTool(_ id: UUID) {
+        features.settings.requestedShortcutToolEdit = id
+        onOpenSettings?(.tools, nil)
+    }
+
     /// Runs one of the person's Shortcuts. It shows as work in progress while it runs.
     func runShortcut(_ name: String) {
         let job = features.work.begin("Running")
         Task {
-            let finished = await ShortcutsCLI.run(shortcut: name)
+            let finished = await shortcutRunner(name)
             features.work.end(job)
             if finished {
                 flash(

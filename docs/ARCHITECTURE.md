@@ -494,6 +494,18 @@ change with nothing wired. A phase that is running, or paused, keeps `startedLen
 it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
 against the new number.
 
+### Shortcut tools
+
+`ToolID` is a struct over a string, not an enum: a built-in's own name (`keepAwake`, stored exactly as before, so nothing already saved
+breaks) or `shortcut:<uuid>`. The built-ins are static members (so `.keepAwake` still reads as it did), `ToolID.allCases` is the nine, and
+`AppSettings.allTools` adds the person's `ShortcutTool`s (`tools.shortcuts`, JSON, at most `maxShortcutTools` = 2 so nine, two, and Less
+fill the grid's 12 slots; beyond that would need a third row and a taller Tools tab). `pinnedTools` may name a tool since removed; `isKnown` and
+`visiblePinned` leave it out, and launch drops it. `ToolCatalog.item(for:)` builds a Shortcut tool's item: dimmed when `installedShortcuts`
+(`shortcuts list`, read when the Tools tab appears, and only if there is a Shortcut tool; an empty answer counts as unknown) lacks its Shortcut.
+`IslandViewModel.runShortcutTool` runs it through `shortcutRunner` (replaced in tests): the blue working activity, a green alert, or a red
+banner; a double press is ignored while it runs. Saving, replacing, removing, and the file import all go through `AppSettings` and do
+nothing unless they change something. The icon can't be read from the Shortcuts app: see [plans/shortcut-icons.md](plans/shortcut-icons.md).
+
 ### The Shelf's results
 
 A job that makes a file (`FileTools.zip`, `unzip`, `convert`, `combinePDF`, `resize`, `compress`) writes into its own folder under
@@ -585,7 +597,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **675 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **694 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

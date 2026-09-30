@@ -84,14 +84,15 @@ struct WidgetInspector: View {
                                 ? nil
                                 : Array(
                                     QuickActionsGrid.tools(
-                                        for: placement.size, chosen: nil, pinned: editor.settings.visiblePinned
+                                        for: placement.size, chosen: nil, pinned: editor.settings.visiblePinned,
+                                        all: editor.settings.allTools
                                     )
                                     .prefix(slots))
                         }
                     }))
             if let chosen = options.tools {
                 let catalog = ToolCatalog(viewModel: preview)
-                let tools = Self.filled(chosen, to: slots)
+                let tools = Self.filled(chosen, to: slots, from: editor.settings.allTools)
                 ForEach(0..<slots, id: \.self) { slot in
                     SettingsDropdown(
                         title: "Tool \(slot + 1)",
@@ -104,7 +105,7 @@ struct WidgetInspector: View {
                                     $0.tools = list
                                 }
                             }),
-                        options: DropdownOption.all(ToolID.allCases) { catalog.item(for: $0).title })
+                        options: DropdownOption.all(editor.settings.allTools) { catalog.item(for: $0).title })
                 }
             } else {
                 Text("Shows the first \(slots) tools in the Tools row.")
@@ -115,9 +116,10 @@ struct WidgetInspector: View {
     }
 
     /// The chosen tools, padded with the defaults to fill `count` slots.
-    static func filled(_ chosen: [ToolID], to count: Int) -> [ToolID] {
-        var list = Array(chosen.prefix(count))
-        for tool in ToolID.fillOrder where list.count < count && !list.contains(tool) { list.append(tool) }
+    static func filled(_ chosen: [ToolID], to count: Int, from all: [ToolID] = ToolID.allCases) -> [ToolID] {
+        var list = Array(chosen.filter(all.contains).prefix(count))
+        let order = ToolID.fillOrder + all.filter { !ToolID.fillOrder.contains($0) }
+        for tool in order where list.count < count && !list.contains(tool) && all.contains(tool) { list.append(tool) }
         return list
     }
 

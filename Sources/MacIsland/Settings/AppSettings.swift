@@ -233,10 +233,22 @@ final class AppSettings {
         didSet { defaults.set(pinLimit.rawValue, forKey: Key.pinLimit) }
     }
 
-    /// Tools in row order. Only the first `pinLimit` show; the rest wait behind More.
+    /// Tools in row order. Only the first `pinLimit` show; the rest wait behind More. May name a Shortcut tool that was since removed;
+    /// `visiblePinned` leaves those out.
     private(set) var pinnedTools: [ToolID] {
         didSet { defaults.set(pinnedTools.map(\.rawValue), forKey: Key.pinned) }
     }
+
+    /// Tools the person made from their Shortcuts, in the order they made them.
+    private(set) var shortcutTools: [ShortcutTool] {
+        didSet { defaults.set(try? JSONEncoder().encode(shortcutTools), forKey: Key.shortcutTools) }
+    }
+
+    /// The Tools tab has room for nine built-in tools, this many of the person's own, and Less: two rows of six.
+    static let maxShortcutTools = 2
+
+    /// A Shortcut tool the Tools tab's Settings asked to edit (its right-click menu). Not stored: the pane takes it.
+    var requestedShortcutToolEdit: UUID?
 
     /// The tabs left of the notch, in order: up to `Theme.Metrics.maxTabs`.
     private(set) var leftTabs: [IslandModule] {
@@ -302,6 +314,7 @@ final class AppSettings {
         static let pomodoroSessions = "pomodoroSessions"
         static let weatherCity = "weatherCity"
         static let pinned = "pinnedTools"
+        static let shortcutTools = "tools.shortcuts"
         static let homeLayout = "home.layout"
         static let savedHomePresets = "home.savedPresets"
         static let customWidgets = "widgets.custom"
@@ -339,7 +352,15 @@ final class AppSettings {
         pomodoroLongBreak = minutes(Key.pomodoroLongBreak, PomodoroPlan.longBreakRange, default: plan.longBreak)
         pomodoroSessions = minutes(Key.pomodoroSessions, PomodoroPlan.sessionsRange, default: plan.sessions)
         pinLimit = PinLimit(rawValue: defaults.integer(forKey: Key.pinLimit)) ?? .six
-        pinnedTools = defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init) ?? ToolID.defaultPins
+        let shortcuts =
+            defaults.data(forKey: Key.shortcutTools).flatMap { try? JSONDecoder().decode([ShortcutTool].self, from: $0) }
+            ?? []
+        shortcutTools = Array(shortcuts.filter(\.isValid).prefix(Self.maxShortcutTools))
+        // A pinned Shortcut tool whose record is gone is dropped.
+        pinnedTools =
+            defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init)
+            .filter { tool in tool.shortcutID.map { id in shortcuts.contains { $0.id == id } } ?? true }
+            ?? ToolID.defaultPins
         menuBarModules = (defaults.stringArray(forKey: Key.menuBar) ?? []).compactMap(IslandModule.init).filter(
             \.isAvailable)
         let customs =
@@ -718,7 +739,61 @@ final class AppSettings {
     /// The row is always full: what the person pinned, then the remaining tools in their usual order,
     /// up to the row length (or every tool, if there are fewer).
     var visiblePinned: [ToolID] {
-        Self.filled(Array(pinnedTools.prefix(pinLimit.rawValue)), to: pinLimit.rawValue)
+        Self.filled(
+            Array(pinnedTools.filter(isKnown).prefix(pinLimit.rawValue)), to: pinLimit.rawValue, from: allTools)
+    }
+
+    // MARK: Shortcut tools
+
+    /// Every tool: the built-in ones, then the person's own.
+    var allTools: [ToolID] { ToolID.allCases + shortcutTools.map(\.toolID) }
+
+    /// Whether `tool` exists: a built-in, or a Shortcut tool that is still there.
+    func isKnown(_ tool: ToolID) -> Bool {
+        tool.shortcutID.map { id in shortcutTools.contains { $0.id == id } } ?? true
+    }
+
+    func shortcutTool(for tool: ToolID) -> ShortcutTool? {
+        tool.shortcutID.flatMap { id in shortcutTools.first { $0.id == id } }
+    }
+
+    func shortcutTool(id: UUID) -> ShortcutTool? { shortcutTools.first { $0.id == id } }
+
+    var canAddShortcutTool: Bool { shortcutTools.count < Self.maxShortcutTools }
+
+    /// Adds a Shortcut tool, or replaces the one with the same id. Refuses (false) one that isn't valid, or a new one when the
+    /// Tools tab is full. Does nothing unless it changes something.
+    @discardableResult
+    func saveShortcutTool(_ tool: ShortcutTool) -> Bool {
+        let tool = tool.cleaned
+        guard tool.isValid else { return false }
+        if let index = shortcutTools.firstIndex(where: { $0.id == tool.id }) {
+            guard shortcutTools[index] != tool else { return true }
+            shortcutTools[index] = tool
+            return true
+        }
+        guard canAddShortcutTool else { return false }
+        shortcutTools.append(tool)
+        return true
+    }
+
+    /// Takes a Shortcut tool away, and off the row. The Shortcut itself is not touched.
+    func removeShortcutTool(_ id: UUID) {
+        guard shortcutTools.contains(where: { $0.id == id }) else { return }
+        shortcutTools.removeAll { $0.id == id }
+        let tool = ToolID(shortcut: id)
+        if pinnedTools.contains(tool) { pinnedTools.removeAll { $0 == tool } }
+    }
+
+    /// For restoring: the valid ones, up to the room there is.
+    func replaceShortcutTools(_ tools: [ShortcutTool]) {
+        var kept: [ShortcutTool] = []
+        for tool in tools.map(\.cleaned) where tool.isValid && kept.count < Self.maxShortcutTools {
+            if !kept.contains(where: { $0.id == tool.id }) { kept.append(tool) }
+        }
+        guard kept != shortcutTools else { return }
+        shortcutTools = kept
+        pinnedTools.removeAll { !isKnown($0) }
     }
 
     /// Puts a pinned tool before another in the row, or last when `other` is nil. The row is what the Tools tab and
@@ -735,7 +810,7 @@ final class AppSettings {
     func isPinned(_ tool: ToolID) -> Bool { visiblePinned.contains(tool) }
 
     /// Whether every tool already fits in the row, so pinning changes nothing.
-    var rowShowsEveryTool: Bool { pinLimit.rawValue >= ToolID.allCases.count }
+    var rowShowsEveryTool: Bool { pinLimit.rawValue >= allTools.count }
 
     /// Pinning into a full row pushes out the tool that has been pinned longest. Unpinning leaves a gap
     /// that another tool fills, so the row never gets shorter.
@@ -743,7 +818,7 @@ final class AppSettings {
         var row = visiblePinned
         if let index = row.firstIndex(of: tool) {
             row.remove(at: index)
-            row = Self.filled(row, to: pinLimit.rawValue, avoiding: tool)
+            row = Self.filled(row, to: pinLimit.rawValue, avoiding: tool, from: allTools)
         } else {
             if row.count >= pinLimit.rawValue { row.removeFirst() }
             row.append(tool)
@@ -751,10 +826,12 @@ final class AppSettings {
         pinnedTools = row
     }
 
-    /// `row` topped up from `ToolID.allCases` to `count` tools. `avoiding` is used only if nothing else is left.
-    static func filled(_ row: [ToolID], to count: Int, avoiding: ToolID? = nil) -> [ToolID] {
+    /// `row` topped up from `pool` to `count` tools. `avoiding` is used only if nothing else is left.
+    static func filled(
+        _ row: [ToolID], to count: Int, avoiding: ToolID? = nil, from pool: [ToolID] = ToolID.allCases
+    ) -> [ToolID] {
         var row = row
-        for tool in ToolID.allCases where row.count < count && !row.contains(tool) && tool != avoiding {
+        for tool in pool where row.count < count && !row.contains(tool) && tool != avoiding {
             row.append(tool)
         }
         if row.count < count, let avoiding, !row.contains(avoiding) { row.append(avoiding) }

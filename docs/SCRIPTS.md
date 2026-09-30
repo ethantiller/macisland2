@@ -69,7 +69,7 @@ Launch at Login only works from this bundle.
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 675 tests, about a second.
+lines; 694 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -251,7 +251,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 
 | File | Contains |
 | --- | --- |
-| `ToolID.swift` | The nine tools and the default pins |
+| `ToolID.swift` | `ToolID` (a built-in tool or a Shortcut tool, stored by name), `ShortcutTool`, and the default pins |
 | `ToolCatalog.swift` | What each tool is and does (shared by the Tools tab, Home, and the peek) |
 | `ToolsView.swift` | The Tools tab: row (or the Mirror), grid, Ring Light sliders, Keep Awake chips; `ControlButton` |
 | `CameraMirror.swift` | `CameraMirror`, `CameraSessionProviding`, the AVFoundation provider, and the preview layer view |
@@ -318,7 +318,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ShortcutRecorder.swift`, `KeyCombo.swift` | Recording a global shortcut, and the key combination it stores |
 | `ShelfPane.swift` | The Shelf pane (drag target, screenshots, retention, clipboard limit) |
 | `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
-| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
+| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `ShortcutToolSheet.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -326,7 +326,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 43 files, about 9,700 lines, **675 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 44 files, about 10,000 lines, **694 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -363,6 +363,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
+| `ShortcutToolTests.swift` | Shortcut tools: identity, storage and the cap, the pinned row, the archive, dimming, running and failing with a stub runner |
 | `PermissionStepTests.swift` | The permission steps (Grant Permission, Not Now, the order, skipped steps, the copy), what is remembered as asked, and the Shelf not looking in protected folders at launch |
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
 | `SettingsTourTests.swift` | The tour's stops, running, anchors, placement, and visibility |

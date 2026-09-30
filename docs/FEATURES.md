@@ -275,7 +275,9 @@ undated ones. Tap the circle to check one off. Asks for Reminders access the fir
 
 ![Tools](images/08c-expanded-tools-eight.png)
 
-Nine tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of six.
+Nine tools, and up to two **Shortcut tools** of your own. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of six.
+
+**Shortcut tools.** Settings → Tools → **Add Shortcut Tool…** makes a tool from one of your Shortcuts: choose the Shortcut from the list (`shortcuts list`), a label of up to 14 characters, and an icon (an SF Symbol: a name, a preview, sixteen common ones, `bolt.fill` to start). **Test** runs it once. Pressing the tool runs the Shortcut with no input: the blue working activity while it runs, a green *Done* alert, or a red banner with the reason if it fails. It can be pinned to the row and shows in Quick Tools and the grid like any tool; right-click it in the Tools tab to edit or remove it (removing never touches the Shortcut). If the Shortcut was renamed or deleted the tool is dimmed, and its banner offers **Edit Tool**. The icon the Shortcuts app shows can't be read honestly, so you choose one ([docs/plans/shortcut-icons.md](plans/shortcut-icons.md)). Shortcut tools are in the settings file (their names, not the Shortcuts).
 Right-click a tool to pin it. The row is always full: unpinning fills the gap with another tool.
 
 | Tool | Does |
