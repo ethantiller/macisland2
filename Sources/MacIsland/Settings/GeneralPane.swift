@@ -2,6 +2,9 @@ import SwiftUI
 
 struct GeneralPane: View {
     let settings: AppSettings
+    /// Shows the first-run guide again, and starts the Settings tour again. Set by the window that holds the pane.
+    var onReplayGuide: () -> Void = {}
+    var onReplayTour: () -> Void = {}
 
     var body: some View {
         Form {
@@ -36,6 +39,17 @@ struct GeneralPane: View {
                 Text(
                     "Off, hovering only swells the island, and a click or a swipe opens it. Swiping needs a trackpad or Magic Mouse. The timer dial scrolls either way."
                 )
+            }
+            Section {
+                HStack(spacing: 8) {
+                    FieldButton(title: "Show the Welcome Guide", systemImage: "sparkles") { onReplayGuide() }
+                    FieldButton(title: "Take the Settings Tour", systemImage: "hand.point.up.left") { onReplayTour() }
+                }
+                .tourAnchor(.guide)
+            } header: {
+                Text("Guide").id(SettingsAnchor.guide)
+            } footer: {
+                Text("The guide shows the gestures and modules again. The tour points out each pane\u{2019}s main controls.")
             }
             Section {
                 Button("Export Settings\u{2026}") { SettingsArchivePanels.export(settings) }

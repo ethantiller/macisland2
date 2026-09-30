@@ -367,3 +367,15 @@ struct LaunchPromptTests {
         }
     }
 }
+
+struct GuideSearchTests {
+    @Test func searchFindsTheGuideAndTheTour() {
+        for query in ["tour", "onboarding", "tutorial", "welcome", "walkthrough"] {
+            let found = SettingsSearch.results(for: query)
+            #expect(found.contains { $0.anchor == SettingsAnchor.guide }, query)
+        }
+        let guide = SettingsSearch.results(for: "getting started").first
+        #expect(guide?.title == "Welcome Guide" && guide?.pane == .general)
+        #expect(SettingsSearch.results(for: "tips").first?.title == "Settings Tour")
+    }
+}

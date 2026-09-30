@@ -418,6 +418,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #endif
             OnboardingWindowController.shared.show(replay: !reset)
         }
+        urlCommands.onTour = {
+            onboarding.tourRequested = true
+            SettingsWindowController.shared.show()
+        }
         if onboarding.needsGuide { OnboardingWindowController.shared.show(replay: false) }
     }
 

@@ -62,6 +62,13 @@ enum SettingsSearch {
                 keywords: ["display", "screen", "monitor", "external", "primary", "notch"], anchor: SettingsAnchor.input
             ),
             .init(
+                pane: .general, title: "Welcome Guide",
+                keywords: ["onboarding", "tutorial", "intro", "help", "getting started", "gestures"],
+                anchor: SettingsAnchor.guide),
+            .init(
+                pane: .general, title: "Settings Tour", keywords: ["tour", "tutorial", "help", "walkthrough", "tips"],
+                anchor: SettingsAnchor.guide),
+            .init(
                 pane: .general, title: "Export Settings",
                 keywords: ["save", "backup", "file", "json", "share"], anchor: SettingsAnchor.yourSettings),
             .init(

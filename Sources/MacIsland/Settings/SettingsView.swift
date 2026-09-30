@@ -126,7 +126,9 @@ struct SettingsView: View {
             }
         }
         .onChange(of: onboarding?.tourRequested) { _, requested in
-            if requested == true, !OnboardingWindowController.shared.isOpen { beginTour() }
+            guard requested == true else { return }
+            // Never over the guide: the request is dropped, not kept for later.
+            if OnboardingWindowController.shared.isOpen { onboarding?.tourRequested = false } else { beginTour() }
         }
         .onChange(of: sidebarHidden) { _, hidden in UserDefaults.standard.set(hidden, forKey: Self.sidebarHiddenKey) }
         .onChange(of: settings.requestedHomeSelection) { takeRequestedSelection() }
@@ -169,7 +171,14 @@ struct SettingsView: View {
 
     @ViewBuilder private var content: some View {
         switch pane {
-        case .general: GeneralPane(settings: settings)
+        case .general:
+            GeneralPane(
+                settings: settings,
+                onReplayGuide: {
+                    if tour.isRunning { tour.end() }
+                    OnboardingWindowController.shared.show(replay: true)
+                },
+                onReplayTour: { beginTour() })
         case .tabs: TabsPane(settings: settings, preview: preview)
         case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
         case .shelf: ShelfPane(settings: settings, preview: preview)
