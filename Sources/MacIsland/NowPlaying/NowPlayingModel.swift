@@ -129,7 +129,19 @@ final class NowPlayingModel {
         state.timestamp = Date()
     }
 
-    func apply(_ newState: NowPlayingState) {
+    /// What Show Media From allows, asked of each state as it arrives. A state it refuses reads as nothing playing.
+    @ObservationIgnored var accepts: (NowPlayingState) -> Bool = { _ in true }
+    /// The last state the adapter reported, before the filter, so changing the source applies at once.
+    @ObservationIgnored private var reported = NowPlayingState()
+
+    /// Applies the filter again to what was last reported: the source setting changed.
+    func refilter() {
+        apply(reported)
+    }
+
+    func apply(_ reportedState: NowPlayingState) {
+        reported = reportedState
+        let newState = reportedState.hasMedia && !accepts(reportedState) ? NowPlayingState() : reportedState
         if Self.trackChanged(from: state, to: newState) {
             isFavorite = nil
         }

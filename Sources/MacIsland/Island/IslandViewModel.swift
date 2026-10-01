@@ -146,6 +146,8 @@ enum CompactActivity: Equatable {
     case agent
     case transfer
     case media
+    /// Keep Awake, with the time it has left: a state, not a clock being timed, so it ranks last and stays white.
+    case keepAwake
     case none
 }
 
@@ -180,6 +182,8 @@ struct IslandFeatures {
     let system: SystemModel
     let agents: AgentActivity
     let mixer: AppMixer
+    let downloads: DownloadsFolder
+    let notifications: NotificationMirror
 }
 
 @MainActor
@@ -201,6 +205,9 @@ final class IslandViewModel {
     var clockMode: ClockMode = .timer
     /// The Media tab's Audio Output and Volume panel is open: the output chips and volume, or the Mixer when it is on.
     var showsMediaOutputs = false
+    /// The activity the person chose to lead the closed island and the peek, by `CompactActivity.choiceID`. Memory only: it ends with
+    /// the activity.
+    var chosenActivityID: String?
     var agentsMode: AgentsMode = .now
     var usageRange: UsageRange = .today
     /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
@@ -219,6 +226,7 @@ final class IslandViewModel {
     var state: State = .compact {
         didSet {
             if state == .compact {
+                pruneChosenActivity()
                 toolsExpanded = false
                 calendarExpanded = false
                 calendarSelectedDay = nil
@@ -286,8 +294,23 @@ final class IslandViewModel {
         features[keyPath: keyPath]
     }
 
-    /// Everything live, highest priority first. The island shows the top two.
+    /// Everything live, highest priority first, with the one the person chose in the peek (while Choose the Activity is on and it is
+    /// still live) moved up to lead, behind an alert. The island shows the top two.
     var compactActivities: [CompactActivity] {
+        let live = liveActivities
+        guard features.settings.isOn(.chooseActivity), let chosen = chosenActivityID,
+            let index = live.firstIndex(where: { $0.choiceID == chosen && $0.isChoosable })
+        else { return live }
+        var list = live
+        let front = list.first?.isChoosable == false ? 1 : 0
+        guard index > front else { return live }
+        list.insert(list.remove(at: index), at: front)
+        return list
+    }
+
+    /// Everything live in the order DESIGN gives: banner, alert, recording, microphone, the clocks, a countdown, work, an agent,
+    /// a transfer, music.
+    var liveActivities: [CompactActivity] {
         if let banner { return [.banner(banner)] }
         var list: [CompactActivity] = []
         if let alert { list.append(.alert(alert)) }
@@ -308,6 +331,11 @@ final class IslandViewModel {
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
         if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
             list.append(.media)
+        }
+        if features.settings.isOn(.tools), features.settings.showsKeepAwakeCompact, features.keepAwake.isOn,
+            features.keepAwake.endsAt != nil
+        {
+            list.append(.keepAwake)
         }
         return list
     }
@@ -388,7 +416,7 @@ final class IslandViewModel {
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .countdown, .transfer: return 52
         case .working, .recording, .agent: return 64
-        case .media: return geometry.notchSize.height + 8
+        case .media, .keepAwake: return geometry.notchSize.height + 8
         }
     }
 
@@ -402,12 +430,46 @@ final class IslandViewModel {
 
     /// A pill on a display without a notch has no hardware to hide behind, so it is not drawn
     /// while nothing is live. Its hover zone stays.
+    /// It is also not drawn while Hide in Full Screen has the front app on the whole display, nor, with Hide Until You Point at It, while
+    /// the pointer is away (a banner or an alert still shows).
     var isPillHidden: Bool {
-        !geometry.hasNotch && presentation == .compact && compactActivity == .none && !showsDragTarget
+        guard presentation == .compact, !showsDragTarget else { return false }
+        if !geometry.hasNotch, compactActivity == .none { return true }
+        if hidesForFullScreen { return true }
+        return features.settings.hidesUntilPointer && !isHovering && alert == nil
+    }
+
+    // MARK: Full screen
+
+    /// The app in front covers the whole island display. Set by the app while Hide in Full Screen is on.
+    private(set) var isFullScreen = false
+    /// An alert that stays until seen, held back while the display is full screen, shown when it ends.
+    private var waitingAlert: IslandAlert?
+
+    /// Whether the island is keeping out of the way of a full-screen app.
+    var hidesForFullScreen: Bool { isFullScreen && features.settings.hidesInFullScreen }
+
+    func setFullScreen(_ on: Bool) {
+        guard on != isFullScreen else { return }
+        isFullScreen = on
+        if on {
+            hoverTask?.cancel()
+            if isSwelling { isSwelling = false }
+            if state == .peek { state = .compact }
+        } else if let waiting = waitingAlert {
+            waitingAlert = nil
+            flash(waiting, respectingFocus: false)
+        }
     }
 
     /// Clock for a running timer or stopwatch, Now Playing for music, and the day at a glance when idle.
     var peekContentHeight: CGFloat {
+        let choice = showsActivityChoice ? Theme.Metrics.hitTarget + Theme.Metrics.rowSpacing : 0
+        return choice + activityPeekHeight
+    }
+
+    /// The height of the top activity's own peek.
+    private var activityPeekHeight: CGFloat {
         switch compactActivity {
         case .timer, .pomodoro, .stopwatch, .countdown: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)
@@ -636,6 +698,7 @@ final class IslandViewModel {
     func leaveModuleThatIsOff() {
         // Without the Clipboard feature the Shelf has one mode.
         if shelfMode == .clipboard, !features.settings.isOn(.clipboard) { shelfMode = .files }
+        if shelfMode == .downloads, !features.settings.isOn(.downloads) { shelfMode = .files }
         if selectedTab != .home, !features.settings.isShown(selectedTab) { select(.home) }
     }
 
@@ -952,6 +1015,7 @@ final class IslandViewModel {
 
     func setShelfMode(_ mode: ShelfMode) {
         guard mode != .clipboard || features.settings.isOn(.clipboard) else { return }
+        guard mode != .downloads || features.settings.isOn(.downloads) else { return }
         withAnimation(Theme.Motion.resize) { shelfMode = mode }
         features.settings.shelfMode = mode
     }
@@ -988,8 +1052,8 @@ final class IslandViewModel {
 
     /// Space over a Shelf file. Returns `false` when there is nothing to preview, so the key passes on.
     func quickLookHoveredItem() -> Bool {
-        guard state == .expanded, selectedTab == .shelf, shelfMode == .files, let url = hoveredShelfItem,
-            features.shelf.items.contains(url)
+        guard state == .expanded, selectedTab == .shelf, let url = hoveredShelfItem,
+            shelfMode == .files ? features.shelf.items.contains(url) : shownDownloadURLs.contains(url)
         else { return false }
         showQuickLook(url)
         return true
@@ -1046,6 +1110,16 @@ final class IslandViewModel {
     /// The copies that match what is typed, newest first.
     var shownClipboardEntries: [ClipboardEntry] { features.clipboard.matches(clipboardQuery) }
 
+    /// The Shelf is open on its Downloads, which is the only time the folder is watched.
+    var isDownloadsShowing: Bool {
+        state == .expanded && selectedTab == .shelf && shelfMode == .downloads && features.settings.isOn(.downloads)
+    }
+
+    /// The files Quick Look can step through in Downloads.
+    var shownDownloadURLs: [URL] {
+        shelfMode == .downloads ? features.downloads.items.filter { !$0.isArriving }.map(\.url) : []
+    }
+
     /// The Shelf is open on its Clipboard, which is where the paste keys work.
     var isClipboardShowing: Bool {
         state == .expanded && selectedTab == .shelf && shelfMode == .clipboard && features.settings.isOn(.clipboard)
@@ -1087,18 +1161,28 @@ final class IslandViewModel {
         return true
     }
 
-    /// Esc takes back one thing before it closes the island: the clipboard search. True when it did.
+    /// Esc takes back one thing before it closes the island, innermost first: the clipboard search, the Mixer's panel, the Tools grid, a
+    /// day picked in the month, then the month. True when it did.
     func stepBack() -> Bool {
-        if calendarSelectedDay != nil {
-            calendarSelectedDay = nil
-            return true
-        }
         if !clipboardQuery.isEmpty {
             clipboardQuery = ""
             return true
         }
         if showsMediaOutputs, selectedTab == .media, isMixerOn, features.nowPlaying.state.hasMedia {
             withAnimation(Theme.Motion.resize) { showsMediaOutputs = false }
+            return true
+        }
+        // Mirror stays until Done, so the grid behind it is not a step.
+        if toolsExpanded, selectedTab == .tools, !features.mirror.isOn {
+            setToolsExpanded(false)
+            return true
+        }
+        if calendarSelectedDay != nil {
+            calendarSelectedDay = nil
+            return true
+        }
+        if calendarExpanded, selectedTab == .home {
+            setCalendarExpanded(false)
             return true
         }
         return false
@@ -1143,12 +1227,13 @@ final class IslandViewModel {
         if isPinnedOpen || isHeld { return }
 
         if hovering {
-            guard state == .compact else { return }
+            guard state == .compact, !hidesForFullScreen else { return }
             if !isPillHidden { withAnimation(Theme.Motion.track) { isSwelling = true } }
             // With Peek on Hover off, hovering only swells it: a click or a swipe opens it.
             guard features.settings.peeksOnHover else { return }
+            let dwell = features.settings.peekDelay.duration
             hoverTask = Task { [weak self] in
-                try? await Task.sleep(for: Theme.Timing.peekDwell)
+                try? await Task.sleep(for: dwell)
                 guard !Task.isCancelled, let self else { return }
                 if case .stopwatch = self.compactActivity { self.clockMode = .stopwatch }
                 if case .timer = self.compactActivity { self.clockMode = .timer }
@@ -1172,15 +1257,46 @@ final class IslandViewModel {
         self.alert = nil
     }
 
-    /// Click, swipe down, or the shortcut: the full island with tabs.
-    func open() {
+    /// Click, swipe down, or the shortcut: the full island with tabs. Opening from closed goes to the page Open On chose, unless the
+    /// caller already picked one; an alert's own page still wins.
+    func open(applyingOpenOn: Bool = true) {
         hoverTask?.cancel()
         bannerTask?.cancel()
         withAnimation(Theme.Motion.open) {
             isSwelling = false
             banner = nil
+            if applyingOpenOn, state != .expanded { applyOpenOn() }
             revealPendingAlert()
             state = .expanded
+        }
+    }
+
+    /// The page the island opens on from closed: the last one, Home, or the page of what is live.
+    private func applyOpenOn() {
+        switch features.settings.openOn {
+        case .lastTab:
+            return
+        case .home:
+            selectedTab = .home
+        case .live:
+            guard let module = Self.module(for: compactActivity), features.settings.isOn(.shelf) || module != .shelf,
+                module.isAvailable, Feature.module(for: module).map(features.settings.isOn) ?? true
+            else { return }
+            selectedTab = module
+            if module == .shelf, features.settings.isOn(.downloads) { shelfMode = .downloads }
+        }
+    }
+
+    /// Where an activity lives: a clock's is Clock, music's Media, a download's the Shelf, an agent's Agents, a countdown's Home. The
+    /// rest have no page of their own.
+    static func module(for activity: CompactActivity) -> IslandModule? {
+        switch activity {
+        case .timer, .pomodoro, .stopwatch: .clock
+        case .media: .media
+        case .transfer: .shelf
+        case .agent: .agents
+        case .countdown: .home
+        case .banner, .alert, .recording, .microphone, .working, .keepAwake, .none: nil
         }
     }
 
@@ -1209,7 +1325,7 @@ final class IslandViewModel {
         }
         selectedTab = .shelf
         isPinnedOpen = true
-        open()
+        open(applyingOpenOn: false)
     }
 
     /// Esc, the shortcut, a swipe up, or a click outside a pinned island. Mirror is the one thing that refuses: it stays until
@@ -1293,6 +1409,11 @@ final class IslandViewModel {
     ) {
         if let event, features.settings.isMuted(event) { return }
         if respectingFocus, isQuiet, !alert.staysUntilSeen { return }
+        // A full-screen app has the display: what passes is dropped, and what stays until seen waits for it to end.
+        if hidesForFullScreen {
+            if alert.staysUntilSeen { waitingAlert = alert }
+            return
+        }
         alertTask?.cancel()
         withAnimation(Theme.Motion.open) { self.alert = alert }
         guard !alert.staysUntilSeen else { return }
@@ -1321,6 +1442,14 @@ final class IslandViewModel {
         flash(Announcements.volume(level), for: Theme.Timing.volumeHUD, respectingFocus: false)
     }
 
+    /// Whether a banner for `event` would show right now: it isn't muted, no full-screen app has the display, and no Focus is holding
+    /// banners. For a caller that has something to do first that it must not do for a banner that won't show.
+    func canShowBanner(for event: AmbientEvent? = nil, respectingFocus: Bool = true) -> Bool {
+        if let event, features.settings.isMuted(event) { return false }
+        if hidesForFullScreen { return false }
+        return !(respectingFocus && isQuiet)
+    }
+
     /// Shows a banner, then optionally leaves `followUp` as a compact alert.
     func showBanner(
         _ banner: IslandBanner,
@@ -1330,6 +1459,7 @@ final class IslandViewModel {
         event: AmbientEvent? = nil
     ) {
         if let event, features.settings.isMuted(event) { return }
+        if hidesForFullScreen { return }
         if respectingFocus, isQuiet {
             if let followUp { flash(followUp) }
             return

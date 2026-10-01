@@ -548,6 +548,14 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Turn the Mixer on in Features and press Allow; macOS asks for System Audio Recording. In Media, the AirPlay button opens the panel, sliders change each app as M1 promised, the output menu routes an app, Esc and the chevron close it, and with the Mixer off the Media tab is as before (compare `04-expanded-media`)
 - [ ] With only a browser video playing (nothing in Now Playing) the Media tab shows the panel; denying the permission shows the red line and nothing is left silent
 
+**Choose the activity (P)** *(written, not run)*
+- [ ] With Choose the Activity on, a running timer and music: hover shows a row of chips in the peek; choosing Music puts the art on the leading side and the player in the peek; when the music stops the timer leads again, and with the feature off nothing changes
+- [ ] The peek does not jump under the pointer when an activity starts or ends
+
+**Downloads in the Shelf (G1)** *(written, not run)*
+- [ ] With Downloads on in Features, the Shelf's header has a third segment; a Safari download shows as arriving with a ring and then as a file, dragging it out copies it, Add to Shelf keeps it, and nothing in this mode can delete a file
+- [ ] With the mode hidden, no file-system source is open (`lsof -p $(pgrep -x MacIsland) | grep Downloads` shows nothing)
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget

@@ -36,7 +36,7 @@ There are 7 modules, and an eighth, **Agents**, that is off until it is switched
 | --- | --- |
 | Home | A dashboard of widgets on a 6 by 3 grid: today (opens a month calendar), what is next, what is playing, the everyday tools, timers, Shelf |
 | Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics; the Mixer (a row per app, up to four before it scrolls) behind the same output button when it is on |
-| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
+| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Downloads (the newest twenty in the folder, when that feature is on; its tiles are the Shelf's, and `shelfChoiceWidthThree` makes room for the third segment) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
 | Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Clean Keyboard, Mirror, Record Screen |
@@ -59,7 +59,7 @@ Rules:
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music. At most 2 activities show at once.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music. At most 2 activities show at once. With **Choose the Activity** on (off by default), a peek with two or more things live starts with a row of chips, one per activity, the leading one selected; choosing one moves it to the front of this order (after an alert; a banner still stands alone), so it leads the closed island and fills the peek. The choice lasts as long as that activity does. There is no Combine menu: the top two are always paired.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.

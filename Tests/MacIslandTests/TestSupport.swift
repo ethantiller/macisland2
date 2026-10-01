@@ -10,7 +10,8 @@ enum TestSupport {
     static func makeViewModel(
         bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
         screen: StubScreen? = nil, transcriber: StubTranscriber? = nil,
-        mixerApps: StubAppList? = nil, mixerTaps: StubTapper? = nil, mixerAccess: OptionalAccessState? = nil
+        mixerApps: StubAppList? = nil, mixerTaps: StubTapper? = nil, mixerAccess: OptionalAccessState? = nil,
+        notifications: ((AppSettings) -> NotificationMirror)? = nil
     ) -> IslandViewModel {
         // A private suite per view model, so tests running in parallel never see each other's settings.
         let suite = "MacIslandTests.\(UUID().uuidString)"
@@ -68,7 +69,11 @@ enum TestSupport {
                 agents: AgentActivity(),
                 mixer: AppMixer(
                     settings: settings, listing: mixerApps ?? StubAppList(), tapper: mixerTaps ?? StubTapper(),
-                    defaults: defaults)
+                    defaults: defaults),
+                downloads: DownloadsFolder(folder: scratch.appendingPathComponent("Downloads")),
+                notifications: notifications?(settings)
+                    ?? NotificationMirror(
+                        reader: NotificationReader(environment: .inert), placement: { settings.notificationPlacement })
             ))
         viewModel.geometry = geometry
         return viewModel

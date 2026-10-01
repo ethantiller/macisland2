@@ -76,6 +76,8 @@ final class LivePowerAssertions: PowerAssertions {
 final class KeepAwake {
     private(set) var isOn = false
     private(set) var duration: KeepAwakeDuration = .indefinitely
+    /// When it ends, if it does.
+    private(set) var endsAt: Date?
 
     /// What the tool says it does, and doesn't.
     static let limits = "Keeps the display awake. Closing the lid can still sleep this Mac unless it is on power with an external display."
@@ -116,7 +118,8 @@ final class KeepAwake {
         self.duration = duration
         expiryTask?.cancel()
         expiryTask = nil
-        guard let end = duration.endDate(from: now) else { return }
+        endsAt = duration.endDate(from: now)
+        guard let end = endsAt else { return }
         expiryTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(max(end.timeIntervalSinceNow, 0)))
             guard !Task.isCancelled else { return }
@@ -132,6 +135,7 @@ final class KeepAwake {
         held = []
         isOn = false
         duration = .indefinitely
+        endsAt = nil
     }
 
     /// After the Mac wakes: if the system no longer holds the display assertion, it is off, and the tool says so.
@@ -144,7 +148,18 @@ final class KeepAwake {
             expiryTask = nil
             isOn = false
             duration = .indefinitely
+            endsAt = nil
             return
         }
+    }
+}
+
+/// Keep Awake's time left, as the closed island words it.
+enum KeepAwakeTime {
+    /// "45m" up to an hour, "1h35" past it, rounded up to the minute: a fresh hour reads "60m".
+    static func text(remaining: TimeInterval) -> String {
+        let minutes = max(Int((remaining / 60).rounded(.up)), 0)
+        guard minutes > 60 else { return "\(minutes)m" }
+        return "\(minutes / 60)h" + String(format: "%02d", minutes % 60)
     }
 }

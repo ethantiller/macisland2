@@ -206,6 +206,8 @@ struct IslandView: View {
         case .media:
             ArtworkView(image: viewModel.nowPlaying.artwork, size: notchSize.height - 12, cornerRadius: 5)
                 .mediaMatch("artwork")
+        case .keepAwake:
+            Glyph(systemName: "cup.and.saucer.fill")
         case .alert, .banner, .none:
             EmptyView()
         }
@@ -241,6 +243,8 @@ struct IslandView: View {
         case .media:
             ArtworkView(image: viewModel.nowPlaying.artwork, size: notchSize.height - 12, cornerRadius: 5)
                 .mediaMatch("artwork")
+        case .keepAwake:
+            Glyph(systemName: "cup.and.saucer.fill")
         case .banner, .none:
             EmptyView()
         }
@@ -305,6 +309,8 @@ struct IslandView: View {
                 .contentTransition(.numericText())
         case .media:
             CompactPlaybackControl(nowPlaying: viewModel.nowPlaying)
+        case .keepAwake:
+            CompactKeepAwakeText(keepAwake: viewModel.keepAwake)
         case .banner, .none:
             EmptyView()
         }

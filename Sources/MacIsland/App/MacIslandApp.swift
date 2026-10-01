@@ -64,7 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
             system: SystemModel(sampler: LiveSystemSampler()),
             agents: AgentActivity(),
-            mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper())
+            mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper()),
+            downloads: DownloadsFolder(),
+            notifications: NotificationMirror(
+                reader: NotificationReader(environment: .live()), placement: { settings.notificationPlacement })
         )
     }
 
@@ -81,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
     private let agentWatcher = AgentLogWatcher()
+    private let fullScreenWatcher = FullScreenWatcher()
     private let accessoryMonitor = AudioAccessoryMonitor()
     private let bluetoothAccess = BluetoothAccess()
     private let diskSpace = DiskSpace()
@@ -275,10 +279,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mixer.start()
     }
 
+    private func applyFullScreen() {
+        if features.settings.hidesInFullScreen { fullScreenWatcher.start() } else { fullScreenWatcher.stop() }
+    }
+
     /// What a switch in the Features catalog does beyond what each feature's own setting already does.
     private func connectFeatures() {
         let runner = featureRunner
         features.settings.onFeatureChange = { runner.apply($0) }
+        // Show Media From: what the adapter reports is filtered, and again when the choice changes.
+        let settings = features.settings
+        let nowPlaying = features.nowPlaying
+        nowPlaying.accepts = { settings.mediaSource.accepts(bundleID: $0.bundleIdentifier) }
+        settings.onMediaSourceChange = { nowPlaying.refilter() }
+        // Hide in Full Screen: the front app is looked at only while the setting is on.
+        let viewModel = viewModel
+        fullScreenWatcher.screenFrame = { [weak viewModel] in viewModel?.geometry.screenFrame ?? .zero }
+        fullScreenWatcher.onChange = { [weak viewModel] on in viewModel?.setFullScreen(on) }
+        settings.onFullScreenSettingChange = { [weak self] in self?.applyFullScreen() }
+        applyFullScreen()
+        // Notifications: a read notification reaches the island through the view model.
+        features.notifications.connect(to: viewModel)
         // After everything else is connected: starts what is on (the music adapter), and nothing that would ask.
         runner.startAtLaunch()
     }

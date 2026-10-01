@@ -101,6 +101,7 @@ struct FeaturesPane: View {
                     .foregroundStyle(.secondary)
             }
             accessLines(feature)
+            notificationLines(feature)
         }
         .id(SettingsAnchor.feature(feature))
         .contentShape(Rectangle())
@@ -134,6 +135,26 @@ struct FeaturesPane: View {
                     }
                 default:
                     EmptyView()
+                }
+            }
+        }
+    }
+
+    /// Notifications is read through Accessibility, one of the ten the guide asks for: when it is off, or the version of macOS isn't one
+    /// this knows, the row says why.
+    @ViewBuilder private func notificationLines(_ feature: Feature) -> some View {
+        if feature == .notifications, settings.isOn(feature), let problem = features.notifications.problem {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if features.notifications.reader.status == .needsAccess {
+                    HStack(spacing: 8) {
+                        if let url = AccessKind.accessibility.settingsURL {
+                            FieldButton(title: "Open System Settings") { NSWorkspace.shared.open(url) }
+                        }
+                        FieldButton(title: "Check Again") { features.notifications.start() }
+                    }
                 }
             }
         }

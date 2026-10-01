@@ -58,6 +58,7 @@ final class FeatureRunner {
         if settings.isOn(.music) { music(true) }
         if settings.isOn(.agents) { agents(true) }
         if settings.isOn(.mixer) { mixer(true) }
+        if settings.isOn(.notifications) { features.notifications.start() }
         settings.syncHomeWidgets()
         viewModel.leaveModuleThatIsOff()
     }
@@ -98,8 +99,13 @@ final class FeatureRunner {
         case .mixer:
             // Off, every tap is given back; on, it listens again (and taps nothing until something is adjusted and the access allows).
             mixer(on)
-        case .volumeHUD, .system, .downloads, .chooseActivity, .notifications:
-            break  // `volumeHUD` follows its own setting; the rest arrive with their packages
+        case .downloads:
+            if !on { features.downloads.stop() }  // the folder is watched only while the mode shows
+        case .notifications:
+            // Off, the listener is removed and the inbox emptied; on, it listens if Accessibility allows it (it never asks).
+            if on { features.notifications.start() } else { features.notifications.stop() }
+        case .volumeHUD, .system, .chooseActivity:
+            break  // `volumeHUD` follows its own setting; the rest have nothing running
         }
         viewModel.leaveModuleThatIsOff()
     }

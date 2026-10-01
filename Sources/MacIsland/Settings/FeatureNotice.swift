@@ -22,6 +22,8 @@ enum FeatureNotice {
             return features.voice.isRecording ? "The voice note was saved." : nil
         case .clipboard:
             return features.clipboard.entries.isEmpty ? nil : "The clipboard history was cleared."
+        case .notifications:
+            return features.notifications.inbox.items.isEmpty ? nil : "The notification inbox was cleared."
         case .music:
             return features.nowPlaying.state.isPlaying ? "The player keeps playing; MacIsland stops listening to it." : nil
         default:
@@ -74,7 +76,9 @@ extension Feature {
         case .system: PreviewContext(presentation: .expanded, tab: .home)
         case .agents: PreviewContext(presentation: .expanded, tab: .agents)
         case .mixer: PreviewContext(presentation: .expanded, tab: .media, showsMixer: true)
-        case .downloads, .chooseActivity, .notifications: nil
+        case .chooseActivity: PreviewContext(presentation: .peek, twoActivities: true)
+        case .downloads: PreviewContext(presentation: .expanded, tab: .shelf, shelfMode: .downloads)
+        case .notifications: PreviewContext(presentation: .banner, event: .notification)
         }
     }
 

@@ -586,8 +586,8 @@ struct FeatureCatalogTests {
                 found.contains { $0.pane == .features && $0.anchor == SettingsAnchor.feature(feature) },
                 "\(feature)")
         }
-        // A feature that isn\u{2019}t built has no row, so nothing to find.
-        #expect(!SettingsSearch.entries.contains { $0.pane == .features && $0.title == Feature.downloads.title })
+        // Every feature is built now, so every one has its row.
+        #expect(Feature.allCases.allSatisfy(\.isBuilt))
         // The two switches that moved are found where they now are.
         #expect(SettingsSearch.results(for: "replace volume").first?.pane == .features)
         #expect(SettingsSearch.results(for: "outlook").contains { $0.pane == .features && $0.title == "Calendar" })
@@ -642,7 +642,7 @@ struct FeatureCatalogTests {
         #expect(settings.featureCount.on == FeaturePreset.minimal.features.filter(\.isBuilt).count)
     }
 
-    @Test func everyBuiltFeatureShowsWhereItLandsAndAnUnbuiltOneHasNoRow() {
+    @Test func everyBuiltFeatureShowsWhereItLands() {
         for feature in Feature.allCases where feature.isBuilt {
             #expect(feature.previewContext != nil, "\(feature)")
         }
@@ -650,7 +650,7 @@ struct FeatureCatalogTests {
         #expect(Feature.calendar.previewContext?.event == .meeting)
         #expect(Feature.weather.previewContext?.presentation == .peek)
         #expect(Feature.shelf.previewContext?.fileDrag == true)
-        #expect(!Feature.downloads.isBuilt)
+        #expect(Feature.notifications.previewContext?.event == .notification)
     }
 
     @Test func anOffFeatureIsKeptApartFromItsSettings() {

@@ -97,7 +97,7 @@ struct PrivacyAccess: Identifiable, Equatable {
                 "screen", "Screen Recording", "Record Screen",
                 undecided(.screenRecording, granted: CGPreflightScreenCaptureAccess()), pane: "Privacy_ScreenCapture"),
             row(
-                "accessibility", "Accessibility", "Clean Keys",
+                "accessibility", "Accessibility", "Clean Keys, and reading notifications",
                 undecided(.accessibility, granted: KeyboardCleaner.hasAccess), pane: "Privacy_Accessibility"),
             row(
                 "bluetooth", "Bluetooth", "Headphone batteries and the device switcher", bluetooth,

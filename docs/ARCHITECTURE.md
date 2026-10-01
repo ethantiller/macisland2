@@ -451,6 +451,12 @@ The Agents module (`Agents/`, `IslandModule.agents`, feature `agents`, off by de
 
 ---
 
+## Downloads in the Shelf
+
+`ShelfMode.downloads` is a third mode, offered by `ShelfMode.available(clipboard:downloads:)` only while the `downloads` feature is on (a stored mode with it off reads as Files; `setShelfMode` refuses it). `DownloadsFolder` (`Shelf/DownloadsFolder.swift`, `IslandFeatures.downloads`) lists the newest 20 entries of `~/Downloads` by `addedToDirectoryDate` with `DownloadsScan` (one directory listing, hidden files skipped, no recursion) and watches the folder with a single `DispatchSourceFileSystemObject` **only while the mode is showing** (`IslandViewModel.isDownloadsShowing`; `ShelfView` starts and stops it, and `FeatureRunner` stops it when the feature goes off). A change is listed again 300 ms after it settles. Partial files (`.download`, `.crdownload`, `.part`) are arriving; their progress comes from `TransferMonitor` by name. Tiles are `ShelfItemView` with `ShelfItemSource.downloads`: no remove button, **Add to Shelf** in the menu. A folder that can't be listed (Downloads not allowed) says so.
+
+---
+
 ## The Mixer
 
 The Mixer (`System/AppMixer.swift`, feature `mixer`, off by default) sets any app's volume from 0 to 200% and sends it to its own output, with no driver. Its UI is the Media tab's panel (below); this section is the engine.

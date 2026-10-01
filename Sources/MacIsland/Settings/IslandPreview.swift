@@ -27,6 +27,10 @@ struct PreviewContext: Equatable {
     var fileDrag = false
     /// The Media tab's Mixer panel is open.
     var showsMixer = false
+    /// A timer runs beside the music, so the peek has two things to choose between.
+    var twoActivities = false
+    /// The Shelf mode the Shelf tab opens on in the preview. Nil leaves it as it was.
+    var shelfMode: ShelfMode?
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
     var clockMode: ClockMode?
 }
@@ -57,6 +61,7 @@ final class IslandPreviewModel {
     /// Stops what the sample features started and removes what they wrote.
     func stop() {
         viewModel.weather.stop()
+        viewModel.timer.reset()
         clearAnnouncements()
         scratch.remove()
     }
@@ -108,6 +113,12 @@ final class IslandPreviewModel {
         let apply = { [self] in
             self.context = context
             viewModel.resetPointerState()
+            if context.twoActivities, !viewModel.timer.isActive {
+                viewModel.timer.start(minutes: 25)
+            } else if !context.twoActivities, viewModel.timer.isActive {
+                viewModel.timer.reset()
+                viewModel.chosenActivityID = nil
+            }
             menuBarProgress = context.presentation == .menuBar ? 1 : 0
             switch context.presentation {
             case .compact:
@@ -143,6 +154,7 @@ final class IslandPreviewModel {
                 viewModel.selectedTab = context.tab
                 viewModel.showsMediaOutputs = context.showsMixer
                 if let mode = context.clockMode { viewModel.clockMode = mode }
+                if let mode = context.shelfMode { viewModel.shelfMode = mode }
                 viewModel.state = .expanded
             case .menuBar:
                 // The island keeps the state it had: it shrinks and slides away as it is, and comes back the same.

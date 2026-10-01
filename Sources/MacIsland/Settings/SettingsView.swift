@@ -189,7 +189,7 @@ struct SettingsView: View {
         case .features: FeaturesPane(settings: settings, features: features, preview: preview)
         case .tabs: TabsPane(settings: settings, preview: preview)
         case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
-        case .notifications: NotificationsPane(settings: settings, preview: preview)
+        case .notifications: NotificationsPane(settings: settings, preview: preview, mirror: features.notifications)
         case .privacy: PrivacyPane(settings: settings)
         }
     }

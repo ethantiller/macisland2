@@ -217,6 +217,13 @@ struct IslandSnapshots {
             ))
         render(viewModel, "12b-banner-two-actions")
 
+        viewModel.showBanner(
+            Announcements.mirrored(
+                MirroredNotification(
+                    id: "snapshot", app: "Messages", title: "Maya", subtitle: "", body: "Are we still on for lunch?",
+                    isPersistent: false, date: Date()), open: {}, dismiss: {}))
+        render(viewModel, "12c-banner-mirrored")
+
         // The banner outranks an alert, so let it go first.
         viewModel.performBannerAction()
         viewModel.flash(
@@ -268,6 +275,32 @@ struct IslandSnapshots {
             viewModel.showsMediaOutputs = true
             render(viewModel, name)
         }
+    }
+
+    /// The Shelf's Downloads mode (G1), over a folder of sample files.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderDownloads() {
+        let viewModel = makeViewModel()
+        _ = PreviewSamples.downloads(in: viewModel.downloads.folder)
+        defer { try? FileManager.default.removeItem(at: viewModel.downloads.folder) }
+        viewModel.settings.setOn(.downloads, true)
+        viewModel.downloads.reload()
+        viewModel.selectedTab = .shelf
+        viewModel.state = .expanded
+        viewModel.setShelfMode(.downloads)
+        render(viewModel, "05d-expanded-shelf-downloads")
+    }
+
+    /// The peek's row of live activities (Choose the Activity): a timer and music, with the timer leading.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderChooseActivity() {
+        let viewModel = makeViewModel()
+        viewModel.settings.setOn(.chooseActivity, true)
+        viewModel.nowPlaying.apply(sampleTrack())
+        viewModel.timer.start(minutes: 25)
+        viewModel.state = .peek
+        render(viewModel, "03i-peek-choose-activity")
+        viewModel.timer.reset()
     }
 
     /// The two drop tiles the Shelf shows while a file is dragged, as they look with the pointer over each half.

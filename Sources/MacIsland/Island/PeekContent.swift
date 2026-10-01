@@ -5,6 +5,17 @@ struct PeekContent: View {
     let viewModel: IslandViewModel
 
     var body: some View {
+        VStack(spacing: Theme.Metrics.rowSpacing) {
+            if viewModel.showsActivityChoice { ActivityChoiceRow(viewModel: viewModel) }
+            content
+        }
+        .frame(height: viewModel.peekContentHeight, alignment: .top)
+        .padding(.horizontal, ScreenGeometry.topFlare + Theme.Metrics.margin)
+        .padding(.top, viewModel.geometry.notchSize.height + Theme.Metrics.contentTopGap)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var content: some View {
         Group {
             switch viewModel.compactActivity {
             case .media:
@@ -23,10 +34,7 @@ struct PeekContent: View {
                 IdlePeekView(viewModel: viewModel)
             }
         }
-        .frame(height: viewModel.peekContentHeight, alignment: .top)
-        .padding(.horizontal, ScreenGeometry.topFlare + Theme.Metrics.margin)
-        .padding(.top, viewModel.geometry.notchSize.height + Theme.Metrics.contentTopGap)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 

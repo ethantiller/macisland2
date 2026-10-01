@@ -82,7 +82,9 @@ enum PreviewFeatures {
             widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher()),
             system: SystemModel(sampler: PreviewSystemSampler()),
             agents: PreviewSamples.agents(),
-            mixer: PreviewSamples.mixer(defaults: defaults)
+            mixer: PreviewSamples.mixer(defaults: defaults),
+            downloads: PreviewSamples.downloads(in: scratch.directory.appendingPathComponent("Downloads")),
+            notifications: PreviewSamples.notifications()
         )
     }
 }
@@ -169,6 +171,42 @@ enum PreviewSamples {
             ],
         ]
         return (try? JSONSerialization.data(withJSONObject: root)) ?? Data()
+    }
+
+    /// A few files in a folder of the preview's own, one still arriving, so the Shelf's Downloads mode has something to draw.
+    @MainActor
+    static func downloads(in folder: URL) -> DownloadsFolder {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let now = Date()
+        for (index, name) in ["Invoice March.pdf", "Photo.jpg", "Archive.zip", "Notes.txt", "Report.pdf.download"].enumerated() {
+            let url = folder.appendingPathComponent(name)
+            FileManager.default.createFile(atPath: url.path, contents: Data("x".utf8))
+            try? FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(-Double(index) * 60)], ofItemAtPath: url.path)
+        }
+        let downloads = DownloadsFolder(folder: folder)
+        downloads.reload()
+        return downloads
+    }
+
+    /// A few notifications in an inbox that listens to nothing, so the Notifications widget has something to draw.
+    @MainActor
+    static func notifications() -> NotificationMirror {
+        let mirror = NotificationMirror(reader: NotificationReader(environment: .inert))
+        let now = Date()
+        let samples: [(String, String, String, String)] = [
+            ("Messages", "Maya", "", "Are we still on for lunch?"),
+            ("Calendar", "Design Review", "In 10 minutes", ""),
+            ("Mail", "Receipt from Orchard", "Your order", "Thanks for shopping with us."),
+            ("Reminders", "Call the bank", "", ""),
+        ]
+        for (index, sample) in samples.enumerated() {
+            mirror.inbox.add(
+                MirroredNotification(
+                    id: "preview-\(index)", app: sample.0, title: sample.1, subtitle: sample.2, body: sample.3,
+                    isPersistent: false, date: now.addingTimeInterval(-Double(index) * 240)))
+        }
+        return mirror
     }
 
     /// Four apps and a level, with nothing behind them: no process list and no tap. Access reads as given, so the panel draws.

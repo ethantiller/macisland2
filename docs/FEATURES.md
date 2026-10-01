@@ -77,6 +77,10 @@ Compact shows the **top two** live activities, ranked. Highest first:
 
 In a pair, each side shows only its activity's glyph, ring, or artwork. Music's play/pause button is left out of a pair. A screen recording is one big stop button: click the compact island to stop it, and hovering does not open it. A voice note peeks with the time, a level meter, and **Stop**.
 
+**Choose the Activity** (off until it is switched on in Settings → Features). With two or more things live, the peek starts with a row of chips, one for each (Timer, Music, Download, the job's name, and so on), the leading one selected. Choose one and it leads the closed island and fills the peek; the other stays beside it. An alert or banner still comes first, and the choice ends with the activity.
+
+![Choosing the activity](images/03i-peek-choose-activity.png)
+
 ### Color
 
 A tint means something is live, one meaning per color. Everything else is white on black.
@@ -221,7 +225,7 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 
 ![Shelf](images/05-expanded-shelf-empty.png)
 
-A **Files / Clipboard** choice. **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
+A **Files / Clipboard** choice (and **Downloads**, a third, while that feature is on; see below). **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
 from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab strip; pressing it again on the Shelf closes it.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
@@ -245,6 +249,10 @@ from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab str
     footnotes, text boxes, and tracked changes do not.
   - **Resize** is half size, or 1920 or 1280 px on the long edge (never larger than the original); **Compress** makes a JPEG at
     quality 0.7.
+- **Downloads** (off until it is switched on in Settings → Features; it uses the Downloads permission from the guide). The newest twenty items in your Downloads folder, most recent first, as the Shelf's tiles: a thumbnail, drag out to copy it, double-click to open, Space for Quick Look, and the file menu, with **Add to Shelf** in place of Remove (Downloads is the folder itself, so nothing here deletes anything). A file a browser is still writing (`.download`, `.crdownload`, `.part`) shows dimmed with a blue progress ring. **Open Downloads** is in the header. The folder is listed when the mode shows and watched only while it does.
+
+  ![Downloads](images/05d-expanded-shelf-downloads.png)
+
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
