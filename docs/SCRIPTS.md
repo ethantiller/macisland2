@@ -171,13 +171,14 @@ There is no CI, no linter config other than `.swift-format`, and no dependency m
 
 ## Source map
 
-Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One folder per feature: a model plus its view.
+Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One folder per feature: a model plus its view.
 
 ### `App/`
 
 | File | Contains |
 | --- | --- |
 | `MacIslandApp.swift` | The `@main` `App` (menu-bar capsule, Settings, module menu bars), `AppDelegate` (builds `IslandFeatures`, wires every monitor to the view model, the hotkeys, the panel), `ModuleMenuBars`, `MenuBarModuleView` |
+| `FullScreenWatcher.swift` | `FullScreenDetector` (pure: a window the size of the whole display, layer 0, owned by the front app) and `FullScreenWatcher` (looks only when the space or the front app changes, and only while Hide in Full Screen is on) |
 | `FeatureRunner.swift` | What a Features switch starts and stops (`apply`, `startAtLaunch`), and how settings read once features are taken into account |
 | `URLCommand.swift` | `URLCommand` (the `macisland://` parser and its limits) and `URLCommandRunner` (runs them, rate-limits banners) |
 | `FloatingPanels.swift` | `FloatingPanels` (torn-off windows, one per module, Keep on Desktop), `DetachedPanelState`, `DetachedModuleView` (the glass window's chrome) |
@@ -196,6 +197,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `StageInput.swift` | `.stageInput(_:isOn:)`: makes the stage island answer to hover, a click, swipes, and a dragged file |
 | `AccessRequests.swift` | `AccessKind` (the ten permissions), `AccessAsked`, `AccessProviding`, `LiveAccess` (every request), `AccessModel` (states, and a grant that stands while EventKit lags), `AccessCenter`, `AppRelaunch` |
 | `BluetoothAccess.swift` | Asks for Bluetooth through `CBCentralManager` and returns the answer |
+| `OptionalAccess.swift` | `OptionalAccess` (permissions only an optional feature needs, never part of the gate), `OptionalAccessState`, and `OptionalAccessRecord` (the evidence) |
 
 ### `Island/` (panel, input, state, drawing)
 
@@ -257,6 +259,8 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `HomeView.swift` | The Home module: the widget grid, and the month calendar it opens |
 | `HomeGrid.swift` | `HomeGrid` (the grid from a `HomeLayout`) and `HomeWidgetView` (a widget at a size) |
 | `MoreWidgets.swift` | Weather, Battery, Reminders, Note, and custom widgets, each at its sizes |
+| `AgentsWidget.swift` | The AI Agents widget: plan-limit rings and today's value (asks for a fresh reading when it appears) |
+| `NotificationsWidget.swift` | The Notifications widget: the newest two (3 × 1) or four (3 × 2, 6 × 2) mirrored notifications; a click opens one |
 | `SystemWidget.swift` | The System card at its four sizes (reads only while shown; red only for needs-you) |
 | `HomeWidgets.swift` | The boxes: `TimeWidget`, `MediaWidget`, `QuickActionsGrid`, `HomeAction` and `HomeActionPill` |
 | `HomeCards.swift` | Pieces the idle peek reuses: `DateInline`, `UpNextLabel`, `QuickToolsRow`, `QuickToolButton`, `QuickTimerChips`, `MacBatteryGlance` |
@@ -327,6 +331,15 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `AgendaView.swift` | `IdleView` (the agenda row) and `AgendaAction` |
 | `RemindersView.swift` | The Reminders tab |
 
+### `Notifications/`
+
+| File | Contains |
+| --- | --- |
+| `NotificationReader.swift` | `AXNodeReading` (a node of an accessibility tree, so tests walk a fixture), `NotificationRoles` (the undocumented names it reads by), `AXTreeDump` (the tree as lines without any words, logged with `MACISLAND_NOTIFICATION_DEBUG=1`), `BannerScanner` (pure, with its caps of 0.8 s, 384 nodes, depth 10), `BannerCloser`, and `NotificationReader` (the debounced scan, the first scan only recording, Open) |
+| `NotificationCenterAX.swift` | The live side: `AXElementNode` (an `AXUIElement` behind `AXNodeReading`), `NotificationCenterObserver` (an `AXObserver` on `com.apple.notificationcenterui`, re-attached if it restarts), and the Open App and Close action names |
+| `NotificationInbox.swift` | `MirroredNotification` and `NotificationInbox` (fifty, newest first, memory only, emptied on lock) |
+| `NotificationMirror.swift` | `NotificationPlacement`, and `NotificationMirror` (the feature: starts and stops the reader, keeps the inbox, closes the system's banner and shows the island's) |
+
 ### `Notes/` and `Weather/`
 
 | File | Contains |
@@ -382,6 +395,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
 | `GeneralPane.swift`, `FeaturesPane.swift`, `TabsPane.swift` (Content), `HomePane.swift`, `NotificationsPane.swift`, `PrivacyPane.swift` | One pane each |
 | `MediaPane.swift`, `ClockPane.swift`, `ShelfPane.swift`, `ToolsPane.swift` | The options of Media, Clock, Shelf, and Tools (`MediaOptions`, `ClockOptions`, `ShelfOptions`, `ToolsOptions`), shown in Content while the module is selected; `ShortcutToolSheet.swift` is the Shortcut tool editor |
+| `InputChoices.swift` | `PeekDelay`, `OpenOn`, and `MediaSource` (with `MusicApps`): the choices under General → Input and Content → Media |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -389,7 +403,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 57 files, about 13,600 lines, 946 tests. Swift Testing.
+`Tests/MacIslandTests/`: 60 files, about 14,500 lines, 983 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -421,6 +435,11 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
 | `MixerTests.swift` | The limiter on buffers, helper grouping, and the Mixer's rules with a stub list and stub taps |
+| `InputChoicesTests.swift` | Show Media From (and keeping it), Peek After, Hide Until You Point at It, Hide in Full Screen, Open On and each activity's module, Esc stepping back one level (and never past Mirror), and Keep Awake's time left (worded by the minute, only with an end, ranked last) |
+| `NotificationReaderTests.swift` | A fixture accessibility tree: a banner's fields, an alert and a banner, the first scan recording, the caps, the inbox, lock, Open, and nothing starting without Accessibility |
+| `NotificationMirrorTests.swift` | In the Island and In the Corner, a persistent alert never closed, a banner that can't be closed, Focus, the widget, and the feature switch |
+| `HotkeyDispatchTests.swift` | Each global hotkey hears only its own key, however many are installed |
+| `ShelfRowTests.swift` | The Shelf's rows drawn by AppKit in a tall host, where `ImageRenderer` can't see a scroll view |
 | `DownloadsTests.swift` | The newest twenty, arriving files, the mode and the feature, and watching only while shown |
 | `ChooseActivityTests.swift` | The chosen activity leading the pair and the peek, alerts first, the choice ending, and the peek's height |
 | `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |

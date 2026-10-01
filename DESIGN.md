@@ -23,8 +23,8 @@ Glass never goes inside the island, and glass is never stacked on glass.
 | Presentation | Trigger | Shows | Size |
 | --- | --- | --- | --- |
 | Compact | Something is live | One activity split around the notch, or two as a minimal pair: leading is the top rank, trailing the second. | Notch + 2 × side |
-| Banner | An event worth noticing once | Glyph, title, one detail line, at most 2 actions (with two, the first is prominent). With none it is an alert: its contents are centered, and a glyph may sit in a ring that draws once around it (green; red when low) | 380 × (notch + 56), or 290 × (notch + 56) for an alert |
-| Peek | Pointer rests on the island. It swells immediately and opens after 120 ms. | The top activity at full size, no tabs. With nothing live it shows the day and the everyday tools. | 380 × content |
+| Banner | An event worth noticing once | Glyph, title, one detail line, at most 2 actions (with two, the first is prominent). With none it is an alert: its contents are centered, and a mirrored notification (a bell, the app and title, the first line of its words, Open and Dismiss) is an ordinary two-action banner with no app icon, and a glyph may sit in a ring that draws once around it (green; red when low) | 380 × (notch + 56), or 290 × (notch + 56) for an alert |
+| Peek | Pointer rests on the island. It swells immediately and opens after 120 ms (Peek After: 300 or 600 ms). | The top activity at full size, no tabs. With nothing live it shows the day and the everyday tools. | 380 × content |
 | Expanded | Click, two-finger swipe down, or ⌃⌥Space | Tab strip and the selected module | 520 × content |
 
 Peek and a banner with buttons share a width of 380, so one becomes the other by changing height only; an alert banner (nothing to press) is narrower, 290.
@@ -59,7 +59,7 @@ Rules:
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music. At most 2 activities show at once. With **Choose the Activity** on (off by default), a peek with two or more things live starts with a row of chips, one per activity, the leading one selected; choosing one moves it to the front of this order (after an alert; a banner still stands alone), so it leads the closed island and fills the peek. The choice lasts as long as that activity does. There is no Combine menu: the top two are always paired.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music, then Keep Awake's time left (a state, not a clock being timed, so it is white and ranks last). At most 2 activities show at once. With **Choose the Activity** on (off by default), a peek with two or more things live starts with a row of chips, one per activity, the leading one selected; choosing one moves it to the front of this order (after an alert; a banner still stands alone), so it leads the closed island and fills the peek. The choice lasts as long as that activity does. There is no Combine menu: the top two are always paired.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.
@@ -100,12 +100,12 @@ Reduce Motion turns every token into a short ease, removes the swell, and swaps 
 ### Input
 | Input | Result |
 | --- | --- |
-| Hover | Swell (`track`), then peek after 120 ms (Peek on Hover off: the swell only, and a click or swipe opens it) |
+| Hover | Swell (`track`), then peek after the Peek After delay, 120 ms by default (Peek on Hover off: the swell only, and a click or swipe opens it). With Hide the Island Until You Point at It the closed island draws nothing until the pointer is on it, and with Hide in Full Screen it also draws nothing and does not peek while the front app covers the display; an alert that stays until seen waits for it, and a banner is dropped |
 | Click, two-finger swipe down, or ⌃⌥Space | Expanded |
 | Pointer leaves for 300 ms | Compact (`close`), unless something holds it open: a menu, Quick Look, a panel, a text field, or the Mirror camera. The 300 ms starts when the last hold ends |
 | Two-finger horizontal swipe | Previous or next tab; over the timer dial, it scrubs the dial. Swiping (down opens, up closes, sideways changes tab) can be turned off in Settings |
 | ←/→ | Previous or next tab |
-| Esc | Close |
+| Esc | Steps back one level (the clipboard search, the Mixer's panel, the Tools grid, a picked day, then the month), then closes |
 
 ### Carried over
 

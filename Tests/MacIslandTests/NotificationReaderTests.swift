@@ -360,6 +360,33 @@ struct NotificationReaderTests {
         #expect(reader.status.problem == "Notifications couldn\u{2019}t be read on this version of macOS.")
     }
 
+    @Test func theDebugDumpNamesRolesButNeverTheWords() async {
+        let secret = "My password is hunter2"
+        let banner = FixtureNode.banner(app: "Messages", title: "Maya", body: secret, actions: [NotificationRoles.press, "Name:Close\nTarget:0x0"])
+        let lines = AXTreeDump.lines(FixtureNode.center([banner]))
+        let text = lines.joined(separator: "\n")
+        #expect(text.contains("subrole=\(NotificationRoles.banner)") && text.contains("id=body"))
+        #expect(text.contains("actions=AXPress | Name:Close Target:0x0"))
+        #expect(text.contains("text=\(secret.count) chars") && !text.contains("hunter2") && !text.contains("Maya"))
+
+        // The reader logs it only when asked to.
+        let mac = FixtureMac(banners: [banner])
+        var logged: [String] = []
+        var environment = mac.environment
+        environment.dumpsTree = true
+        environment.log = { logged.append($0) }
+        let reader = NotificationReader(environment: environment)
+        reader.start()
+        await reader.scan()
+        #expect(logged.count == 1 && logged[0].contains("1 banners read") && !logged[0].contains("hunter2"))
+        var quiet = mac.environment
+        quiet.log = { logged.append($0) }
+        let silent = NotificationReader(environment: quiet)
+        silent.start()
+        await silent.scan()
+        #expect(logged.count == 1, "off by default")
+    }
+
     @Test func closeUsesTheCloseActionOrMovesTheWindowAway() throws {
         let names: Set<String> = ["Close", "Fermer"]
         #expect(
