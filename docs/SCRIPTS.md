@@ -241,7 +241,13 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `AgentLogParser.swift` | `AgentKind`, `AgentLogEvent`, and the pure parser for both tools' lines |
 | `AgentActivity.swift` | `AgentTask` and `AgentActivity`: open turns, the idle deadline, the finish notice |
 | `AgentLogWatcher.swift` | `AgentLogWatching`, the FSEvents watcher, `AgentLogTail` (a file's new whole lines), and where the logs are |
-| `AgentsView.swift` | The module's Now view, a task row, and the peek |
+| `AgentsView.swift` | The module (its header and modes), the Now view, a task row, and the peek |
+| `AgentUsageStore.swift` | The usage line parser, the buckets and their cache (`AgentUsageData`), and the `AgentUsageStore` actor that reads the history |
+| `AgentPricing.swift` | `AgentTokens`, `AgentPrice`, and the price lookup over the bundled table |
+| `AgentLimits.swift` | `AgentLimit`, the Claude app's file and the reset rules, the estimated block, and Codex's windows |
+| `AgentUsageSummary.swift` | Pure: the ranges, the ranked models and projects, and the activity map with its streak |
+| `AgentUsageModel.swift` | The main-actor model that asks the store for a snapshot (on appearance, and after a log changes) |
+| `AgentUsageViews.swift` | `AgentsMode`, the number formats, the limit row, the Usage and Activity modes |
 
 ### `Home/`
 
@@ -376,7 +382,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 53 files, about 10,900 lines, ** tests**. Swift Testing.
+`Tests/MacIslandTests/`: 54 files, about 12,800 lines, 899 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -407,6 +413,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
+| `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |
 | `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |

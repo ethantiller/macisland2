@@ -26,6 +26,9 @@ final class AgentActivity {
     /// A turn that ended longer ago than this is never announced.
     static let announceWindow: TimeInterval = 300
 
+    /// What the agents used, their plan limits, and the activity map: the history behind the Usage and Activity modes.
+    let usage: AgentUsageModel
+
     /// What is working now, longest-running first.
     var liveTasks: [AgentTask] {
         _ = tick
@@ -49,8 +52,9 @@ final class AgentActivity {
     /// Changes when a deadline passes, so what shows is looked at again.
     private var tick = 0
 
-    init(clock: @escaping () -> Date = Date.init) {
+    init(clock: @escaping () -> Date = Date.init, usage: AgentUsageModel = AgentUsageModel()) {
         self.clock = clock
+        self.usage = usage
     }
 
     // MARK: Lines in
@@ -122,6 +126,7 @@ final class AgentActivity {
         deadline?.cancel()
         deadline = nil
         tick += 1
+        usage.stop()
     }
 
     // MARK: The deadline

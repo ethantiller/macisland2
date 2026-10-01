@@ -13,6 +13,7 @@ extension WidgetCatalog {
         case .reminders: return .reminders
         case .note: return .notes
         case .system: return .system
+        case .agents: return .agents
         case .today, .battery: return nil
         }
     }

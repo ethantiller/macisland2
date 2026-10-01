@@ -11,7 +11,7 @@ import Foundation
 // task_complete or turn_aborted. Not checked on a Mac with Codex: **verify**.
 
 /// Which tool wrote a log.
-enum AgentKind: String, CaseIterable, Identifiable {
+enum AgentKind: String, CaseIterable, Identifiable, Codable {
     case claudeCode = "Claude Code"
     case codex = "Codex"
 

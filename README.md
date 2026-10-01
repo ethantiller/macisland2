@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start (the first build makes a signing identity)
-./scripts/test.sh                                                     # 718 tests, under a second
+./scripts/test.sh                                                     # 899 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -139,7 +139,7 @@ The full story, with state machines, data flow, and the lessons learned, is in
 
 ## Privacy and permissions
 
-When AI Agents is on, it reads the Claude Code and Codex logs in your home folder (nothing is sent).
+When AI Agents is on, it reads the Claude Code and Codex logs in your home folder, and the Claude app's usage file (`~/Library/Application Support/Claude/plan-usage-history.json`) for plan limits; a summary of the last 91 days is cached in `~/Library/Caches/com.ethantiller.MacIsland/Agents` and deleted when the feature is turned off. Nothing is sent.
 
 Nothing leaves the Mac except: the **city name** you type in Settings (to Open-Meteo, for weather), and the **track's
 name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off). Clipboard history stays in memory.

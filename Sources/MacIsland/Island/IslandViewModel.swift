@@ -198,6 +198,8 @@ final class IslandViewModel {
         didSet { if selectedTab != .tools { features.mirror.stop() } }
     }
     var clockMode: ClockMode = .timer
+    var agentsMode: AgentsMode = .now
+    var usageRange: UsageRange = .today
     /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
     private(set) var dialPosition: Double?
     /// How far the ruler is stretched past 1 minute or the maximum, in points.
@@ -908,6 +910,16 @@ final class IslandViewModel {
 
     func setToolsExpanded(_ expanded: Bool) {
         withAnimation(Theme.Motion.resize) { toolsExpanded = expanded }
+    }
+
+    func setAgentsMode(_ mode: AgentsMode) {
+        guard mode != agentsMode else { return }
+        withAnimation(Theme.Motion.resize) { agentsMode = mode }
+    }
+
+    func setUsageRange(_ range: UsageRange) {
+        guard range != usageRange else { return }
+        usageRange = range
     }
 
     func setShelfMode(_ mode: ShelfMode) {

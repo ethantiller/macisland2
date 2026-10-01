@@ -57,7 +57,7 @@ struct NotificationsPane: View {
         case .reminderDue:
             if !settings.isOn(.reminders) { return "Turn on Reminders in Features." }
             return settings.showsReminders ? nil : "Turn on Due Reminders in Home."
-        case .agentDone:
+        case .agentDone, .agentLimit:
             return settings.isOn(.agents) ? nil : "Turn on AI Agents in Features."
         case .rainSoon:
             if !settings.isOn(.weather) { return "Turn on Weather in Features." }

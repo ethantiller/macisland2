@@ -297,6 +297,14 @@ enum SettingsSearch {
                 pane: .tabs, title: "Tell Me When a Task Finishes",
                 keywords: ["agent", "done", "notice", "minimum", "minutes", "claude", "codex"],
                 anchor: SettingsAnchor.agents, module: .agents),
+            SettingsSearchEntry(
+                pane: .tabs, title: "Tell Me When a Plan Limit Is Near",
+                keywords: ["agent", "limit", "usage", "percent", "session", "week", "plan", "claude", "codex"],
+                anchor: SettingsAnchor.agents, module: .agents),
+            SettingsSearchEntry(
+                pane: .tabs, title: "Show Limits as What\u{2019}s Left",
+                keywords: ["agent", "limit", "used", "left", "remaining", "usage"], anchor: SettingsAnchor.agents,
+                module: .agents),
         ]
     }
 

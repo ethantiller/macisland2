@@ -313,10 +313,16 @@ struct AgentsOptions: View {
             SettingsDropdown(
                 title: "Tell Me When a Task Finishes", selection: Bindable(settings).agentFinishMinimum,
                 options: AppSettings.agentMinimums.map { DropdownOption($0, Self.words($0)) })
+            SettingsDropdown(
+                title: "Tell Me When a Plan Limit Is Near", selection: Bindable(settings).agentLimitThreshold,
+                options: AppSettings.agentThresholds.map { DropdownOption($0, "At \($0)%") })
+            Toggle("Show Limits as What\u{2019}s Left", isOn: Bindable(settings).showsLimitsLeft)
         } header: {
             Text("AI Agents").id(SettingsAnchor.agents)
         } footer: {
-            Text("Read from the logs Claude Code and Codex keep in your home folder. Nothing is sent.")
+            Text(
+                "Read from the logs Claude Code and Codex keep in your home folder, and from the Claude app\u{2019}s usage file when it has one. Nothing is sent."
+            )
         }
     }
 

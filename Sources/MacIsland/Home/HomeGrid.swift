@@ -121,6 +121,8 @@ struct HomeWidgetView: View {
         case .builtIn(.weather): WeatherWidget(viewModel: viewModel, size: size)
         case .builtIn(.battery): BatteryWidget(size: size)
         case .builtIn(.system): SystemWidget(model: viewModel.system, size: size)
+        case .builtIn(.agents):
+            AgentsWidget(usage: viewModel.agents.usage, settings: viewModel.settings, size: size)
         case .builtIn(.reminders): RemindersWidget(viewModel: viewModel, size: size)
         case .builtIn(.note): NoteWidget(viewModel: viewModel, options: placement.options, size: size)
         case .custom(let id):

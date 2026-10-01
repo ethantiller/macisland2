@@ -27,6 +27,11 @@ enum Theme {
         static let inverse = SurfaceInk(role: .inverse)
         /// Nothing: for the "off" side of a ternary that would otherwise be `.clear`.
         static let none = SurfaceInk(opacity: 0)
+        /// The Agents activity map: no use, then four steps of white up to full.
+        static let activitySteps = [
+            SurfaceInk(opacity: 0.12), SurfaceInk(opacity: 0.3), SurfaceInk(opacity: 0.55), SurfaceInk(opacity: 0.8),
+            SurfaceInk(opacity: 1),
+        ]
     }
 
     /// Color means something is live, and each color means one thing. See DESIGN.md.
@@ -226,8 +231,16 @@ enum Theme {
         static let keyCapRadius: CGFloat = 6
         /// The dot under a day in the month view that has an event.
         static let monthEventDot: CGFloat = 4
-        /// The Agents module's Now view: up to three running tasks.
-        static let agentsHeight: CGFloat = 96
+        /// The Agents module, in every mode: its header, then what fits under it (two tasks and the limits; the usage; the map).
+        static let agentsHeight: CGFloat = 176
+        /// The header's two choosers: the modes, and the range of the usage.
+        static let agentsModeWidth: CGFloat = 190
+        static let agentsRangeWidth: CGFloat = 170
+        /// A day in the activity map, and the gap between days. Seven of them, with their gaps, fit under the header.
+        static let activityCell: CGFloat = 12
+        static let activityGap: CGFloat = 2
+        /// The Agents widget's ring, in the 2 by 1 and the 3 by 1.
+        static let agentsRing: CGFloat = 36
         /// The Settings tour's callout: wide enough for the longest copy in four lines.
         static let tourCalloutWidth: CGFloat = 280
         /// The callout's arrow, and the space between the ring and the arrow's tip.

@@ -28,6 +28,8 @@ struct SettingsArchive: Codable, Equatable {
     var readsCodex: Bool?
     var showsAgentCompact: Bool?
     var agentFinishMinimum: Int?
+    var agentLimitThreshold: Int?
+    var showsLimitsLeft: Bool?
     var weatherCity: String?
     var dragTarget: String?
     var addsScreenshots: Bool?
@@ -84,6 +86,8 @@ struct SettingsArchive: Codable, Equatable {
         archive.readsCodex = settings.readsCodex
         archive.showsAgentCompact = settings.showsAgentCompact
         archive.agentFinishMinimum = settings.agentFinishMinimum
+        archive.agentLimitThreshold = settings.agentLimitThreshold
+        archive.showsLimitsLeft = settings.showsLimitsLeft
         archive.weatherCity = settings.weatherCity
         archive.dragTarget = settings.dragTarget.rawValue
         archive.addsScreenshots = settings.addsScreenshots
@@ -167,6 +171,8 @@ extension AppSettings {
         }
         if let value = archive.showsAgentCompact { showsAgentCompact = value }
         if let value = archive.agentFinishMinimum, Self.agentMinimums.contains(value) { agentFinishMinimum = value }
+        if let value = archive.agentLimitThreshold, Self.agentThresholds.contains(value) { agentLimitThreshold = value }
+        if let value = archive.showsLimitsLeft { showsLimitsLeft = value }
         if let value = archive.weatherCity { weatherCity = value }
         if let value = archive.dragTarget.flatMap(DragTarget.init) { dragTarget = value }
         if let value = archive.addsScreenshots { addsScreenshots = value }

@@ -532,6 +532,12 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] A task of two minutes or more ends with the green "Done" notice; quitting Claude Code mid-task clears it with no notice; idle CPU with no agent running is unchanged
 - [ ] Codex: the same with a Codex task (**verify** the log lines on a Mac with Codex)
 
+**AI Agents usage and limits (A2)** *(written, not run; the Codex limits and the Claude app's older file are unverified)*
+- [ ] With AI Agents on, Usage → Today shows a value in the right range for your own day (compare with Claude Code's `/cost`), and 7 Days and 30 Days grow; the first read of your logs ends without a beachball, and idle CPU afterwards is unchanged (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
+- [ ] Now shows the session and week bars with the same percent as the Claude app's menu bar within a reading's age; with the app's menu-bar item off, it says the limit is estimated
+- [ ] A window at 80% flashes the red "Claude at 80%" once and not again until it resets; turning Agents off deletes `~/Library/Caches/com.ethantiller.MacIsland/Agents/usage.json`
+- [ ] Activity shows your last 91 days with today's cell last, the streak is right, and hovering a cell names its day; the Agents widget (Add Widgets) fits at 2 × 1 and 3 × 1
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget
@@ -597,7 +603,7 @@ Not planned, not promised.
 ### Agents module (unscheduled)
 
 **Built in part (A1):** the Agents module now reads the logs Claude Code and Codex keep in the home folder (see [FEATURES](FEATURES.md) and [ARCHITECTURE](ARCHITECTURE.md#ai-agents)): working agents beside the notch, a peek, the module's Now view, and a notice when a task finishes. It has no listener, no hooks, no approvals, and writes nothing to anyone's configuration. What follows is the rest of the old idea, which is not built: Developer API,
-Agent Approvals, and Shell Activity (usage is the planned A2).
+Agent Approvals, and Shell Activity (usage and plan limits are now built, A2).
 
 - **`Agents/LocalAPI.swift`.** An `NWListener` on **127.0.0.1** only, with a bearer token stored at
   `~/Library/Application Support/MacIsland/api-token` (create it 0600).

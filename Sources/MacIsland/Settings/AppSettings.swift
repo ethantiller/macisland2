@@ -230,6 +230,28 @@ final class AppSettings {
         }
     }
 
+    /// The share of a plan limit at which the notice comes.
+    static let agentThresholds = [75, 80, 90]
+    var agentLimitThreshold: Int {
+        didSet {
+            if !Self.agentThresholds.contains(agentLimitThreshold) {
+                agentLimitThreshold = 80
+                defaults.set(80, forKey: Key.agentsThreshold)
+                return
+            }
+            guard agentLimitThreshold != oldValue else { return }
+            defaults.set(agentLimitThreshold, forKey: Key.agentsThreshold)
+        }
+    }
+
+    /// Plan limits as the share that is left, not the share that is used.
+    var showsLimitsLeft: Bool {
+        didSet {
+            guard showsLimitsLeft != oldValue else { return }
+            defaults.set(showsLimitsLeft, forKey: Key.agentsLeft)
+        }
+    }
+
     func hasCountdown(_ id: String) -> Bool { countdowns[id] != nil }
 
     /// Adds or removes a countdown. Does nothing unless it changes something.
@@ -458,6 +480,8 @@ final class AppSettings {
         static let agentsCodex = "agents.codex"
         static let agentsCompact = "agents.compact"
         static let agentsMinimum = "agents.minimum"
+        static let agentsThreshold = "agents.limitThreshold"
+        static let agentsLeft = "agents.limitsLeft"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
 
@@ -500,6 +524,9 @@ final class AppSettings {
         showsAgentCompact = defaults.object(forKey: Key.agentsCompact) as? Bool ?? true
         let minimum = defaults.object(forKey: Key.agentsMinimum) as? Int ?? 60
         agentFinishMinimum = Self.agentMinimums.contains(minimum) ? minimum : 60
+        let threshold = defaults.object(forKey: Key.agentsThreshold) as? Int ?? 80
+        agentLimitThreshold = Self.agentThresholds.contains(threshold) ? threshold : 80
+        showsLimitsLeft = defaults.object(forKey: Key.agentsLeft) as? Bool ?? false
         countdowns = (defaults.dictionary(forKey: Key.countdowns) as? [String: Double] ?? [:])
             .mapValues { Date(timeIntervalSince1970: $0) }
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""

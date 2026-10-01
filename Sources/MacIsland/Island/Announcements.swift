@@ -7,7 +7,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
     case headphones, drive, hotspot, unlocked
     case meeting, reminderDue, rainSoon
     case download, lowDisk
-    case agentDone
+    case agentDone, agentLimit
 
     var id: String { rawValue }
 
@@ -26,6 +26,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .download: "Downloads"
         case .lowDisk: "Low Disk Space"
         case .agentDone: "Task Finished"
+        case .agentLimit: "Plan Limit"
         }
     }
 
@@ -45,7 +46,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .headphones, .drive, .hotspot, .unlocked: .devices
         case .meeting, .reminderDue, .rainSoon: .day
         case .download, .lowDisk: .storage
-        case .agentDone: .agents
+        case .agentDone, .agentLimit: .agents
         }
     }
 }
@@ -64,6 +65,14 @@ enum Announcements {
     static func agentDone(duration: TimeInterval) -> IslandAlert {
         IslandAlert(
             systemImage: "sparkles", tint: Theme.Tint.positive, text: "Done " + formatTime(duration), opensTab: .agents)
+    }
+
+    /// A plan limit is near: "Claude at 80%" and when the window resets. Red, because it is the one thing here that asks you to slow down.
+    static func agentLimit(agent: AgentKind, percent: Int, resetsAt: Date?) -> IslandBanner {
+        let name = agent == .claudeCode ? "Claude" : "Codex"
+        return IslandBanner(
+            systemImage: "gauge.with.needle.fill", tint: Theme.Tint.attention, title: "\(name) at \(percent)%",
+            detail: resetsAt.map { "Resets at " + $0.formatted(date: .omitted, time: .shortened) })
     }
 
     static func charging(percent: Int) -> IslandAlert {
@@ -182,6 +191,8 @@ enum Announcements {
         case .download: .alert(downloadSaved)
         case .lowDisk: .banner(lowDisk(free: 4_000_000_000).banner)
         case .agentDone: .alert(agentDone(duration: 252))
+        case .agentLimit:
+            .banner(agentLimit(agent: .claudeCode, percent: 80, resetsAt: Date().addingTimeInterval(2 * 3600)))
         }
     }
 }

@@ -22,8 +22,9 @@ protocol AgentLogWatching: AnyObject {
 /// Reads the end of a file from an offset, whole lines only. Pure apart from the file, and tested on temporary files.
 enum AgentLogTail {
     /// The complete lines after `offset`, and the offset after the last of them. A line still being written (no newline yet) waits
-    /// for the next read. A file that got shorter was replaced: it is read from its start.
-    static func read(_ url: URL, from offset: UInt64) -> (lines: [String], offset: UInt64)? {
+    /// for the next read. A file that got shorter was replaced: it is read from its start. With a `limit`, at most that many bytes are
+    /// read, so a long file is taken in chunks; a chunk with no newline in it comes back empty at the same offset.
+    static func read(_ url: URL, from offset: UInt64, limit: Int = .max) -> (lines: [String], offset: UInt64)? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return nil }
@@ -31,7 +32,13 @@ enum AgentLogTail {
         if size < start { start = 0 }
         guard size > start else { return ([], size) }
         do { try handle.seek(toOffset: start) } catch { return nil }
-        guard let data = try? handle.readToEnd(), !data.isEmpty else { return ([], start) }
+        let data: Data?
+        if limit == .max {
+            data = try? handle.readToEnd()
+        } else {
+            data = try? handle.read(upToCount: limit)
+        }
+        guard let data, !data.isEmpty else { return ([], start) }
         guard let lastNewline = data.lastIndex(of: 0x0A) else { return ([], start) }
         let complete = data[data.startIndex...lastNewline]
         let lines = String(decoding: complete, as: UTF8.self).split(separator: "\n").map(String.init)

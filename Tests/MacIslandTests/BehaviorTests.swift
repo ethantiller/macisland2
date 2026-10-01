@@ -221,7 +221,7 @@ struct NotificationSettingsTests {
             }
         }
         #expect(Set(AmbientEvent.allCases.map(\.group)) == Set(AmbientEvent.Group.allCases))
-        #expect(AmbientEvent.allCases.count == 12)
+        #expect(AmbientEvent.allCases.count == 14)
     }
 
     @Test func thePreviewDrawsAnEventsRealBannerOrAlert() {

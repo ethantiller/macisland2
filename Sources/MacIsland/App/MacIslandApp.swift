@@ -234,12 +234,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for event in batch.events {
                 features.agents.ingest(event, agent: batch.agent, session: batch.session)
             }
+            features.agents.usage.activity()
         }
         agentWatcher.onProcesses = { features.agents.setProcesses($0) }
         features.agents.onFinish = { [viewModel] _, duration in
             viewModel.flash(Announcements.agentDone(duration: duration), event: .agentDone)
         }
         agentWatcher.start()
+
+        // The history behind Usage, Activity and the plan limits: read once, then kept up to date.
+        let usage = features.agents.usage
+        usage.request = {
+            AgentUsageRequest(
+                readsClaude: settings.readsClaudeCode, readsCodex: settings.readsCodex, threshold: settings.agentLimitThreshold)
+        }
+        usage.onLimit = { [viewModel] limit in
+            guard let percent = limit.percent else { return }
+            viewModel.showBanner(
+                Announcements.agentLimit(agent: limit.agent, percent: Int(percent.rounded()), resetsAt: limit.resetsAt),
+                event: .agentLimit)
+        }
+        usage.start()
     }
 
     /// What a switch in the Features catalog does beyond what each feature's own setting already does.

@@ -173,11 +173,43 @@ enum PreviewSamples {
     @MainActor
     static func agents() -> AgentActivity {
         let activity = AgentActivity()
+        activity.usage.show(usageSnapshot())
         let started = Date().addingTimeInterval(-252)
         activity.ingest(
             AgentLogEvent(kind: .turnStarted, sessionID: "preview", cwd: "/Users/you/code/island", model: "claude-opus-4-5-20251101", date: started),
             agent: .claudeCode, session: "preview", announces: false)
         return activity
+    }
+
+    /// Forty days of use and two plan limits, for the Usage and Activity modes and the Agents widget.
+    @MainActor
+    static func usageSnapshot(now: Date = Date()) -> AgentUsageSnapshot {
+        let calendar = Calendar.current
+        var snapshot = AgentUsageSnapshot()
+        snapshot.generated = now
+        let projects = ["island", "notes", "site"]
+        let models = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929"]
+        for offset in 0..<40 where offset % 7 != 3 {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: now) else { continue }
+            let day = UsageDay.key(date, calendar: calendar)
+            let model = models[offset % 2]
+            let project = projects[offset % 3]
+            let scale = 1 + (offset * 7) % 5
+            let bucket = UsageBucket(
+                day: day, agent: .claudeCode, model: model, project: project,
+                tokens: AgentTokens(
+                    input: 40_000 * scale, output: 90_000 * scale, cacheRead: 6_000_000 * scale, cacheWrite: 500_000 * scale),
+                requests: 30 * scale)
+            snapshot.buckets.append(bucket)
+        }
+        snapshot.hasClaudePlanFile = true
+        snapshot.limits = [
+            AgentLimit(
+                agent: .claudeCode, kind: .session, percent: 64, resetsAt: now.addingTimeInterval(2 * 3600 + 600), asOf: nil),
+            AgentLimit(
+                agent: .claudeCode, kind: .week, percent: 41, resetsAt: now.addingTimeInterval(3 * 86_400), asOf: nil),
+        ]
+        return snapshot
     }
 
     static func nextEvent() -> AgendaItem {
