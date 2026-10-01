@@ -1,4 +1,12 @@
 import Carbon.HIToolbox
+import os
+
+/// Where the shortcuts log: `log stream --predicate 'subsystem == "com.ethantiller.MacIsland"'`. Cheap, and what a hand test of a
+/// shortcut that did nothing needs.
+enum HotkeyLog {
+    static let logger = Logger(subsystem: "com.ethantiller.MacIsland", category: "hotkey")
+    static let accessLogger = Logger(subsystem: "com.ethantiller.MacIsland", category: "access")
+}
 
 /// A system-wide shortcut. Carbon's `RegisterEventHotKey` needs no Accessibility permission. Each instance has its
 /// own id, so several can live side by side and each hears only its own key.
@@ -19,16 +27,25 @@ final class GlobalHotkey {
         self.id = id
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let callback: EventHandlerUPP = { _, event, userData in
-            guard let userData, let event else { return noErr }
+            guard let userData, let event else { return OSStatus(eventNotHandledErr) }
             var pressed = EventHotKeyID()
             GetEventParameter(
                 event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                 nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed
             )
             let hotkey = Unmanaged<GlobalHotkey>.fromOpaque(userData).takeUnretainedValue()
-            // Every handler hears every hot key; only the one that registered it acts.
-            guard pressed.signature == GlobalHotkey.signature, pressed.id == hotkey.id else { return noErr }
-            DispatchQueue.main.async { MainActor.assumeIsolated { hotkey.onPress?() } }
+            // Every handler hears every hot key, newest first; only the one that registered it acts. The others must say they did not
+            // handle it (`noErr` would end the dispatch, and the key would never reach its own handler: the open shortcut never fired
+            // while the Shelf's handler, installed after it, answered first).
+            guard pressed.signature == GlobalHotkey.signature, pressed.id == hotkey.id else {
+                return OSStatus(eventNotHandledErr)
+            }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    HotkeyLog.logger.info("press id=\(hotkey.id) hasHandler=\(hotkey.onPress != nil)")
+                    hotkey.onPress?()
+                }
+            }
             return noErr
         }
         InstallEventHandler(
@@ -48,6 +65,7 @@ final class GlobalHotkey {
         unregister()
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: id)
         let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey)
+        HotkeyLog.logger.info("register id=\(self.id) key=\(keyCode) modifiers=\(modifiers) status=\(status)")
         return status == noErr
     }
 
@@ -55,4 +73,7 @@ final class GlobalHotkey {
         if let hotKey { UnregisterEventHotKey(hotKey) }
         hotKey = nil
     }
+
+    /// Whether the key is registered right now.
+    var isRegistered: Bool { hotKey != nil }
 }

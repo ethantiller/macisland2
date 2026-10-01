@@ -60,7 +60,7 @@ struct OnboardingSnapshots {
         let model = OnboardingModel(
             state: state, settings: island.settings, geometry: { island.geometry }, preview: preview,
             access: AccessModel(provider: access, settings: island.settings, onBluetoothAllowed: {}),
-            replay: false, startDeferredMonitors: {}, openSettings: {}, onEnd: { _ in })
+            replay: false, openSettings: {}, onEnd: { _ in })
         return Guide(model: model, island: island)
     }
 
@@ -96,11 +96,26 @@ struct OnboardingSnapshots {
 
     @Test(.enabled(if: OnboardingSnapshots.enabled))
     func renderTheAccessStepMixed() async throws {
-        let guide = makeGuide(access: StubAccess(states: [.calendars: .allowed, .reminders: .denied]))
+        // Calendars is allowed, so its step is left out; the rest show Grant Permission, or Open System Settings and Check Again.
+        let guide = makeGuide(
+            access: StubAccess(states: [.calendars: .allowed, .reminders: .denied, .screenRecording: .denied]))
         defer { guide.model.stop() }
         try await Task.sleep(for: .milliseconds(150))
-        while guide.model.step.id != .calendars { guide.model.next(animated: false) }
-        renderGuide(guide, "40-guide-09-access-mixed")
+        while guide.model.step.id != .reminders { guide.model.next(animated: false) }
+        renderGuide(guide, "40-guide-09-access-denied")
+        while guide.model.step.id != .screenRecording { guide.model.next(animated: false) }
+        renderGuide(guide, "40-guide-09-access-screen-denied")
+        while guide.model.step.id != .bluetooth { guide.model.back(animated: false) }
+        renderGuide(guide, "40-guide-09-access-not-asked")
+    }
+
+    @Test(.enabled(if: OnboardingSnapshots.enabled))
+    func renderTheLastStepWithWhatIsStillNeeded() async throws {
+        let guide = makeGuide(access: StubAccess(states: [.calendars: .allowed, .focus: .denied]))
+        defer { guide.model.stop() }
+        try await Task.sleep(for: .milliseconds(150))
+        guide.model.go(to: .finish, animated: false)
+        renderGuide(guide, "40-guide-19-finish-needed")
     }
 
     // MARK: The tour

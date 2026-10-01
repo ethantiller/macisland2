@@ -62,14 +62,6 @@ extension AccessKind {
         }
     }
 
-    /// Whether the system says nothing about this one until it is used: there is no "not asked yet" to read.
-    var stateIsHidden: Bool {
-        switch self {
-        case .downloads, .automation, .screenRecording, .accessibility: true
-        default: false
-        }
-    }
-
     /// The System Settings pane where a denied permission is turned back on.
     var settingsURL: URL? {
         let pane: String =
@@ -89,8 +81,8 @@ extension AccessKind {
     }
 }
 
-/// Which permissions MacIsland has asked for, for the ones the system won't say. Downloads can't be read without asking;
-/// Screen Recording, Accessibility, and Automation can't tell "never asked" from "off". Kept in `UserDefaults`; the guide's
+/// Which permissions MacIsland has asked for, for the ones the system can't tell "never asked" from "off": Downloads can't be read
+/// without asking, and Screen Recording and Accessibility only say whether they are on. Kept in `UserDefaults`; the guide's
 /// `make first-run` clears it.
 enum AccessAsked {
     static let key = "access.asked"
@@ -113,6 +105,16 @@ protocol AccessProviding: AnyObject {
     /// Asks the system if it was never asked, and says whether access is now allowed. For a permission the system won't
     /// answer for, it says whether the request was made.
     func request(_ kind: AccessKind) async -> Bool
+    /// Reads what can only be read off the main actor (Automation), so the next `state(of:)` is true. Nothing for most providers.
+    func reload() async
+    /// For a step that needs more than one permission (Microphone needs Speech Recognition too): the one that is off, if it isn't the
+    /// step's own name. Nil otherwise.
+    func offItem(of kind: AccessKind) -> PrivacyAccess.Item?
+}
+
+extension AccessProviding {
+    func reload() async {}
+    func offItem(of kind: AccessKind) -> PrivacyAccess.Item? { nil }
 }
 
 /// The real Mac. States come from `PrivacyAccess.current()`; requests use the app's own paths. Nothing here runs until the person
@@ -139,10 +141,19 @@ final class LiveAccess: AccessProviding {
         if kind == .microphone {
             // Voice notes need the microphone and speech recognition: allowed only when both are, asked again while either isn't.
             let both = [row("microphone"), row("speech")]
+            HotkeyLog.accessLogger.info("microphone=\(both[0].rawValue, privacy: .public) speech=\(both[1].rawValue, privacy: .public)")
             if both.allSatisfy({ $0 == .allowed }) { return .allowed }
             return both.contains(.notAsked) ? .notAsked : .denied
         }
         return row(kind.rawValue)
+    }
+
+    func offItem(of kind: AccessKind) -> PrivacyAccess.Item? {
+        guard kind == .microphone else { return nil }
+        let rows = PrivacyAccess.current(defaults: defaults)
+        // Name the one that is off: the Microphone first, and Speech Recognition when the Microphone is on.
+        let off = rows.filter { ["microphone", "speech"].contains($0.id) && $0.state != .allowed }
+        return off.first.map { PrivacyAccess.Item(title: $0.title, settingsURL: $0.settingsURL) }
     }
 
     func request(_ kind: AccessKind) async -> Bool {
@@ -153,10 +164,7 @@ final class LiveAccess: AccessProviding {
         case .downloads:
             // Listing the folder is what makes macOS ask, and the answer can't be read back except by whether the listing worked.
             AccessAsked.mark(.downloads, defaults: defaults)
-            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-            let readable = await Task.detached {
-                downloads.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } != nil
-            }.value
+            let readable = await Task.detached { PrivacyAccess.downloadsFolderIsReadable() }.value
             if readable { transfers.start() }
             return readable
         case .camera:
@@ -179,24 +187,38 @@ final class LiveAccess: AccessProviding {
                 INFocusStatusCenter.default.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
             }
         case .automation:
-            AccessAsked.mark(.automation, defaults: defaults)
-            return await Self.requestAutomation()
+            return await requestAutomation()
         }
     }
 
-    /// Asks to control Music and Spotify, for whichever is running (macOS can only ask about a running app). True when one
-    /// said yes.
-    private static func requestAutomation() async -> Bool {
+    func reload() async {
+        let defaults = defaults
+        await Task.detached { AutomationAccess.read(defaults: defaults) }.value
+    }
+
+    /// Asks to control Music and Spotify. macOS can only ask about a running app, so with neither open, Music is opened hidden
+    /// first, and left running. True when one said yes.
+    private func requestAutomation() async -> Bool {
+        func isRunning(_ id: String) -> Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty }
+        if !AutomationAccess.bundleIDs.contains(where: isRunning) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            configuration.hides = true
+            let music = URL(fileURLWithPath: "/System/Applications/Music.app")
+            _ = try? await NSWorkspace.shared.openApplication(at: music, configuration: configuration)
+            for _ in 0..<50 where !isRunning("com.apple.Music") { try? await Task.sleep(for: .milliseconds(100)) }
+            // A moment for it to start answering Apple events.
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        let defaults = defaults
         await Task.detached {
-            var allowed = false
-            for bundleID in ["com.apple.Music", "com.spotify.client"] {
-                guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else { continue }
-                let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
-                let status = AEDeterminePermissionToAutomateTarget(target.aeDesc!, typeWildCard, typeWildCard, true)
-                if status == noErr { allowed = true }
+            var statuses: [String: OSStatus] = [:]
+            for id in AutomationAccess.bundleIDs where !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty {
+                statuses[id] = AutomationAccess.status(of: id, asking: true)
             }
-            return allowed
+            AutomationAccess.store(statuses, defaults: defaults)
         }.value
+        return AutomationAccess.cachedState(defaults: defaults) == .allowed
     }
 }
 
@@ -211,6 +233,9 @@ final class AccessModel {
     @ObservationIgnored private let provider: AccessProviding
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let onBluetoothAllowed: () -> Void
+    /// What was allowed in this run. EventKit can still say "not determined" for a moment after a grant, so a yes from a request
+    /// stands until the system says no.
+    @ObservationIgnored private var grantedThisSession: Set<AccessKind> = []
 
     init(provider: AccessProviding, settings: AppSettings, onBluetoothAllowed: @escaping () -> Void) {
         self.provider = provider
@@ -223,16 +248,31 @@ final class AccessModel {
 
     var allAllowed: Bool { AccessKind.allCases.allSatisfy { state(of: $0) == .allowed } }
 
-    /// The permissions there is nothing left to ask: allowed, or asked once when the system won't say more. The guide leaves
-    /// their steps out.
-    var settled: Set<AccessKind> {
-        Set(AccessKind.allCases.filter { [.allowed, .asked].contains(state(of: $0)) })
+    /// The permissions there is nothing left to ask. The guide leaves their steps out.
+    /// For Microphone: whether it is the microphone or speech recognition that is off.
+    func offItem(of kind: AccessKind) -> PrivacyAccess.Item? { provider.offItem(of: kind) }
+
+    var allowed: Set<AccessKind> {
+        Set(AccessKind.allCases.filter { state(of: $0) == .allowed })
     }
 
-    /// Reads every state again: after a system prompt closes, and when the person comes back from System Settings.
+    /// The permissions that aren't allowed yet, in `AccessKind` order.
+    var missing: [AccessKind] { AccessKind.allCases.filter { state(of: $0) != .allowed } }
+
+    private func read(_ kind: AccessKind) -> PrivacyAccess.State {
+        let read = provider.state(of: kind)
+        return grantedThisSession.contains(kind) && read != .denied ? .allowed : read
+    }
+
+    private func readAll() -> [AccessKind: PrivacyAccess.State] {
+        Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, read($0)) })
+    }
+
+    /// Reads every state again: after a system prompt closes, and when the person comes back from System Settings. What can only be
+    /// read off the main actor (Automation) follows a moment later.
     func refresh() {
-        let fresh = Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, provider.state(of: $0)) })
-        if fresh != states { states = fresh }
+        apply(readAll())
+        Task { await reloadSlowReads() }
     }
 
     /// Asks for one permission. A grant also turns on the feature it serves, so the permission and the choice are one step;
@@ -243,6 +283,7 @@ final class AccessModel {
         let granted = await provider.request(kind)
         asking = nil
         if granted {
+            grantedThisSession.insert(kind)
             switch kind {
             case .calendars: if !settings.showsCalendar { settings.showsCalendar = true }
             case .reminders: if !settings.showsReminders { settings.showsReminders = true }
@@ -250,12 +291,23 @@ final class AccessModel {
             default: break
             }
         }
-        refresh()
+        apply(readAll())
+        await reloadSlowReads()
     }
 
-    /// Every permission still never asked, in `AccessKind` order, one after another. Skip uses it.
-    func requestAllPending() async {
-        for kind in AccessKind.allCases where state(of: kind) == .notAsked { await allow(kind) }
+    /// Reads every state again, the slow ones too, and returns once they are in.
+    func refreshed() async {
+        apply(readAll())
+        await reloadSlowReads()
+    }
+
+    private func apply(_ fresh: [AccessKind: PrivacyAccess.State]) {
+        if fresh != states { states = fresh }
+    }
+
+    private func reloadSlowReads() async {
+        await provider.reload()
+        apply(readAll())
     }
 }
 
@@ -268,7 +320,12 @@ enum AccessCenter {
 /// Quits and opens MacIsland again, which Screen Recording needs before it takes effect.
 @MainActor
 enum AppRelaunch {
+    /// Lets go of what the new copy needs at once: the global shortcuts. The new copy starts before this one exits, and a hot key
+    /// still held here would refuse to register there.
+    static var beforeRelaunch: (() -> Void)?
+
     static func relaunch() {
+        beforeRelaunch?()
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in

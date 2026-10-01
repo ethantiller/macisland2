@@ -56,6 +56,10 @@ final class FloatingPanels {
         panels[module] = nil
     }
 
+    func closeAll() {
+        for module in Array(panels.keys) { close(module) }
+    }
+
     func toggleDesktop(_ module: IslandModule) {
         guard let entry = panels[module] else { return }
         entry.state.keepsOnDesktop.toggle()

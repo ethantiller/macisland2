@@ -30,7 +30,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Format the code in place | `./scripts/format.sh` (see the warning below) |
 | Rebuild the Now Playing adapter | `./scripts/build-adapter.sh` |
 | Show the first-run guide again | `open macisland://guide` |
-| Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, and opens the app |
+| Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, the last Automation answers, and the step the guide stopped at, and opens the app |
 | Open Settings on its tour | `open macisland://tour` |
 | See the guide as a fresh install would (debug builds) | `open 'macisland://guide?reset=1'` |
 | Forget the app's macOS permissions | `tccutil reset All com.ethantiller.MacIsland` |
@@ -45,7 +45,7 @@ All are Bash with `set -euo pipefail`, run from anywhere (each `cd`s to the repo
 
 ### `first-run.sh` (`make first-run`)
 
-Dev only. Puts this Mac back to a true first run, to test the guide's permission steps. In this order, because the preferences daemon caches: quits MacIsland, runs `tccutil reset All com.ethantiller.MacIsland`, **writes** `onboarding.install fresh` (writing, not deleting: a deleted key would be read as an existing install), `onboarding.guide 0`, and `onboarding.settingsTour 0`, deletes `access.asked` (what the guide asked), and opens `build/MacIsland.app`. Run `make bundle` first.
+Dev only. Puts this Mac back to a true first run, to test the guide's permission steps. In this order, because the preferences daemon caches: quits MacIsland, runs `tccutil reset All com.ethantiller.MacIsland`, **writes** `onboarding.install fresh` (writing, not deleting: a deleted key would be read as an existing install), `onboarding.guide 0`, and `onboarding.settingsTour 0`, deletes `access.asked` (what the guide asked), `access.automation` (the last answer for Music and Spotify), and `onboarding.resumeStep` (where the guide stopped), and opens `build/MacIsland.app`. Run `make bundle` first.
 
 ### `bundle.sh`
 
@@ -187,12 +187,13 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 
 | File | Contains |
 | --- | --- |
-| `OnboardingState.swift` | `OnboardingState` (which guide and tour versions were seen; `onboarding.*` keys), `InstallEvidence` (existing or fresh) |
+| `OnboardingState.swift` | `OnboardingState` (which guide and tour versions were seen, and the step to resume at; `onboarding.*` keys), `InstallEvidence` (existing or fresh) |
 | `OnboardingFlow.swift` | `GuideStepID`, `PracticeGoal`, `GuideStep`, `OnboardingFlow`, `GuideSetup`, `GuideCopy` (every sentence) |
-| `OnboardingModel.swift` | `OnboardingModel` (walks the steps, practice, Skip, Done, Close, Open Settings) and `GuideEnding` |
+| `OnboardingModel.swift` | `OnboardingModel` (walks the steps, practice, Done, Open Settings, and where to resume) and `GuideEnding` |
 | `OnboardingView.swift` | The guide's content (`OnboardingView`), the window's root on glass (`OnboardingRoot`), the permission step's status and the practice line |
+| `SetupGate.swift` | `SetupGate`: whether setup is complete (the guide finished, every permission allowed), which shows or hides the island |
 | `StageInput.swift` | `.stageInput(_:isOn:)`: makes the stage island answer to hover, a click, swipes, and a dragged file |
-| `AccessRequests.swift` | `AccessKind` (the ten permissions), `AccessAsked`, `AccessProviding`, `LiveAccess` (every request), `AccessModel`, `AccessCenter`, `AppRelaunch` |
+| `AccessRequests.swift` | `AccessKind` (the ten permissions), `AccessAsked`, `AccessProviding`, `LiveAccess` (every request), `AccessModel` (states, and a grant that stands while EventKit lags), `AccessCenter`, `AppRelaunch` |
 | `BluetoothAccess.swift` | Asks for Bluetooth through `CBCentralManager` and returns the answer |
 
 ### `Island/` (panel, input, state, drawing)
@@ -202,7 +203,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `IslandPanel.swift` | The always-there `NSPanel`: borderless, non-activating, over everything, click-through by default, first-click-acts hosting view |
 | `ScreenGeometry.swift` | Notch detection and sizes; `panelSize` (560 x 276); `islandRect(for:)` |
 | `MenuHoldObserver.swift` | Holds the island open while any AppKit menu is tracking |
-| `MouseTracker.swift` | Global and local event monitors: hover, click-through, file-drag detection, swipes, click-outside |
+| `MouseTracker.swift` | Global and local event monitors: hover, click-through, file-drag detection, swipes, click-outside (off until setup is complete) |
 | `SwipeRecognizer.swift` | Turns one gesture's scroll deltas into down, up, left, or right, once |
 | `Announcements.swift` | `AmbientEvent` (what can be muted) and the banners and alerts of each, built once for the island and the preview |
 | `IslandViewModel.swift` | `IslandModule`, `ClockMode`, `IslandAlert`, `IslandBanner`, `CompactActivity`, `IslandFeatures`, the view model itself, and `TrailingStrip` (what fits right of the notch) |
@@ -399,7 +400,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `VolumeHUDTests.swift` | The volume keys' math and speaker, the controller over a stub tap and volume, the island alert, and the setting |
 | `KeepAwakeTests.swift` | Keep Awake's two assertions over a stub, the wake check, and the honest label |
 | `ShortcutToolTests.swift` | Shortcut tools: identity, storage and the cap, the pinned row, the archive, dimming, running and failing with a stub runner |
-| `PermissionStepTests.swift` | The permission steps (Grant Permission, Not Now, the order, skipped steps, the copy), what is remembered as asked, and the Shelf not looking in protected folders at launch |
+| `PermissionStepTests.swift` | The permission steps (the footer per state, required permissions, Done blocked, Still needed, the order, the copy), Downloads and Automation read for real, and the Shelf not looking in protected folders at launch |
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
 | `SettingsTourTests.swift` | The tour's stops, running, anchors, placement, and visibility |
 | `IslandSnapshots.swift` | Opt-in: renders states to PNG |

@@ -23,7 +23,7 @@ final class OnboardingState {
 
     /// How this install was classified. Decided once, on the first launch that has this code, and trusted after.
     private(set) var install: Install
-    /// The guide version last completed, skipped, or closed. 0 is never.
+    /// The guide version last completed. 0 is never.
     private(set) var guideSeen: Int
     /// The tour version last completed or ended. 0 is never.
     private(set) var tourSeen: Int
@@ -38,6 +38,7 @@ final class OnboardingState {
         static let install = "onboarding.install"
         static let guide = "onboarding.guide"
         static let tour = "onboarding.settingsTour"
+        static let resumeStep = "onboarding.resumeStep"
     }
 
     /// `isExistingInstall` is only asked when no classification is stored yet. It has to run before anything in this launch
@@ -70,14 +71,19 @@ final class OnboardingState {
         tourSeen = defaults.integer(forKey: Key.tour)
     }
 
-    /// A fresh install whose guide hasn't ended holds back what would show a system prompt at launch (Bluetooth, Downloads), so
-    /// the guide asks at a moment of its own. An existing install, and every later launch, starts everything as before.
-    var holdsLaunchPrompts: Bool { install == .fresh && needsGuide }
+    /// The step the guide was on when MacIsland quit, so a relaunch (Screen Recording asks for one) or a quit from the menu bar
+    /// picks it up there. Cleared when the guide ends.
+    var resumeStep: GuideStepID? {
+        get { defaults.string(forKey: Key.resumeStep).flatMap(GuideStepID.init(rawValue:)) }
+        set {
+            if let newValue { defaults.set(newValue.rawValue, forKey: Key.resumeStep) } else { defaults.removeObject(forKey: Key.resumeStep) }
+        }
+    }
 
     var needsGuide: Bool { guideSeen < currentGuide }
     var needsTour: Bool { tourSeen < currentTour }
 
-    /// The guide ended by Done, Open Settings, Close, or Skip. Writes only when something changes.
+    /// The guide ended by Done or Open Settings. Writes only when something changes.
     func finishGuide() {
         guard guideSeen < currentGuide else { return }
         guideSeen = currentGuide
@@ -100,6 +106,7 @@ final class OnboardingState {
             defaults.set(Install.fresh.rawValue, forKey: Key.install)
             defaults.set(0, forKey: Key.guide)
             defaults.set(0, forKey: Key.tour)
+            defaults.removeObject(forKey: Key.resumeStep)
         }
     #endif
 }

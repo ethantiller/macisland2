@@ -8,13 +8,18 @@ struct MacIslandApp: App {
 
     var body: some Scene {
         MenuBarExtra("MacIsland", systemImage: "capsule.fill") {
-            Button("Settings…") { SettingsWindowController.shared.show() }
-                .keyboardShortcut(",")
+            if appDelegate.gate.isOpen {
+                Button("Settings…") { SettingsWindowController.shared.show() }
+                    .keyboardShortcut(",")
+            } else {
+                // Until setup is complete the guide is all there is.
+                Button("Continue Setup") { appDelegate.continueSetup() }
+            }
             Button("Quit MacIsland") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
-        // Modules the person put in the menu bar. None are there until they choose.
-        ModuleMenuBars(viewModel: appDelegate.viewModel, panels: appDelegate.panels)
+        // Modules the person put in the menu bar. None are there until they choose, or until setup is complete.
+        ModuleMenuBars(viewModel: appDelegate.viewModel, panels: appDelegate.panels, gate: appDelegate.gate)
     }
 }
 
@@ -22,6 +27,7 @@ struct MacIslandApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// First, so it tells an existing install from a fresh one before anything in this launch can write a key.
     let onboarding = OnboardingState()
+    let gate = SetupGate()
     let features = AppDelegate.makeFeatures()
 
     private static func makeFeatures() -> IslandFeatures {
@@ -91,12 +97,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectEvents()
         features.settings.onDisplayChange = { [weak self] in self?.layout() }
 
+        // The panel is ordered front when setup is complete (`updateSetupGate`), never before.
         let panel = IslandPanel(rootView: IslandView(viewModel: viewModel))
         self.panel = panel
         layout()
-        panel.orderFrontRegardless()
 
         mouseTracker = MouseTracker(panel: panel, viewModel: viewModel)
+        mouseTracker?.isEnabled = false
         menuHold = MenuHoldObserver(viewModel: viewModel)
         connectKeyboard(panel: panel)
         connectReach()
@@ -197,11 +204,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectDevices()
         connectCapture()
 
-        // Nothing prompts at launch, on any install. What has a permission starts only once the person has allowed it (Bluetooth) or
-        // been asked (Downloads, which the system won't say): the guide, Settings \u{2192} Privacy, or first use asks.
+        // Nothing prompts at launch, on any install. What has a permission (Bluetooth, Downloads) starts when setup is complete and the
+        // island appears (`startPermittedMonitors`): the guide asks.
         batteryMonitor.start()
         features.privacy.start()
-        startPermittedMonitors()
         features.network.start()
         volumeMonitor.start()
         connectShelfChoices()
@@ -481,21 +487,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyQuiet(true)
     }
 
-    /// The first-run guide: what it needs from the app, its links, and showing it at the end of launch when this install hasn't
-    /// seen it.
+    /// The first-run guide: what it needs from the app, its links, and the setup gate: the island appears only once the guide is
+    /// finished and every permission is allowed, and the guide is what shows until then.
     private func connectOnboarding() {
         let onboarding = onboarding
         SettingsWindowController.shared.onboarding = onboarding
         let access = LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess, transfers: features.transfers)
-        // Settings \u{2192} Privacy asks through this one, so a grant there does what a grant in the guide does.
-        AccessCenter.model = AccessModel(
+        // Settings \u{2192} Privacy and the guide ask through this one, so a grant in either counts in both.
+        let model = AccessModel(
             provider: access, settings: features.settings,
             onBluetoothAllowed: { [weak self] in self?.accessoryMonitor.start() })
+        AccessCenter.model = model
         OnboardingWindowController.shared.context = OnboardingContext(
-            features: features, island: viewModel, state: onboarding,
-            access: access,
-            startDeferredMonitors: { [weak self] in self?.startPermittedMonitors() },
-            startAccessoryMonitor: { [weak self] in self?.accessoryMonitor.start() },
+            features: features, island: viewModel, state: onboarding, access: model,
+            guideEnded: { [weak self] in self?.updateSetupGate() },
             openSettings: { SettingsWindowController.shared.show() })
         urlCommands.onGuide = { reset in
             #if DEBUG
@@ -507,14 +512,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onboarding.tourRequested = true
             SettingsWindowController.shared.show()
         }
-        if onboarding.needsGuide { OnboardingWindowController.shared.show(replay: false) }
+
+        updateSetupGate()
+        refreshSetupGate()
+        // Back from System Settings, or from anywhere: a permission may have been turned off or on.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshSetupGate() }
+        }
     }
 
-    /// Starts the monitors that have a permission, for the ones whose permission is already settled, and never prompts: Bluetooth
-    /// when it is allowed, Downloads once it has been asked. Run at launch and again when the guide ends. Safe to call again.
+    /// Reads every permission again, the slow ones too, then settles the gate.
+    private func refreshSetupGate() {
+        Task { @MainActor in
+            await AccessCenter.model?.refreshed()
+            updateSetupGate()
+        }
+    }
+
+    /// **Continue Setup** in the menu bar: the guide, from where it stopped.
+    func continueSetup() {
+        OnboardingWindowController.shared.show(replay: false, permissionsOnly: !onboarding.needsGuide)
+    }
+
+    /// Opens or closes the island to match setup. Complete (the guide finished, every permission allowed) opens it; anything less
+    /// closes it and shows the guide, in its permissions-only form once the guide has been finished before. A guide still open when
+    /// setup becomes complete (the permissions-only one) keeps the island closed until Done ends it.
+    private func updateSetupGate() {
+        guard let access = AccessCenter.model else { return }
+        let complete = SetupGate.isComplete(needsGuide: onboarding.needsGuide, allAllowed: access.allAllowed)
+        let guideIsOpen = OnboardingWindowController.shared.isOpen
+        if complete {
+            if !(guideIsOpen && !gate.isOpen) { openGate() }
+        } else {
+            closeGate()
+            if !guideIsOpen { continueSetup() }
+        }
+    }
+
+    private func openGate() {
+        guard !gate.isOpen else { return }
+        gate.open()
+        mouseTracker?.isEnabled = true
+        panel?.orderFrontRegardless()
+        startPermittedMonitors()
+    }
+
+    private func closeGate() {
+        gate.close()
+        viewModel.closePinned()
+        mouseTracker?.isEnabled = false
+        panel?.orderOut(nil)
+        panels.closeAll()
+    }
+
+    /// Starts the monitors that have a permission, when it is allowed, and never prompts: Bluetooth, and Downloads once it reads as
+    /// allowed. Run when the island appears. Safe to call again.
     private func startPermittedMonitors() {
         if BluetoothAccess.isAllowed { accessoryMonitor.start() }
-        if AccessAsked.contains(.downloads) { features.transfers.start() }
+        if AccessAsked.contains(.downloads), PrivacyAccess.downloadsFolderIsReadable() { features.transfers.start() }
     }
 
     /// Windows torn off the island, and opening Settings from it.
@@ -545,18 +602,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settings.shortcutRegistrar = apply
         for slot in ShortcutSlot.allCases { _ = apply(slot, settings.shortcut(slot)) }
+        AppRelaunch.beforeRelaunch = { [hotkey, shelfHotkey] in
+            hotkey.unregister()
+            shelfHotkey.unregister()
+        }
+
+        // A key the copy that is quitting still held (a relaunch starts the new one first) is free within a moment: try again for
+        // about 3 seconds, then say it failed.
+        Task { @MainActor in
+            for attempt in 1...6 {
+                let missing = ShortcutSlot.allCases.filter { slot in
+                    guard let key = keys[slot], settings.shortcut(slot) != nil else { return false }
+                    return !key.isRegistered
+                }
+                if missing.isEmpty { return }
+                try? await Task.sleep(for: .milliseconds(500))
+                for slot in missing { _ = apply(slot, settings.shortcut(slot)) }
+                if attempt == 6 {
+                    let stillMissing = missing.filter { !(keys[$0]?.isRegistered ?? true) }
+                    for slot in stillMissing { HotkeyLog.logger.error("shortcut \(slot.rawValue) could not be registered") }
+                }
+            }
+        }
     }
 
     /// Control-Option-Space opens the island and gives it the keyboard: Esc closes, arrows switch tabs.
     private func connectKeyboard(panel: IslandPanel) {
         let viewModel = viewModel
+        let gate = gate
         hotkey.onPress = { [weak panel] in
-            // While the first-run guide is up, the shortcut is practised on the island in its window, not on this one.
+            // While the first-run guide is up, the shortcut is practised on the island in its window, not on this one. Before setup is
+            // complete it goes nowhere else.
             if OnboardingWindowController.shared.handleOpenShortcut() { return }
+            guard gate.isOpen else { return }
             viewModel.toggleFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }
         shelfHotkey.onPress = { [weak panel] in
+            guard gate.isOpen else { return }
             viewModel.toggleShelfFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }
@@ -588,6 +671,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ModuleMenuBars: Scene {
     let viewModel: IslandViewModel
     let panels: FloatingPanels
+    let gate: SetupGate
 
     var body: some Scene {
         menuBar(.home)
@@ -604,8 +688,8 @@ struct ModuleMenuBars: Scene {
             module.title,
             systemImage: module.systemImage,
             isInserted: Binding(
-                get: { viewModel.settings.isInMenuBar(module) },
-                set: { viewModel.settings.setInMenuBar(module, $0) }
+                get: { gate.isOpen && viewModel.settings.isInMenuBar(module) },
+                set: { if gate.isOpen { viewModel.settings.setInMenuBar(module, $0) } }
             )
         ) {
             MenuBarModuleView(module: module, viewModel: viewModel, panels: panels)

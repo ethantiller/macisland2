@@ -1,6 +1,6 @@
 import Foundation
 
-/// The guide's steps in order. After the tour of the island comes one step for each permission, each optional.
+/// The guide's steps in order. After the tour of the island comes one step for each permission, each required.
 enum GuideStepID: String, CaseIterable {
     case welcome, peek, open, tabs, close, modules, drop, menuBar
     case calendars, reminders, bluetooth, downloads, camera, microphone, screenRecording, accessibility, focus, automation
@@ -100,7 +100,7 @@ struct GuideStep: Equatable {
             id: .modules, since: 1, practice: nil, stage: PreviewContext(presentation: .expanded, tab: .home)),
         GuideStep(id: .drop, since: 1, practice: .dropFile, stage: PreviewContext(presentation: .compact)),
         GuideStep(id: .menuBar, since: 1, practice: nil, stage: nil),
-        // One step for each permission, each showing what it gives. None is required: Not Now goes on.
+        // One step for each permission, each showing what it gives. Every one is required: a step stays until it is allowed.
         GuideStep(id: .calendars, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .meeting)),
         GuideStep(
             id: .reminders, since: 1, practice: nil, stage: PreviewContext(presentation: .banner, event: .reminderDue)),
@@ -131,10 +131,16 @@ struct OnboardingFlow: Equatable {
     private(set) var index = 0
 
     /// Every step for a fresh install or a replay; for a re-run, the steps newer than `seen`, then `finish`. A permission's step is
-    /// left out when it is `settled` (allowed, or asked once), so there is nothing to ask.
-    static func make(seen: Int, replay: Bool, settled: Set<AccessKind>) -> OnboardingFlow {
-        var steps = GuideStep.all.filter { replay || seen == 0 || $0.since > seen || $0.id == .finish }
-        steps.removeAll { step in step.id.accessKind.map(settled.contains) ?? false }
+    /// left out only when it is `allowed`, so there is nothing to ask. With `permissionsOnly` (a permission was taken away after the
+    /// guide was done), the steps are the permissions that aren't allowed, then `finish`.
+    static func make(
+        seen: Int, replay: Bool, allowed: Set<AccessKind>, permissionsOnly: Bool = false
+    ) -> OnboardingFlow {
+        var steps =
+            permissionsOnly
+            ? GuideStep.all.filter { $0.id.accessKind != nil || $0.id == .finish }
+            : GuideStep.all.filter { replay || seen == 0 || $0.since > seen || $0.id == .finish }
+        steps.removeAll { step in step.id.accessKind.map(allowed.contains) ?? false }
         return OnboardingFlow(steps: steps)
     }
 
@@ -145,6 +151,26 @@ struct OnboardingFlow: Equatable {
 
     mutating func next() { index = min(index + 1, steps.count - 1) }
     mutating func back() { index = max(index - 1, 0) }
+
+    /// Starts at a step the guide stopped at. A step that was left out since (its permission is allowed now) starts at the next one
+    /// after it, in `GuideStep.all` order, that is still here.
+    mutating func start(at id: GuideStepID) {
+        let order = GuideStep.all.map(\.id)
+        guard let position = order.firstIndex(of: id) else { return }
+        index = steps.firstIndex { order.firstIndex(of: $0.id).map { $0 >= position } ?? false } ?? steps.count - 1
+    }
+
+    /// Moves to a step, putting it back in its place first when it was left out (a permission allowed when the guide began, and
+    /// taken away since).
+    mutating func go(to id: GuideStepID) {
+        if !steps.contains(where: { $0.id == id }), let step = GuideStep.all.first(where: { $0.id == id }) {
+            let order = GuideStep.all.map(\.id)
+            let position = order.firstIndex(of: id) ?? 0
+            let at = steps.firstIndex { order.firstIndex(of: $0.id).map { $0 > position } ?? false } ?? steps.count
+            steps.insert(step, at: at)
+        }
+        if let target = steps.firstIndex(where: { $0.id == id }) { index = target }
+    }
 }
 
 /// What the person's own setup changes in the copy: their shortcut, their tabs, what a dragged file does, and whether the Mac
@@ -235,7 +261,7 @@ enum GuideCopy {
         case .focus:
             return "We need Focus access so Quiet in Focus can hold banners back while a Focus is on. Without it, that setting does nothing."
         case .automation:
-            return "We need permission to control Music and Spotify, so play, pause, and Favorite reach the right app. Open the one you use first; macOS can only ask about an app that is running."
+            return "We need permission to control Music and Spotify, so play, pause, and Favorite reach the right app. If neither is open, Music opens in the background so macOS can ask."
         case .finish:
             return "Choose your tabs, arrange Home, and pick what may interrupt you in Settings. The gear beside the tabs opens it."
         }
@@ -268,17 +294,19 @@ enum GuideCopy {
     }
 
     /// What a permission step says once the person has answered, or before they have if the system won't say.
-    static func outcome(_ kind: AccessKind, state: PrivacyAccess.State) -> String {
+    /// `offItem` names what is off when it is not the step's own permission: Microphone's step also needs Speech Recognition.
+    static func outcome(_ kind: AccessKind, state: PrivacyAccess.State, offItem: String? = nil) -> String {
         switch state {
         case .notAsked:
-            return "Not asked yet. You can allow it now, or later in Settings \u{2192} Privacy."
+            return "Not asked yet."
         case .allowed:
             return kind == .calendars || kind == .reminders
                 ? "Allowed, and turned on in Settings." : "Allowed."
-        case .asked:
-            return "Asked. If you said no, turn it on in System Settings."
         case .denied:
             switch kind {
+            case .microphone:
+                let item = offItem ?? "Microphone"
+                return "\(item) is off, and macOS won\u{2019}t ask again. Turn on MacIsland in System Settings \u{2192} Privacy & Security \u{2192} \(item)."
             case .screenRecording:
                 return "Turn on MacIsland in System Settings \u{2192} Privacy & Security \u{2192} Screen Recording, then reopen MacIsland."
             case .accessibility:

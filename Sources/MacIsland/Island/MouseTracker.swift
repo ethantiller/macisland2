@@ -6,6 +6,8 @@ import AppKit
 final class MouseTracker {
     private let panel: NSPanel
     private let viewModel: IslandViewModel
+    /// Off until setup is complete: the island is out of sight, so the pointer means nothing to it.
+    var isEnabled = true
     private var monitors: [Any] = []
     private var dragPollTimer: Timer?
     private var dragStartedOnIsland = false
@@ -46,6 +48,7 @@ final class MouseTracker {
     }
 
     private func handle(_ event: NSEvent) {
+        guard isEnabled else { return }
         if event.type == .scrollWheel {
             handleScroll(event)
             return

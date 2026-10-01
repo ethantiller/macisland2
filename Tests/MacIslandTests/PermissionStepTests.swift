@@ -3,14 +3,18 @@ import Testing
 
 @testable import MacIsland
 
-/// The guide asks for one permission per step: a reason, **Grant Permission**, and **Not Now**. Nothing asks until Grant is pressed.
+/// The guide asks for one permission per step: a reason, **Grant Permission**, and then what the answer was. Every permission is
+/// required, so a step stays until its permission is allowed.
 @MainActor
 struct PermissionStepTests {
     private struct Rig {
         let model: OnboardingModel
         let access: StubAccess
         let settings: AppSettings
+        let ends: Ends
     }
+
+    private final class Ends { var list: [GuideEnding] = [] }
 
     private func makeRig(access: StubAccess? = nil, replay: Bool = false) -> Rig {
         let access = access ?? StubAccess()
@@ -21,10 +25,11 @@ struct PermissionStepTests {
         let reference = TestSupport.makeViewModel()
         let preview = IslandPreviewModel(live: reference.features)
         let accessModel = AccessModel(provider: access, settings: reference.settings, onBluetoothAllowed: {})
+        let ends = Ends()
         let model = OnboardingModel(
             state: state, settings: reference.settings, geometry: { reference.geometry }, preview: preview,
-            access: accessModel, replay: replay, startDeferredMonitors: {}, openSettings: {}, onEnd: { _ in })
-        return Rig(model: model, access: access, settings: reference.settings)
+            access: accessModel, replay: replay, openSettings: {}, onEnd: { ends.list.append($0) })
+        return Rig(model: model, access: access, settings: reference.settings, ends: ends)
     }
 
     private func walk(_ model: OnboardingModel, to id: GuideStepID) {
@@ -68,44 +73,99 @@ struct PermissionStepTests {
         #expect(rig.access.requests == [.camera])
     }
 
-    @Test func notNowAsksNothingAndGoesOn() {
-        let rig = makeRig()
+    @Test func theFooterFollowsTheAnswer() {
+        let rig = makeRig(access: StubAccess(states: [.camera: .denied, .microphone: .allowed]))
         defer { rig.model.stop() }
         walk(rig.model, to: .calendars)
-        rig.model.notNow()
-        #expect(rig.model.step.id == .reminders)
-        #expect(rig.access.requests.isEmpty)
-        #expect(rig.model.access.state(of: .calendars) == .notAsked)
-        // Not Now on a step that isn't a permission does nothing.
-        walk(rig.model, to: .finish)
-        rig.model.notNow()
-        #expect(rig.model.step.id == .finish)
+        #expect(rig.model.isAskingPermission && !rig.model.isDeniedPermission, "not asked: Grant Permission")
+        walk(rig.model, to: .camera)
+        #expect(rig.model.isDeniedPermission && !rig.model.isAskingPermission, "off: Open System Settings and Check Again")
+        // Allowed steps are left out of the guide, so the one that is allowed has no step to show Continue on.
+        #expect(!rig.model.flow.steps.contains { $0.id == .microphone })
     }
 
-    @Test func theGuideIsCompletableByPressingNotNowOnEveryPermission() {
-        let rig = makeRig()
+    @Test func aPermissionStepDoesNotGoOnUntilItIsAllowed() async {
+        let rig = makeRig(access: StubAccess(answers: [.calendars: false]))
         defer { rig.model.stop() }
-        var permissionSteps: [AccessKind] = []
-        while !rig.model.flow.isLast {
-            if let kind = rig.model.accessKind {
-                permissionSteps.append(kind)
-                rig.model.notNow()
-            } else {
-                rig.model.advance()
-            }
-        }
-        #expect(rig.model.step.id == .finish)
-        #expect(permissionSteps == AccessKind.allCases)
-        #expect(rig.access.requests.isEmpty)
+        walk(rig.model, to: .calendars)
+        rig.model.advance()
+        #expect(rig.model.step.id == .calendars, "not asked yet")
+        await rig.model.grant()
+        #expect(rig.model.accessState == .denied)
+        rig.model.advance()
+        #expect(rig.model.step.id == .calendars, "off")
+        // Turned on in System Settings, then Check Again.
+        rig.access.states[.calendars] = .allowed
+        rig.model.checkAgain()
+        #expect(rig.model.accessState == .allowed)
+        rig.model.advance()
+        #expect(rig.model.step.id == .reminders)
     }
 
-    @Test func aPermissionAlreadySettledHasNoStep() {
-        let rig = makeRig(access: StubAccess(states: [.calendars: .allowed, .downloads: .asked, .focus: .denied]))
+    @Test func aGrantReadsAsAllowedEvenWhenTheSystemStillSaysNotAsked() async {
+        // EventKit can report "not determined" for a moment after a grant.
+        let access = LaggingAccess()
+        let reference = TestSupport.makeViewModel()
+        let model = AccessModel(provider: access, settings: reference.settings, onBluetoothAllowed: {})
+        await model.allow(.calendars)
+        #expect(access.requests == [.calendars])
+        #expect(model.state(of: .calendars) == .allowed)
+        model.refresh()
+        #expect(model.state(of: .calendars) == .allowed, "a later read doesn't undo it")
+        // The system saying no does.
+        access.reads[.calendars] = .denied
+        model.refresh()
+        #expect(model.state(of: .calendars) == .denied)
+    }
+
+    /// A provider whose reads lag behind what it granted.
+    private final class LaggingAccess: AccessProviding {
+        var reads: [AccessKind: PrivacyAccess.State] = [:]
+        private(set) var requests: [AccessKind] = []
+        func state(of kind: AccessKind) -> PrivacyAccess.State { reads[kind] ?? .notAsked }
+        func request(_ kind: AccessKind) async -> Bool {
+            requests.append(kind)
+            return true
+        }
+    }
+
+    @Test func doneIsBlockedUntilEveryPermissionIsAllowed() {
+        let rig = makeRig(access: StubAccess(states: [.focus: .denied, .calendars: .notAsked]))
+        defer { rig.model.stop() }
+        walk(rig.model, to: .finish)
+        #expect(!rig.model.canFinish)
+        #expect(rig.model.stillNeeded.contains(.focus) && rig.model.stillNeeded.contains(.calendars))
+        rig.model.advance()
+        rig.model.finish()
+        #expect(rig.ends.list.isEmpty && rig.model.step.id == .finish)
+        rig.access.states = Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, .allowed) })
+        rig.model.access.refresh()
+        #expect(rig.model.canFinish && rig.model.stillNeeded.isEmpty)
+        rig.model.advance()
+        #expect(rig.ends.list == [.done])
+    }
+
+    @Test func aNameInStillNeededGoesBackToItsStep() {
+        let rig = makeRig(access: StubAccess(states: [.focus: .denied]))
+        defer { rig.model.stop() }
+        walk(rig.model, to: .finish)
+        #expect(rig.model.stillNeeded.first == .calendars)
+        rig.model.go(to: GuideStepID(.focus), animated: false)
+        #expect(rig.model.step.id == .focus)
+        rig.model.go(to: .calendars, animated: false)
+        #expect(rig.model.step.id == .calendars)
+        // Back works on every step but the first, so earlier steps can be redone.
+        rig.model.back(animated: false)
+        #expect(rig.model.step.id == .menuBar)
+    }
+
+    @Test func anAllowedPermissionIsLeftOutAndTheRestStay() {
+        let rig = makeRig(access: StubAccess(states: [.calendars: .allowed, .focus: .denied, .automation: .denied]))
         defer { rig.model.stop() }
         let kinds = rig.model.flow.steps.compactMap(\.id.accessKind)
-        #expect(!kinds.contains(.calendars) && !kinds.contains(.downloads))
-        #expect(kinds.contains(.focus), "an answer of no can still be turned on in System Settings, so it is shown")
-        #expect(kinds.count == 8)
+        #expect(!kinds.contains(.calendars))
+        #expect(kinds.contains(.focus) && kinds.contains(.automation), "off is shown, so it can be turned on")
+        #expect(kinds.count == 9)
     }
 
     @Test func everyStepSaysWhatItNeedsAndWhatIsLostWithoutIt() {
@@ -117,12 +177,20 @@ struct PermissionStepTests {
             #expect(body.hasPrefix("We need"), "\(kind)")
             #expect(body.count <= 240, "\(kind) is \(body.count) characters: the guide shows three lines")
             #expect(!GuideCopy.title(id).isEmpty)
-            for state in [PrivacyAccess.State.notAsked, .allowed, .asked, .denied] {
+            for state in [PrivacyAccess.State.notAsked, .allowed, .denied] {
                 #expect(!GuideCopy.outcome(kind, state: state).isEmpty)
             }
         }
         #expect(GuideCopy.body(.bluetooth, setup: setup).contains("AirPods connect"))
         #expect(GuideCopy.outcome(.screenRecording, state: .denied).contains("reopen"))
+        #expect(GuideCopy.outcome(.camera, state: .notAsked) == "Not asked yet.")
+        // Microphone's step names whichever of Microphone and Speech Recognition is off.
+        #expect(GuideCopy.outcome(.microphone, state: .denied, offItem: "Speech Recognition").contains("Speech Recognition"))
+        #expect(GuideCopy.outcome(.microphone, state: .denied).contains("Microphone"))
+        for kind in AccessKind.allCases {
+            #expect(GuideCopy.outcome(kind, state: .denied).contains("System Settings"), "\(kind)")
+        }
+        #expect(GuideCopy.body(.automation, setup: setup).contains("Music opens in the background"))
     }
 
     @Test func aPermissionStepsStageIsAPictureSoItLeavesTheKeysToTheRealIsland() {
@@ -140,21 +208,74 @@ struct PermissionStepTests {
         #expect(!AccessAsked.contains(.downloads, defaults: defaults))
         AccessAsked.mark(.downloads, defaults: defaults)
         AccessAsked.mark(.downloads, defaults: defaults)
-        #expect(AccessAsked.contains(.downloads, defaults: defaults) && !AccessAsked.contains(.automation, defaults: defaults))
+        #expect(AccessAsked.contains(.downloads, defaults: defaults) && !AccessAsked.contains(.screenRecording, defaults: defaults))
         #expect(defaults.stringArray(forKey: AccessAsked.key) == ["downloads"])
     }
 
-    @Test func downloadsAndAutomationAreNotAskedUntilAskedThenAskedNeverAllowed() {
-        let suite = "MacIslandAskedRows.\(UUID().uuidString)"
+    @Test func downloadsIsNotAskedUntilAskedThenReadsByListingTheFolder() {
+        let suite = "MacIslandDownloads.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        func state(_ id: String) -> PrivacyAccess.State? {
-            PrivacyAccess.current(defaults: defaults).first { $0.id == id }?.state
+        var listings = 0
+        func state(readable: Bool) -> PrivacyAccess.State? {
+            PrivacyAccess.current(defaults: defaults, downloadsReadable: {
+                listings += 1
+                return readable
+            }).first { $0.id == "downloads" }?.state
         }
-        #expect(state("downloads") == .notAsked && state("automation") == .notAsked)
+        // Listing the folder is what makes macOS ask, so before it was asked nothing is listed.
+        #expect(state(readable: true) == .notAsked && listings == 0)
         AccessAsked.mark(.downloads, defaults: defaults)
-        #expect(state("downloads") == .asked, "the system won't say what the answer was")
-        #expect(state("automation") == .notAsked)
+        #expect(state(readable: true) == .allowed)
+        #expect(state(readable: false) == .denied)
+        #expect(listings == 2)
+    }
+
+    // MARK: Automation
+
+    private let music = "com.apple.Music"
+    private let spotify = "com.spotify.client"
+
+    @Test func automationIsAllowedWhenEitherAppIsAllowed() {
+        #expect(AutomationAccess.state(statuses: [music: noErr], cache: [:]) == .allowed)
+        #expect(AutomationAccess.state(statuses: [music: AutomationAccess.denied, spotify: noErr], cache: [:]) == .allowed)
+    }
+
+    @Test func automationIsOffWhenAnAppIsDeniedAndNoneAllowed() {
+        #expect(AutomationAccess.state(statuses: [music: AutomationAccess.denied], cache: [:]) == .denied)
+        #expect(AutomationAccess.state(statuses: [:], cache: [music: "denied"]) == .denied)
+    }
+
+    @Test func automationIsNotAskedWhenNothingIsKnown() {
+        #expect(AutomationAccess.state(statuses: [:], cache: [:]) == .notAsked)
+        #expect(AutomationAccess.state(statuses: [music: AutomationAccess.wouldAsk], cache: [:]) == .notAsked)
+        // An app that isn't running says nothing, and the cache stands.
+        #expect(AutomationAccess.state(statuses: [music: AutomationAccess.notRunning], cache: [:]) == .notAsked)
+    }
+
+    @Test func automationStaysAllowedAfterMusicQuits() {
+        let cache = AutomationAccess.updatedCache(statuses: [music: noErr], cache: [:])
+        #expect(cache == [music: "allowed"])
+        #expect(AutomationAccess.state(statuses: [music: AutomationAccess.notRunning], cache: cache) == .allowed)
+        #expect(AutomationAccess.updatedCache(statuses: [music: AutomationAccess.notRunning], cache: cache) == cache)
+    }
+
+    @Test func automationForgetsAnAnswerThatWasReset() {
+        let cache = [music: "allowed", spotify: "denied"]
+        let updated = AutomationAccess.updatedCache(statuses: [music: AutomationAccess.wouldAsk], cache: cache)
+        #expect(updated == [spotify: "denied"])
+        #expect(AutomationAccess.updatedCache(statuses: [music: AutomationAccess.denied], cache: cache)[music] == "denied")
+    }
+
+    @Test func automationsLastAnswerIsKeptInDefaults() {
+        let suite = "MacIslandAutomation.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        #expect(AutomationAccess.cachedState(defaults: defaults) == .notAsked)
+        AutomationAccess.store([music: noErr], defaults: defaults)
+        #expect(defaults.dictionary(forKey: "access.automation") as? [String: String] == [music: "allowed"])
+        #expect(AutomationAccess.cachedState(defaults: defaults) == .allowed)
+        #expect(PrivacyAccess.current(defaults: defaults).first { $0.id == "automation" }?.state == .allowed)
     }
 
     // MARK: Nothing touches a protected folder at launch

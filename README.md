@@ -48,7 +48,7 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | ← / → , or a two-finger horizontal swipe | Previous or next tab |
 | Esc, or move the pointer away for 300 ms | Fold back in |
 | Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |
-| First launch | A short **guide** shows the gestures and modules with the real island, and asks for each permission in turn, one step at a time (each optional: **Grant Permission** or **Not Now**). Replay it, or the Settings tour, from Settings → General → Guide |
+| First launch | A short **guide** shows the gestures and modules with the real island, and asks for each permission in turn, one step at a time. Every permission is required: the island stays hidden until the guide is finished and all are allowed. Replay it, or the Settings tour, from Settings → General → Guide |
 
 ## A tour
 
@@ -145,7 +145,7 @@ Web searches open in your browser. **Widgets you make** can also send one HTTPS 
 widget), or run a Shortcut or a program you chose (a command widget); both run only while Home is showing, and Settings → Privacy
 lists every host and everything MacIsland runs.
 
-**Nothing asks at launch.** The first-run guide walks through Calendars, Reminders, Bluetooth, Downloads, Camera, Microphone (with Speech), Screen Recording, Accessibility, Focus, and Automation, one step each with a reason and **Grant Permission** or **Not Now** (each optional); Settings → Privacy has a **Grant** for anything not yet asked; and otherwise macOS asks when a feature first needs it (and for a folder widget in Desktop or Documents). The app is signed
+**Nothing asks at launch.** The first-run guide walks through Calendars, Reminders, Bluetooth, Downloads, Camera, Microphone (with Speech), Screen Recording, Accessibility, Focus, and Automation, one step each with a reason and **Grant Permission** (each required, so the island appears only once all ten are allowed); Settings → Privacy has a **Grant** for anything not yet asked; and otherwise macOS asks when a feature first needs it (and for a folder widget in Desktop or Documents). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
 Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 

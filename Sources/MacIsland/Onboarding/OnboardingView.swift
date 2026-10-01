@@ -38,7 +38,6 @@ struct OnboardingView: View {
         HStack {
             StepDots(count: model.flow.count, current: model.flow.index)
             Spacer()
-            IconButton(systemName: "xmark", label: "Close Guide", size: 12) { model.close() }
         }
         .frame(height: Theme.Metrics.hitTarget)
     }
@@ -98,13 +97,50 @@ struct OnboardingView: View {
             .focus, .automation:
             permissionDetail
         case .finish:
+            finishDetail
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Open at Login, and the permissions still to allow: Done waits for them, and a name goes back to its step.
+    private var finishDetail: some View {
+        VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
             ChipButton(
                 title: "Open at Login", systemImage: "power", isSelected: model.launchAtLogin
             ) { model.toggleLaunchAtLogin() }
-            // Login Items can be changed in System Settings while the guide is open.
-            .onAppear { model.refreshLaunchAtLogin() }
-        default:
-            EmptyView()
+            if !model.stillNeeded.isEmpty { stillNeeded }
+        }
+        // Login Items can be changed in System Settings while the guide is open, and so can a permission.
+        .onAppear {
+            model.refreshLaunchAtLogin()
+            model.access.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.access.refresh()
+        }
+    }
+
+    private var stillNeeded: some View {
+        let names = model.stillNeeded
+        return FlowLayout(spacing: 4) {
+            Text("Still needed:")
+                .font(Theme.Typography.body)
+                .foregroundStyle(Theme.Palette.secondary)
+            ForEach(Array(names.enumerated()), id: \.element) { index, kind in
+                HStack(spacing: 0) {
+                    Button {
+                        withAnimation(Theme.Motion.resize) { model.go(to: GuideStepID(kind)) }
+                    } label: {
+                        Text(kind.title).underline()
+                    }
+                    .buttonStyle(IslandButtonStyle())
+                    .accessibilityLabel("Go to \(kind.title)")
+                    Text(index == names.count - 1 ? "." : ",")
+                }
+                .font(Theme.Typography.body)
+                .foregroundStyle(Theme.Palette.secondary)
+            }
         }
     }
 
@@ -114,19 +150,12 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
             if let kind = model.accessKind, let state = model.accessState {
                 PermissionStatus(kind: kind, state: state, isAsking: model.access.asking == kind)
-                Text(GuideCopy.outcome(kind, state: state))
+                Text(GuideCopy.outcome(kind, state: state, offItem: model.offItem?.title))
                     .font(Theme.Typography.body)
                     .foregroundStyle(Theme.Palette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: Theme.Metrics.rowSpacing) {
-                    if state == .denied || state == .asked {
-                        ChipButton(title: "Open System Settings", accessibilityLabel: "Open \(kind.title) in System Settings") {
-                            if let url = kind.settingsURL { NSWorkspace.shared.open(url) }
-                        }
-                    }
-                    if kind == .screenRecording, state == .denied {
-                        ChipButton(title: "Reopen MacIsland") { AppRelaunch.relaunch() }
-                    }
+                if kind == .screenRecording, state == .denied {
+                    ChipButton(title: "Reopen MacIsland") { AppRelaunch.relaunch() }
                 }
             }
         }
@@ -185,27 +214,34 @@ struct OnboardingView: View {
 
     private var footer: some View {
         HStack(spacing: Theme.Metrics.rowSpacing) {
-            // TEMPORARY (onboarding Skip): remove before release, with OnboardingModel.showsSkip.
-            if OnboardingModel.showsSkip, !model.flow.isLast {
-                ChipButton(title: "Skip") { Task { await model.skip() } }
-            }
             Spacer()
             if !model.flow.isFirst {
                 ChipButton(title: "Back") { withAnimation(Theme.Motion.resize) { model.back() } }
             }
             if model.flow.isLast {
                 ChipButton(title: "Open Settings") { model.openSettings() }
+                    .disabled(!model.canFinish)
             }
             if model.isAskingPermission {
-                // The prompt appears only when this is pressed; Not Now asks nothing and goes on.
-                ChipButton(title: "Not Now") { withAnimation(Theme.Motion.resize) { model.notNow() } }
+                // The prompt appears only when this is pressed.
                 ChipButton(title: "Grant Permission", isProminent: true) { Task { await model.grant() } }
                     .disabled(model.access.asking != nil)
                     .keyboardShortcut(.defaultAction)
+            } else if model.isDeniedPermission, let kind = model.accessKind {
+                // macOS won't ask again: turn it on in System Settings, then read it again (coming back to the app does too).
+                ChipButton(title: "Check Again") { model.checkAgain() }
+                ChipButton(
+                    title: "Open System Settings", accessibilityLabel: "Open \(kind.title) in System Settings",
+                    isProminent: true
+                ) {
+                    if let url = model.offItem?.settingsURL ?? kind.settingsURL { NSWorkspace.shared.open(url) }
+                }
+                .keyboardShortcut(.defaultAction)
             } else {
                 ChipButton(title: model.primaryTitle, isProminent: true) {
                     withAnimation(Theme.Motion.resize) { model.advance() }
                 }
+                .disabled(model.flow.isLast && !model.canFinish)
                 .keyboardShortcut(.defaultAction)
             }
         }
@@ -248,13 +284,6 @@ private struct PermissionStatus: View {
             HStack(spacing: 4) {
                 Glyph(systemName: "checkmark.circle.fill", tint: Theme.Tint.positive)
                 Text("Allowed")
-                    .font(Theme.Typography.body)
-                    .foregroundStyle(Theme.Palette.secondary)
-            }
-        case .asked:
-            HStack(spacing: 4) {
-                Glyph(systemName: "checkmark.circle")
-                Text("Asked")
                     .font(Theme.Typography.body)
                     .foregroundStyle(Theme.Palette.secondary)
             }

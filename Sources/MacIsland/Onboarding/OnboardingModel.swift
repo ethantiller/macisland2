@@ -2,19 +2,15 @@ import Carbon.HIToolbox
 import Foundation
 import Observation
 
-/// How the guide ended. Every way is recorded as seen.
+/// How the guide ended. Only Done and Open Settings end it, and both need every permission allowed.
 enum GuideEnding {
-    case done, openSettings, closed, skipped
+    case done, openSettings
 }
 
 /// Walks the first-run guide: where it is, what the stage shows, which practice checks are met, and what each way out does.
 @MainActor
 @Observable
 final class OnboardingModel {
-    /// TEMPORARY (onboarding Skip): remove before release, with everything it guards; see docs/plans/onboarding-plan.md.
-    /// Skip exists so the permission prompts can be tested without clicking through every step.
-    static let showsSkip = true
-
     private(set) var flow: OnboardingFlow
     /// Steps whose practice check has turned green. Kept when going back, so a finished check stays finished.
     private(set) var practiceMet: Set<GuideStepID> = []
@@ -28,7 +24,6 @@ final class OnboardingModel {
     @ObservationIgnored private let state: OnboardingState
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let geometry: () -> ScreenGeometry
-    @ObservationIgnored private let startDeferredMonitors: () -> Void
     @ObservationIgnored private let openSettingsWindow: () -> Void
     @ObservationIgnored private let onEnd: (GuideEnding) -> Void
     @ObservationIgnored private var lastIsland: PracticeGoal.Island
@@ -36,9 +31,8 @@ final class OnboardingModel {
 
     init(
         state: OnboardingState, settings: AppSettings, geometry: @escaping () -> ScreenGeometry,
-        preview: IslandPreviewModel, access: AccessModel, replay: Bool,
-        startDeferredMonitors: @escaping () -> Void, openSettings: @escaping () -> Void,
-        onEnd: @escaping (GuideEnding) -> Void
+        preview: IslandPreviewModel, access: AccessModel, replay: Bool, permissionsOnly: Bool = false,
+        openSettings: @escaping () -> Void, onEnd: @escaping (GuideEnding) -> Void
     ) {
         self.state = state
         self.settings = settings
@@ -46,11 +40,19 @@ final class OnboardingModel {
         self.preview = preview
         self.access = access
         self.replay = replay
-        self.startDeferredMonitors = startDeferredMonitors
         openSettingsWindow = openSettings
         self.onEnd = onEnd
         lastIsland = PracticeGoal.Island(preview.viewModel)
-        flow = OnboardingFlow.make(seen: state.guideSeen, replay: replay, settled: access.settled)
+        var flow = OnboardingFlow.make(
+            seen: state.guideSeen, replay: replay, allowed: access.allowed, permissionsOnly: permissionsOnly)
+        // A relaunch picks the guide up where it stopped. What was practised before that point stays practised.
+        var practised: Set<GuideStepID> = []
+        if !replay, let resume = state.resumeStep {
+            flow.start(at: resume)
+            practised = Set(flow.steps[..<flow.index].filter { $0.practice != nil }.map(\.id))
+        }
+        self.flow = flow
+        practiceMet = practised
         showStage(animated: false)
     }
 
@@ -80,8 +82,11 @@ final class OnboardingModel {
     /// Where that permission stands now.
     var accessState: PrivacyAccess.State? { accessKind.map { access.state(of: $0) } }
 
-    /// A permission step that is still waiting for an answer: it offers **Grant Permission** and **Not Now** instead of Continue.
+    /// A permission step that is still waiting for an answer: it offers **Grant Permission** instead of Continue.
     var isAskingPermission: Bool { accessState == .notAsked }
+
+    /// A permission step whose answer is no: it offers **Open System Settings** and **Check Again**, and no Continue.
+    var isDeniedPermission: Bool { accessState == .denied }
 
     /// **Grant Permission**: the system prompt appears only now. The step stays, showing how it was answered.
     func grant() async {
@@ -89,21 +94,38 @@ final class OnboardingModel {
         await access.allow(kind)
     }
 
-    /// **Not Now**: nothing is asked, and the guide goes on. The permission is asked for at first use, or from Settings \u{2192} Privacy.
-    func notNow() {
-        guard accessKind != nil else { return }
-        next()
-    }
+    /// What is off on this step when it is not the step's own name (Speech Recognition, for Microphone), and where to turn it on.
+    var offItem: PrivacyAccess.Item? { accessKind.flatMap { access.offItem(of: $0) } }
+
+    /// **Check Again**: reads the permission again, after it was turned on in System Settings.
+    func checkAgain() { access.refresh() }
+
+    /// Whether the guide can end: every permission is allowed.
+    var canFinish: Bool { access.allAllowed }
+
+    /// The permissions still to allow, which the last step names.
+    var stillNeeded: [AccessKind] { access.missing }
 
     // MARK: Moving
 
     func next(animated: Bool = true) {
         flow.next()
-        showStage(animated: animated)
+        moved(animated: animated)
     }
 
     func back(animated: Bool = true) {
         flow.back()
+        moved(animated: animated)
+    }
+
+    /// Jumps to a step, from the last step's list of what is still needed.
+    func go(to id: GuideStepID, animated: Bool = true) {
+        flow.go(to: id)
+        moved(animated: animated)
+    }
+
+    private func moved(animated: Bool) {
+        if !replay { state.resumeStep = step.id }
         showStage(animated: animated)
     }
 
@@ -119,9 +141,13 @@ final class OnboardingModel {
         chosenModule = tab
     }
 
-    /// Continue, or Done on the last step.
+    /// Continue, or Done on the last step. A permission step goes on only once its permission is allowed, and Done only once all are.
     func advance() {
-        if flow.isLast { finish() } else { next() }
+        if flow.isLast {
+            finish()
+        } else if accessKind == nil || accessState == .allowed {
+            next()
+        }
     }
 
     private func showStage(animated: Bool = true) {
@@ -191,33 +217,25 @@ final class OnboardingModel {
 
     // MARK: Ending
 
-    func finish() { end(.done) }
-
-    func close() { end(.closed) }
+    func finish() {
+        guard canFinish else { return }
+        end(.done)
+    }
 
     func openSettings() {
-        guard !ended else { return }
+        guard !ended, canFinish else { return }
         if state.needsTour { state.tourRequested = true }
         end(.openSettings)
         openSettingsWindow()
     }
 
-    /// TEMPORARY (onboarding Skip): ends the guide at once, then asks every permission still never asked, one at a time.
-    /// The window closes first so the system prompts don't fight it for the screen.
-    func skip() async {
-        guard !ended else { return }
-        end(.skipped)
-        await access.requestAllPending()
-        startDeferredMonitors()
-    }
-
-    /// Records the guide as seen and closes it. Whatever the way out, what was held back on a fresh install starts now.
+    /// Records the guide as seen and closes it. The app opens the island, and starts what waited for it, when it hears.
     private func end(_ ending: GuideEnding) {
         guard !ended else { return }
         ended = true
+        state.resumeStep = nil
         state.finishGuide()
         onEnd(ending)
-        if ending != .skipped { startDeferredMonitors() }
     }
 
     /// Stops what the stage started.

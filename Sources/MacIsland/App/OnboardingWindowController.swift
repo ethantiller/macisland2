@@ -3,7 +3,7 @@ import Carbon.HIToolbox
 import SwiftUI
 
 /// The first-run guide's window: floating glass like a torn-off panel, but borderless: no title bar, so nothing of the window's own
-/// sits over the top of the guide (its ⊗ is there), and no resize edge.
+/// sits over the top of the guide, and no resize edge. It has no way to close: only the guide's Done ends it.
 final class OnboardingPanel: FloatingGlassPanel {
     /// Esc, ←, and → go to the island in the guide's window. Returns whether the key was taken.
     var keyHandler: ((_ keyCode: UInt16) -> Bool)?
@@ -30,16 +30,14 @@ final class OnboardingPanel: FloatingGlassPanel {
         super.sendEvent(event)
     }
 
-    /// Where a press drags the window: the glass's rim on every side, and the header row (the step dots) up to the ⊗. Nothing but
-    /// the dots sits there, and the ⊗ keeps its own click. `point` is in window coordinates, which start at the bottom left.
+    /// Where a press drags the window: the glass's rim on every side, and the header row (the step dots). Nothing but the dots sits
+    /// there. `point` is in window coordinates, which start at the bottom left.
     static func isDragArea(_ point: NSPoint, in size: CGSize) -> Bool {
         let rim = Theme.Metrics.floatPadding
         let fromTop = size.height - point.y
         let fromRight = size.width - point.x
         if point.x < rim || fromRight < rim || point.y < rim || fromTop < rim { return true }
-        let headerBottom = rim + Theme.Metrics.hitTarget
-        let closeButtonEdge = rim + Theme.Metrics.hitTarget + Theme.Metrics.rowSpacing
-        return fromTop < headerBottom && fromRight > closeButtonEdge
+        return fromTop < rim + Theme.Metrics.hitTarget
     }
 
     /// Esc is the stage island's. Left alone it reached the panel's own cancel action, which closed the guide (found by hand); the
@@ -55,11 +53,10 @@ struct OnboardingContext {
     /// The real island: the guide reads its screen and notch, and leaves it alone.
     let island: IslandViewModel
     let state: OnboardingState
-    let access: AccessProviding
-    /// Starts what a fresh install held back until the guide ended.
-    let startDeferredMonitors: () -> Void
-    /// Starts the headphones monitor alone, when Bluetooth is allowed in the guide.
-    let startAccessoryMonitor: () -> Void
+    /// The one model Settings → Privacy asks through too, so a grant anywhere counts everywhere.
+    let access: AccessModel
+    /// The guide ended: the app opens the island and starts what waited for it.
+    let guideEnded: () -> Void
     let openSettings: () -> Void
 }
 
@@ -77,8 +74,9 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     var isOpen: Bool { panel != nil }
 
     /// Opens the guide, or brings it forward. `replay` shows every step; otherwise it shows what this install hasn't seen.
+    /// `permissionsOnly` shows just the permissions that aren't allowed (one was turned off after the guide was done).
     /// The app is activated first: an accessory app's window takes no keys, and the system prompts stay behind, until it is.
-    func show(replay: Bool) {
+    func show(replay: Bool, permissionsOnly: Bool = false) {
         NSApp.activate()
         if let panel {
             panel.makeKeyAndOrderFront(nil)
@@ -88,17 +86,13 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
         let preview = IslandPreviewModel(live: context.features)
         preview.allowsMenuBar = true
-        let access = AccessModel(
-            provider: context.access, settings: context.features.settings,
-            onBluetoothAllowed: context.startAccessoryMonitor)
         let island = context.island
         // The stage island is the stage's own, which starts at the real island's screen and notch.
         preview.viewModel.geometry = island.geometry
         let model = OnboardingModel(
             state: context.state, settings: context.features.settings, geometry: { island.geometry },
-            preview: preview, access: access, replay: replay,
-            startDeferredMonitors: context.startDeferredMonitors, openSettings: context.openSettings,
-            onEnd: { [weak self] ending in self?.end(ending) })
+            preview: preview, access: context.access, replay: replay, permissionsOnly: permissionsOnly,
+            openSettings: context.openSettings, onEnd: { [weak self] ending in self?.end(ending) })
 
         let panel = OnboardingPanel()
         panel.keyHandler = { [weak self] keyCode in self?.model?.handleKey(keyCode) ?? false }
@@ -128,6 +122,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private func end(_ ending: GuideEnding) {
         guard let panel else { return }
         let model = model
+        let guideEnded = context?.guideEnded
         self.panel = nil
         self.model = nil
         NSAnimationContext.runAnimationGroup(
@@ -142,19 +137,21 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
                     model?.stop()
                 }
             })
+        guideEnded?()
     }
 
-    /// Closing any other way (a menu's Close, ⌘W) counts as the ⊗: seen, and gone.
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        model?.close()
-        return false
-    }
+    /// The guide ends only by Done: ⌘W and every other way of closing the window do nothing.
+    func windowShouldClose(_ sender: NSWindow) -> Bool { false }
 
     /// The open shortcut pressed while the guide is up: it opens or closes the island in the guide, not the real one, and brings the
     /// guide forward so Esc and the arrows reach it. False when there is no guide, or this step's stage is a picture: the real island
     /// answers then, as usual.
     func handleOpenShortcut() -> Bool {
+        HotkeyLog.logger.info(
+            "open shortcut: panel=\(self.panel != nil) model=\(self.model != nil) step=\(self.model?.step.id.rawValue ?? "-") interactive=\(self.model?.step.stageIsInteractive ?? false) stage=\(String(describing: self.model?.stageIsland.state))"
+        )
         guard let panel, let model, model.toggleStageFromKeyboard() else { return false }
+        HotkeyLog.logger.info("open shortcut: stage is now \(String(describing: model.stageIsland.state))")
         NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
         return true

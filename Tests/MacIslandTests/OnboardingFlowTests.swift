@@ -17,17 +17,17 @@ struct OnboardingFlowTests {
     // MARK: Flow
 
     @Test func everyStepForAFreshInstall() {
-        let flow = OnboardingFlow.make(seen: 0, replay: false, settled: [])
+        let flow = OnboardingFlow.make(seen: 0, replay: false, allowed: [])
         #expect(flow.steps.map(\.id) == GuideStepID.allCases)
         #expect(flow.count == 19)
     }
 
-    @Test func permissionStepsAreLeftOutWhenSettled() {
-        let flow = OnboardingFlow.make(seen: 0, replay: false, settled: Set(AccessKind.allCases))
+    @Test func permissionStepsAreLeftOutOnlyWhenAllowed() {
+        let flow = OnboardingFlow.make(seen: 0, replay: false, allowed: Set(AccessKind.allCases))
         #expect(flow.count == 9)
         #expect(flow.steps.allSatisfy { $0.id.accessKind == nil })
-        // One settled permission leaves only its own step out, and the rest keep their order.
-        let some = OnboardingFlow.make(seen: 0, replay: false, settled: [.camera, .reminders])
+        // One allowed permission leaves only its own step out, and the rest keep their order.
+        let some = OnboardingFlow.make(seen: 0, replay: false, allowed: [.camera, .reminders])
         #expect(some.count == 17)
         #expect(!some.steps.contains { $0.id == .camera || $0.id == .reminders })
         #expect(some.steps.contains { $0.id == .calendars } && some.steps.contains { $0.id == .microphone })
@@ -47,25 +47,61 @@ struct OnboardingFlowTests {
     }
 
     @Test func replayShowsEveryStep() {
-        let flow = OnboardingFlow.make(seen: 1, replay: true, settled: [])
+        let flow = OnboardingFlow.make(seen: 1, replay: true, allowed: [])
         #expect(flow.steps.map(\.id) == GuideStepID.allCases)
     }
 
     @Test func aRerunShowsOnlyWhatIsNewThenTheLastStep() {
         // Nothing has `since` above 1 yet, so someone who saw version 1 sees just the last step.
-        let flow = OnboardingFlow.make(seen: 1, replay: false, settled: [])
+        let flow = OnboardingFlow.make(seen: 1, replay: false, allowed: [])
         #expect(flow.steps.map(\.id) == [.finish])
         #expect(flow.isFirst && flow.isLast)
     }
 
     @Test func nextAndBackClamp() {
-        var flow = OnboardingFlow.make(seen: 0, replay: false, settled: [])
+        var flow = OnboardingFlow.make(seen: 0, replay: false, allowed: [])
         flow.back()
         #expect(flow.isFirst && flow.current.id == .welcome)
         for _ in 0..<20 { flow.next() }
         #expect(flow.isLast && flow.current.id == .finish)
         flow.back()
         #expect(flow.current.id == .automation)
+    }
+
+    @Test func permissionsOnlyIsTheStepsNotAllowedThenTheLastStep() {
+        let flow = OnboardingFlow.make(
+            seen: 1, replay: false, allowed: Set(AccessKind.allCases).subtracting([.calendars, .focus]),
+            permissionsOnly: true)
+        #expect(flow.steps.map(\.id) == [.calendars, .focus, .finish])
+        // Nothing missing: only the last step is left.
+        let none = OnboardingFlow.make(seen: 1, replay: false, allowed: Set(AccessKind.allCases), permissionsOnly: true)
+        #expect(none.steps.map(\.id) == [.finish])
+    }
+
+    @Test func startAtGoesToTheStepTheGuideStoppedAt() {
+        var flow = OnboardingFlow.make(seen: 0, replay: false, allowed: [])
+        flow.start(at: .screenRecording)
+        #expect(flow.current.id == .screenRecording)
+    }
+
+    @Test func startAtAStepThatWasLeftOutGoesToTheNextOneThatIsLeft() {
+        // Screen Recording was allowed after the relaunch, so its step is gone: the guide starts at Accessibility.
+        var flow = OnboardingFlow.make(seen: 0, replay: false, allowed: [.screenRecording])
+        flow.start(at: .screenRecording)
+        #expect(flow.current.id == .accessibility)
+        // Everything after it is gone too: the last step.
+        var late = OnboardingFlow.make(seen: 0, replay: false, allowed: [.accessibility, .focus, .automation])
+        late.start(at: .accessibility)
+        #expect(late.current.id == .finish)
+    }
+
+    @Test func goPutsALeftOutStepBackInItsPlace() {
+        var flow = OnboardingFlow.make(seen: 0, replay: false, allowed: [.camera])
+        flow.go(to: .focus)
+        #expect(flow.current.id == .focus)
+        flow.go(to: .camera)
+        #expect(flow.current.id == .camera)
+        #expect(flow.steps.map(\.id) == GuideStepID.allCases, "back where it belongs")
     }
 
     @Test func everyStepHasItsStage() {
@@ -218,7 +254,6 @@ struct OnboardingModelTests {
         let access: StubAccess
         let reference: IslandViewModel
         let ends: Ends
-        let monitorStarts: Counter
         let settingsOpened: Counter
     }
 
@@ -234,17 +269,13 @@ struct OnboardingModelTests {
         let reference = TestSupport.makeViewModel()
         let preview = IslandPreviewModel(live: reference.features)
         let ends = Ends()
-        let starts = Counter()
         let opened = Counter()
         let accessModel = AccessModel(provider: access, settings: reference.settings, onBluetoothAllowed: {})
         let model = OnboardingModel(
             state: state, settings: reference.settings, geometry: { reference.geometry }, preview: preview,
-            access: accessModel, replay: replay,
-            startDeferredMonitors: { starts.count += 1 }, openSettings: { opened.count += 1 },
-            onEnd: { ends.list.append($0) })
+            access: accessModel, replay: replay, openSettings: { opened.count += 1 }, onEnd: { ends.list.append($0) })
         return Rig(
-            model: model, state: state, access: access, reference: reference, ends: ends, monitorStarts: starts,
-            settingsOpened: opened)
+            model: model, state: state, access: access, reference: reference, ends: ends, settingsOpened: opened)
     }
 
     private func island(_ state: IslandViewModel.State, tab: IslandModule = .home, drag: Bool = false)
@@ -458,19 +489,10 @@ struct OnboardingModelTests {
         #expect(stage.hitRect.width == stage.hitSize.width)
     }
 
-    @Test func closeRecordsTheGuideAsSeenAndStartsDeferredMonitors() {
-        let rig = makeRig()
+    @Test func doneOnTheLastStepFinishesOnceEveryPermissionIsAllowed() {
+        let rig = makeRig(access: Self.allAllowed)
         defer { rig.model.stop() }
         #expect(rig.state.needsGuide)
-        rig.model.close()
-        #expect(!rig.state.needsGuide)
-        #expect(rig.ends.list == [.closed])
-        #expect(rig.monitorStarts.count == 1)
-    }
-
-    @Test func doneOnTheLastStepFinishes() {
-        let rig = makeRig()
-        defer { rig.model.stop() }
         while !rig.model.flow.isLast { rig.model.advance() }
         #expect(rig.model.primaryTitle == "Done")
         rig.model.advance()
@@ -478,8 +500,22 @@ struct OnboardingModelTests {
         #expect(!rig.state.needsGuide)
     }
 
+    @Test func nothingEndsTheGuideWhileAPermissionIsMissing() {
+        let rig = makeRig(access: StubAccess(states: [.camera: .denied]))
+        defer { rig.model.stop() }
+        while !rig.model.flow.isLast { rig.model.next(animated: false) }
+        rig.model.advance()
+        rig.model.finish()
+        rig.model.openSettings()
+        #expect(rig.ends.list.isEmpty && rig.state.needsGuide && rig.settingsOpened.count == 0)
+    }
+
+    private static var allAllowed: StubAccess {
+        StubAccess(states: Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, .allowed) }))
+    }
+
     @Test func openSettingsRequestsTheTourOnce() {
-        let rig = makeRig()
+        let rig = makeRig(access: Self.allAllowed)
         defer { rig.model.stop() }
         rig.model.openSettings()
         #expect(rig.ends.list == [.openSettings])
@@ -490,43 +526,68 @@ struct OnboardingModelTests {
     }
 
     @Test func openSettingsDoesNotRequestATourAnExistingInstallHasSeen() {
-        let rig = makeRig(existing: true, replay: true)
+        let rig = makeRig(existing: true, replay: true, access: Self.allAllowed)
         defer { rig.model.stop() }
         rig.model.openSettings()
         #expect(!rig.state.tourRequested)
     }
 
-    @Test func skipEndsTheGuideThenAsksEveryPendingPermission() async {
-        let rig = makeRig(access: StubAccess(states: [.reminders: .allowed]))
-        defer { rig.model.stop() }
-        await rig.model.skip()
-        #expect(rig.ends.list == [.skipped])
-        #expect(!rig.state.needsGuide)
-        #expect(
-            rig.access.requests == [
-                .calendars, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility, .focus,
-                .automation,
-            ])
-        #expect(rig.monitorStarts.count == 1)
-    }
-
     @Test func replayDoesNotAskForAnything() {
         let rig = makeRig(existing: true, replay: true)
         defer { rig.model.stop() }
-        while !rig.model.flow.isLast { rig.model.advance() }
-        rig.model.advance()
+        while !rig.model.flow.isLast { rig.model.next(animated: false) }
         #expect(rig.access.requests.isEmpty)
         #expect(rig.model.flow.count == 19)
     }
 
     @Test func endingTwiceDoesNothingTheSecondTime() {
-        let rig = makeRig()
+        let rig = makeRig(access: Self.allAllowed)
         defer { rig.model.stop() }
-        rig.model.close()
-        rig.model.close()
         rig.model.finish()
-        #expect(rig.ends.list == [.closed])
-        #expect(rig.monitorStarts.count == 1)
+        rig.model.finish()
+        rig.model.openSettings()
+        #expect(rig.ends.list == [.done])
+    }
+
+    // MARK: Resuming
+
+    @Test func theStepIsRememberedOnEveryMoveAndForgottenAtTheEnd() {
+        let rig = makeRig(access: Self.allAllowed)
+        defer { rig.model.stop() }
+        #expect(rig.state.resumeStep == nil)
+        rig.model.next(animated: false)
+        #expect(rig.state.resumeStep == .peek)
+        rig.model.back(animated: false)
+        #expect(rig.state.resumeStep == .welcome)
+        rig.model.go(to: .finish, animated: false)
+        #expect(rig.state.resumeStep == .finish)
+        rig.model.finish()
+        #expect(rig.state.resumeStep == nil)
+    }
+
+    @Test func aRelaunchResumesAtTheStepAndKeepsEarlierPracticeMet() {
+        let suite = "MacIslandOnboardingResume.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = OnboardingState(defaults: defaults, isExistingInstall: { false })
+        state.resumeStep = .screenRecording
+        let reference = TestSupport.makeViewModel()
+        let model = OnboardingModel(
+            state: state, settings: reference.settings, geometry: { reference.geometry },
+            preview: IslandPreviewModel(live: reference.features),
+            access: AccessModel(provider: StubAccess(), settings: reference.settings, onBluetoothAllowed: {}),
+            replay: false, openSettings: {}, onEnd: { _ in })
+        defer { model.stop() }
+        #expect(model.step.id == .screenRecording)
+        for id in [GuideStepID.peek, .open, .tabs, .close, .drop] { #expect(model.practiceMet.contains(id), "\(id)") }
+        // A replay starts at the beginning whatever was remembered.
+        let replay = OnboardingModel(
+            state: state, settings: reference.settings, geometry: { reference.geometry },
+            preview: IslandPreviewModel(live: reference.features),
+            access: AccessModel(provider: StubAccess(), settings: reference.settings, onBluetoothAllowed: {}),
+            replay: true, openSettings: {}, onEnd: { _ in })
+        defer { replay.stop() }
+        #expect(replay.step.id == .welcome)
     }
 }
 
@@ -541,9 +602,12 @@ struct GuideWindowTests {
         #expect(OnboardingPanel.isDragArea(NSPoint(x: 100, y: 612), in: size))  // the header, at the step dots
     }
 
-    @Test func theCloseButtonAndTheContentKeepTheirClicks() {
-        // The close button is 28 wide and sits 14 in from the right and from the top.
-        #expect(!OnboardingPanel.isDragArea(NSPoint(x: 560, y: 612), in: size))
+    @Test func theWholeHeaderRowDragsTheWindow() {
+        // There is no close button any more: the row has only the step dots.
+        #expect(OnboardingPanel.isDragArea(NSPoint(x: 560, y: 612), in: size))
+    }
+
+    @Test func theContentKeepsItsClicks() {
         #expect(!OnboardingPanel.isDragArea(NSPoint(x: 300, y: 300), in: size))  // the stage and the words
         #expect(!OnboardingPanel.isDragArea(NSPoint(x: 300, y: 28), in: size))  // the footer's buttons
     }

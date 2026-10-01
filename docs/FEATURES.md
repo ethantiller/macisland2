@@ -378,7 +378,7 @@ Note picks a note. Right-click any widget on the real island and choose **Edit H
 ## First run
 
 The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it by its header or its edge), with an island you can
-use as its stage (drawn from sample data, as in Settings). It has nineteen steps (a permission step is left out when that permission is already allowed), and the window never changes height:
+use as its stage (drawn from sample data, as in Settings). It has nineteen steps (a permission step is left out when that permission is already allowed), and the window never changes height. **The guide must be finished before the island can be used**, and every permission is required: it has no Skip, no Not Now, and no close button, and ⌘W does nothing. Only **Done** ends it, and Done waits until all ten permissions read Allowed:
 
 | # | Step | What it shows |
 | --- | --- | --- |
@@ -390,22 +390,20 @@ use as its stage (drawn from sample data, as in Settings). It has nineteen steps
 | 6 | Seven Modules | A chip per module; the stage shows the one you choose |
 | 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line; the copy ends with your Shelf shortcut when it is on |
 | 8 | Keep a Module Close | The menu bar sliding in |
-| 9 to 18 | One step per permission: See Your Next Meeting (Calendars), See What's Due (Reminders), Know When Headphones Connect (Bluetooth), Watch Your Downloads (Downloads), Check Yourself in Mirror (Camera), Record Voice Notes (Microphone and Speech), Record Your Screen (Screen Recording), Clean Your Keyboard (Accessibility), Stay Quiet in Focus (Focus), Control Music and Spotify (Automation) | What it gives and what you lose without it, in a banner or tab picture on the stage, and its state: Not asked yet, Allowed (green check), Asked, or Off (red) with **Open System Settings**. While it is waiting, the footer offers **Not Now** (goes on, asks nothing) and **Grant Permission** (the system prompt appears only now); after an answer it is Continue. Screen Recording also offers **Reopen MacIsland**. Left out when already allowed |
-| 19 | Make It Yours | Open at Login, Open Settings, Done |
+| 9 to 18 | One step per permission: See Your Next Meeting (Calendars), See What's Due (Reminders), Know When Headphones Connect (Bluetooth), Watch Your Downloads (Downloads), Check Yourself in Mirror (Camera), Record Voice Notes (Microphone and Speech), Record Your Screen (Screen Recording), Clean Your Keyboard (Accessibility), Stay Quiet in Focus (Focus), Control Music and Spotify (Automation) | What it gives and what you lose without it, in a banner or tab picture on the stage, and its state, read for real: Not asked yet, Allowed (green check), or Off (red). Not asked, the footer offers **Grant Permission** (the system prompt appears only now); Allowed, it is **Continue**; Off, it offers **Open System Settings** and **Check Again** (coming back to MacIsland checks too) and no Continue, and Back still works on every step but the first. Screen Recording also offers **Reopen MacIsland**. Automation asks for Music and Spotify: if neither is open, Music opens in the background first, and the step counts as allowed when either is. Left out when already allowed |
+| 19 | Make It Yours | Open at Login, and a line "Still needed: Calendars, Focus." while any permission is missing (tap a name to go back to its step); Open Settings and Done are disabled until none is |
 
 The **practice lines** ("Try it: ...") watch the island in the window and turn green, beside a check, when you do it there (hover, click or swipe it, drag a file over it, or use Esc, the arrows, or your open shortcut, which goes to it while the guide is up); a file dragged over it is never dropped. They never block
 Continue. The words follow your setup: with no open shortcut the key caps and the keyboard sentences go, the drop step follows
 "When You Drag a File", and a Mac without a notch says "the top center of the screen". **Esc closes the island in the window and never the
-guide**, which ends only by its own buttons.
+guide**, which ends only by Done.
 
 Granting Calendars turns on Calendar Events in Up Next, and Reminders turns on Due Reminders. Bluetooth starts the headphones
-monitor, and Downloads starts the download monitor. **Nothing asks at launch, on any install:** a monitor with a permission starts only once it is allowed (Bluetooth) or asked (Downloads, which macOS won't say), and the Shelf doesn't look inside Desktop, Documents, or Downloads until it is shown. Settings → Privacy has a **Grant** for anything not yet asked.
+monitor, and Downloads starts the download monitor. **Nothing asks at launch, on any install:** a monitor with a permission starts only once it is allowed, when the island appears, and the Shelf doesn't look inside Desktop, Documents, or Downloads until it is shown. Settings → Privacy has a **Grant** for anything not yet asked.
 
-The ⊗, Done, Open Settings, and Skip each count the guide as seen; quitting with it open does not. **Skip** is temporary: it ends the
-guide at once and then asks every permission not yet asked, one after another (ten of them now). Someone who updates from a build they already used
-sees neither the guide nor the tour. **Replay** them from Settings → General → Guide, or with `macisland://guide` and `macisland://tour`.
+**Until setup is complete, MacIsland shows only the guide:** the island is out of sight, ⌃⌥Space and the Shelf shortcut touch only the guide, module menu-bar icons are not inserted, and the menu bar offers only **Continue Setup** and **Quit MacIsland**. When Done ends the guide, the island appears. If a permission is turned off later, coming back to MacIsland hides the island and reopens the guide on just the permissions that are off. Quitting mid-guide (the menu bar, or macOS's Quit & Reopen for Screen Recording) resumes at the same step on the next launch. Someone who updates from a build they already used sees no welcome tour, but the island waits until all ten permissions are allowed. Done and Open Settings count the guide as seen. **Replay** them from Settings → General → Guide, or with `macisland://guide` and `macisland://tour`.
 
-Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-guide-09-access.png`.
+Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-guide-09-calendars.png`, `40-guide-19-finish.png`.
 
 ---
 

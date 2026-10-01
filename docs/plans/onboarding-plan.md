@@ -2,6 +2,7 @@
 
 **For:** Sonnet 5.5, to carry out on the user's Mac (`/Users/ethantiller/git/mac-island`).
 **Status:** plan only. Nothing here is built yet.
+**Update 2026-10-01:** Skip, Not Now, and the ⊗ (Close) were removed, and every permission is now required: the island stays hidden until the guide is done and all ten are allowed (see `docs/FEATURES.md#first-run`). The sections below on Skip, Close, and Not Now describe what was first built.
 **Written:** 2026-09-30, from a read of the code at `c99d4a0`.
 
 Every claim about today's code below names the file and symbol it comes from. Where the plan makes a choice, it gives a one-line

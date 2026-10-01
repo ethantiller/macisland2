@@ -264,26 +264,6 @@ struct AccessTests {
         #expect(stub.requests.isEmpty)
     }
 
-    @Test func skipAsksOnlyPendingInOrder() async {
-        let stub = StubAccess(states: [.reminders: .allowed])
-        let model = makeModel(stub)
-        await model.requestAllPending()
-        #expect(
-            stub.requests == [
-                .calendars, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility, .focus,
-                .automation,
-            ])
-        #expect(model.asking == nil)
-    }
-
-    @Test func skipAsksNothingWhenAllDecided() async {
-        var decided: [AccessKind: PrivacyAccess.State] = [:]
-        for (index, kind) in AccessKind.allCases.enumerated() { decided[kind] = index.isMultiple(of: 2) ? .allowed : .denied }
-        let stub = StubAccess(states: decided)
-        await makeModel(stub).requestAllPending()
-        #expect(stub.requests.isEmpty)
-    }
-
     @Test func bluetoothGrantStartsTheMonitor() async {
         var started = 0
         let model = makeModel(StubAccess(), onBluetoothAllowed: { started += 1 })
@@ -304,7 +284,7 @@ struct AccessTests {
         #expect(!makeModel(StubAccess()).allAllowed)
         let all = StubAccess(states: Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, .allowed) }))
         #expect(makeModel(all).allAllowed)
-        #expect(makeModel(all).settled == Set(AccessKind.allCases))
+        #expect(makeModel(all).allowed == Set(AccessKind.allCases) && makeModel(all).missing.isEmpty)
     }
 
     @Test func refreshReadsTheSystemAgain() {
@@ -360,15 +340,24 @@ struct LaunchPromptTests {
         return OnboardingState(defaults: defaults, isExistingInstall: { existing })
     }
 
-    @Test func aFreshInstallHoldsLaunchPromptsUntilTheGuideEnds() {
-        let state = makeState(existing: false)
-        #expect(state.holdsLaunchPrompts)
-        state.finishGuide()
-        #expect(!state.holdsLaunchPrompts)
+    @Test func theResumeStepRoundTripsAndIsClearedByReset() {
+        let suite = "MacIslandResume.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = OnboardingState(defaults: defaults, isExistingInstall: { false })
+        #expect(state.resumeStep == nil)
+        state.resumeStep = .screenRecording
+        #expect(OnboardingState(defaults: defaults, isExistingInstall: { false }).resumeStep == .screenRecording)
+        #expect(defaults.string(forKey: "onboarding.resumeStep") == "screenRecording")
+        state.resumeStep = nil
+        #expect(defaults.object(forKey: "onboarding.resumeStep") == nil)
     }
 
-    @Test func anExistingInstallNeverHoldsThem() {
-        #expect(!makeState(existing: true).holdsLaunchPrompts)
+    @Test func theSetupGateOpensOnlyWhenTheGuideIsFinishedAndEveryPermissionIsAllowed() {
+        #expect(SetupGate.isComplete(needsGuide: false, allAllowed: true))
+        #expect(!SetupGate.isComplete(needsGuide: true, allAllowed: true))
+        #expect(!SetupGate.isComplete(needsGuide: false, allAllowed: false))
+        #expect(!SetupGate.isComplete(needsGuide: true, allAllowed: false))
     }
 
     @Test func everyAccessKindHasItsWordsAndItsPane() {
