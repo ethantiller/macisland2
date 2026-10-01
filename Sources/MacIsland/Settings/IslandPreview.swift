@@ -27,6 +27,8 @@ struct PreviewContext: Equatable {
     var fileDrag = false
     /// The Media tab's Mixer panel is open.
     var showsMixer = false
+    /// A timer runs beside the music, so the peek has two things to choose between.
+    var twoActivities = false
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
     var clockMode: ClockMode?
 }
@@ -57,6 +59,7 @@ final class IslandPreviewModel {
     /// Stops what the sample features started and removes what they wrote.
     func stop() {
         viewModel.weather.stop()
+        viewModel.timer.reset()
         clearAnnouncements()
         scratch.remove()
     }
@@ -108,6 +111,12 @@ final class IslandPreviewModel {
         let apply = { [self] in
             self.context = context
             viewModel.resetPointerState()
+            if context.twoActivities, !viewModel.timer.isActive {
+                viewModel.timer.start(minutes: 25)
+            } else if !context.twoActivities, viewModel.timer.isActive {
+                viewModel.timer.reset()
+                viewModel.chosenActivityID = nil
+            }
             menuBarProgress = context.presentation == .menuBar ? 1 : 0
             switch context.presentation {
             case .compact:

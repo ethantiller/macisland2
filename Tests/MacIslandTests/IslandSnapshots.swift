@@ -270,6 +270,18 @@ struct IslandSnapshots {
         }
     }
 
+    /// The peek's row of live activities (Choose the Activity): a timer and music, with the timer leading.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderChooseActivity() {
+        let viewModel = makeViewModel()
+        viewModel.settings.setOn(.chooseActivity, true)
+        viewModel.nowPlaying.apply(sampleTrack())
+        viewModel.timer.start(minutes: 25)
+        viewModel.state = .peek
+        render(viewModel, "03i-peek-choose-activity")
+        viewModel.timer.reset()
+    }
+
     /// The two drop tiles the Shelf shows while a file is dragged, as they look with the pointer over each half.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderDropTiles() {

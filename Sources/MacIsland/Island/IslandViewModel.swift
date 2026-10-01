@@ -201,6 +201,9 @@ final class IslandViewModel {
     var clockMode: ClockMode = .timer
     /// The Media tab's Audio Output and Volume panel is open: the output chips and volume, or the Mixer when it is on.
     var showsMediaOutputs = false
+    /// The activity the person chose to lead the closed island and the peek, by `CompactActivity.choiceID`. Memory only: it ends with
+    /// the activity.
+    var chosenActivityID: String?
     var agentsMode: AgentsMode = .now
     var usageRange: UsageRange = .today
     /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
@@ -219,6 +222,7 @@ final class IslandViewModel {
     var state: State = .compact {
         didSet {
             if state == .compact {
+                pruneChosenActivity()
                 toolsExpanded = false
                 calendarExpanded = false
                 calendarSelectedDay = nil
@@ -286,8 +290,23 @@ final class IslandViewModel {
         features[keyPath: keyPath]
     }
 
-    /// Everything live, highest priority first. The island shows the top two.
+    /// Everything live, highest priority first, with the one the person chose in the peek (while Choose the Activity is on and it is
+    /// still live) moved up to lead, behind an alert. The island shows the top two.
     var compactActivities: [CompactActivity] {
+        let live = liveActivities
+        guard features.settings.isOn(.chooseActivity), let chosen = chosenActivityID,
+            let index = live.firstIndex(where: { $0.choiceID == chosen && $0.isChoosable })
+        else { return live }
+        var list = live
+        let front = list.first?.isChoosable == false ? 1 : 0
+        guard index > front else { return live }
+        list.insert(list.remove(at: index), at: front)
+        return list
+    }
+
+    /// Everything live in the order DESIGN gives: banner, alert, recording, microphone, the clocks, a countdown, work, an agent,
+    /// a transfer, music.
+    var liveActivities: [CompactActivity] {
         if let banner { return [.banner(banner)] }
         var list: [CompactActivity] = []
         if let alert { list.append(.alert(alert)) }
@@ -408,6 +427,12 @@ final class IslandViewModel {
 
     /// Clock for a running timer or stopwatch, Now Playing for music, and the day at a glance when idle.
     var peekContentHeight: CGFloat {
+        let choice = showsActivityChoice ? Theme.Metrics.hitTarget + Theme.Metrics.rowSpacing : 0
+        return choice + activityPeekHeight
+    }
+
+    /// The height of the top activity's own peek.
+    private var activityPeekHeight: CGFloat {
         switch compactActivity {
         case .timer, .pomodoro, .stopwatch, .countdown: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)

@@ -212,6 +212,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `IslandContainer.swift` | `IslandPresentation`, `IslandSurface`, and the container that draws the outline, surface, size, and swell |
 | `NotchShape.swift` | The island outline (flat top, concave flares, continuous bottom corners) |
 | `PeekContent.swift` | What each peek shows, and the idle peek |
+| `ActivityChoice.swift` | Choose the Activity: each activity's name and identity, the choice, and the peek's row of chips |
 | `ModuleContent.swift` | The one module-to-view switch used everywhere |
 | `Theme.swift` | All design tokens: `Palette`, `SurfaceInk`, `Tint` (with `Tint.airDrop` for the AirDrop target), `Typography`, `Metrics`, `Timing`, `Motion`, `BlurFade`, the `\.islandSurface` key |
 | `Components.swift` | Shared controls: `IconButton`, `ChipButton`, `SegmentedChoice`, `IslandSlider`, `ArtworkView`, `ProgressRing`, `EdgeFade`, `ChargingBadge`, `AirDropGlyph`, `Glyph`, `IslandButtonStyle`, `formatTime` |
@@ -387,7 +388,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 55 files, about 13,400 lines, 929 tests. Swift Testing.
+`Tests/MacIslandTests/`: 56 files, about 13,500 lines, 938 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -419,6 +420,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
 | `MixerTests.swift` | The limiter on buffers, helper grouping, and the Mixer's rules with a stub list and stub taps |
+| `ChooseActivityTests.swift` | The chosen activity leading the pair and the peek, alerts first, the choice ending, and the peek's height |
 | `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |
 | `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |

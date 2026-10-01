@@ -77,6 +77,10 @@ Compact shows the **top two** live activities, ranked. Highest first:
 
 In a pair, each side shows only its activity's glyph, ring, or artwork. Music's play/pause button is left out of a pair. A screen recording is one big stop button: click the compact island to stop it, and hovering does not open it. A voice note peeks with the time, a level meter, and **Stop**.
 
+**Choose the Activity** (off until it is switched on in Settings → Features). With two or more things live, the peek starts with a row of chips, one for each (Timer, Music, Download, the job's name, and so on), the leading one selected. Choose one and it leads the closed island and fills the peek; the other stays beside it. An alert or banner still comes first, and the choice ends with the activity.
+
+![Choosing the activity](images/03i-peek-choose-activity.png)
+
 ### Color
 
 A tint means something is live, one meaning per color. Everything else is white on black.
