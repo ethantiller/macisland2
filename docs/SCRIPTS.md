@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 724 tests, about a second.
+lines; 769 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -338,6 +338,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | File | Contains |
 | --- | --- |
 | `AppSettings.swift` | Every setting, its storage, the tab sides, menu-bar modules, search engines, pinned tools |
+| `FeatureCatalog.swift` | `Feature` (what can be switched off, with its words and cost), `FeatureCost`, and the `FeaturePreset`s |
 | `SettingsView.swift` | The Settings window: a sidebar of panes over a live preview and the pane's form |
 | `SettingsPane.swift` | The panes, and what the preview shows for each |
 | `IslandPreview.swift` | `IslandPreviewModel` (a second view model on sample data), `IslandPreview` (the picker, arrows, tray, and hints around the band), and `PreviewBand` (the real `IslandView` on a desk band, which the first-run guide uses alone as its stage) |
@@ -360,7 +361,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 46 files, about 10,400 lines, **724 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 48 files, about 10,700 lines, **769 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -386,6 +387,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `DialTests.swift` | The timer dial: drag math, rubber band, scroll routing, the dial rectangle |
 | `PresentationTests.swift` | Hover, peek, expanded, banner widths, drag target, the hidden pill, swipes |
 | `SettingsTests.swift` | Hotkey, tabs |
+| `FeatureCatalogTests.swift` | The Features catalog: the words, defaults, presets, the two bridged settings, the clipboard migration, the shown tabs, the menu bar, the archive |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

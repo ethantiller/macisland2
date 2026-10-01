@@ -368,6 +368,39 @@ right of the notch, from known worst-case widths; it is a pure function with tes
 
 ---
 
+## The Features catalog
+
+`Feature` (`Settings/FeatureCatalog.swift`) is the list of parts of MacIsland that can be switched off entirely: eight modules (Music,
+Clock, Reminders, Tools, Shelf, Clipboard, Notes, AI Agents) and eight island extensions (Calendar, Weather, Volume HUD, Mixer, System,
+Downloads in the Shelf, Choose the Activity, Notifications). The raw values are stored, so cases are added and never renamed. A feature
+that is off doesn't show and doesn't run, and **its settings are kept**: the switch sits above the feature's own settings.
+`FeaturePreset` (Minimal, Everyday, Everything) sets every feature at once. `Feature.isBuilt` (a set each package adds its case to)
+says which have code: a feature that isn't built has a switch that does nothing, and the Features pane won't list it.
+
+**Two layers.** `AppSettings.isOn(_:)` and `setOn(_:_:)` are the catalog. A feature's switch is its entry in `features.available` (a
+dictionary of the choices made, raw value to `Bool`; absent means `isOnByDefault`), except two that keep the setting they always had, so
+nothing was migrated: **Calendar is `showsCalendar`** and **Volume HUD is `replacesVolumeHUD`**. `setOn` does nothing unless the value
+changes (the scene-recursion gotcha), and `onFeatureChange` is told once per flip by every route, including those two settings'
+own `didSet`. Calendar's switch is off on a store the guide hasn't reached, because the guide turns it on when Calendars is allowed and
+nothing asks at launch; Everyday still counts it, so a finished install matches Everyday.
+
+**The clipboard.** The history used to be turned off with a limit of 0. A stored 0 is read as the Clipboard feature off with the limit
+back at 10 (`init` and `restore` both do it; `ClipboardHistory.limits` keeps 0 because it is how the model stops). The model is given
+`effectiveClipboardLimit`, which is 0 while the feature is off.
+
+**The tab strip reads shown tabs.** `IslandModule.isAvailable` stays "has a view" and never reads a setting: `normalized` drops
+unavailable modules from what is stored, so making it read the catalog would erase a tab's place. Instead `isShown(module)` is
+`isAvailable` and the module's feature is on, and `shownLeftTabs`, `shownRightTabs`, and `shownTabs` are the stored lists filtered by it
+(Home alone when nothing is left, so the strip is never empty). The island, the arrow keys, the trailing strip, the Tabs pane's rows and
+tray, the menu bar (`showsInMenuBar`), the guide, and `macisland://open` read those. The stored `leftTabs` and `rightTabs` never change
+because of a switch, so a module that is switched back on returns to its place. Capacity still counts the stored list: a side with a
+module that is off keeps its room until the module is back. A selected tab whose feature is turned off goes to Home
+(`IslandViewModel.leaveModuleThatIsOff`, called from `onFeatureChange`).
+
+**The archive** writes every feature (`features`) and `restore` applies the names it knows and skips the rest.
+
+---
+
 ## Floating surfaces
 
 `FloatingGlassPanel` is an `NSPanel` for a module torn off the island: resizable, moved by its background, no chrome, closed by its own button.
@@ -423,6 +456,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Home's layout | UserDefaults | `home.layout` (JSON `HomeLayout`, version 2, under 5 KB; a version 1 blob is read and migrated, and written as version 2 on the next edit; a layout that won't decode shows the default and keeps its bytes until the next edit) |
 | Saved Home layouts | UserDefaults | `home.savedPresets` (JSON `[SavedHomePreset]`: a name and a `HomeLayout` of the widgets, sizes, and options; local only, not in the settings file; cleared by Reset All) |
 | Left and right tabs | UserDefaults | `tabsLeft`, `tabsRight` (legacy `tabs` is read once) |
+| Features switched on or off | UserDefaults | `features.available` (a dictionary of raw value to `Bool`, the choices made; Calendar and Volume HUD are not in it: they are `showsCalendar` and `replacesVolumeHUD`). A stored `clipboardLimit` of 0 is read as the Clipboard feature off |
 | Menu-bar modules | UserDefaults | `menuBarModules` |
 | Synced lyrics on/off | UserDefaults | `showsLyrics` |
 | Full-charge level | UserDefaults | `fullChargeLevel` |
@@ -619,7 +653,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **724 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **769 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (724 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (769 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -74,6 +74,7 @@ Where the app ended up differently from what was first planned, and why. The des
 | The guide does not teach the palette | It was removed on 2026-09-30 |
 | Launch-time monitors with a permission start only once it is allowed or asked (`startPermittedMonitors`), on every install | Every rebuild resets permissions, so the prompts used to appear at launch on an existing install too. `OnboardingState.holdsLaunchPrompts` is no longer used by the launch and can be deleted |
 | AirDrop blue (`Tint.airDrop`) is an exception to "one meaning per color" | It marks the AirDrop target, beside `AirDropGlyph`, so it reads as AirDrop and not as storage |
+| **A Features catalog** (`Feature`): each part of MacIsland has a switch above its own settings, three presets, and an off feature neither shows nor runs but keeps its settings. Calendar and Volume HUD keep their old settings as their switches, and the Clipboard switch replaces a limit of 0 | The island felt cluttered while people wanted more from it: a feature that is off costs nothing, and the new ones can start off |
 
 ---
 
@@ -516,6 +517,12 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 **Reach**
 - [ ] A menu-bar module: add from Settings and from a tab's menu; drag its header away; Keep on Desktop; close
+
+**Features catalog (F1)** *(written, not run)*
+- [ ] `defaults write com.ethantiller.MacIsland features.available -dict music -bool false` and a relaunch: the Media tab and its menu-bar icon (if it had one) are gone; deleting the key (`defaults delete com.ethantiller.MacIsland features.available`) and relaunching brings both back in the same place
+- [ ] With Music off and Media selected in the island, nothing is left on screen that names Media; turn it back on and the tab returns where it was
+- [ ] Settings → Shelf → Clipboard History → Off still stops the clipboard history (the same switch as the Clipboard feature), and an install that had it Off before this build still has it off
+- [ ] `open "macisland://open?module=media"` with Music off does nothing; with it on, opens Media
 
 ---
 
