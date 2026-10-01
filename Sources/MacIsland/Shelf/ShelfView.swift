@@ -91,10 +91,12 @@ struct ShelfView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            SegmentedChoice(options: ShelfMode.allCases, selection: viewModel.shelfMode, title: \.rawValue) {
-                viewModel.setShelfMode($0)
+            if viewModel.settings.isOn(.clipboard) {
+                SegmentedChoice(options: ShelfMode.allCases, selection: viewModel.shelfMode, title: \.rawValue) {
+                    viewModel.setShelfMode($0)
+                }
+                .frame(width: Theme.Metrics.shelfChoiceWidth)
             }
-            .frame(width: Theme.Metrics.shelfChoiceWidth)
             Spacer()
             switch viewModel.shelfMode {
             case .files where !shelf.items.isEmpty:

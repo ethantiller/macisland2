@@ -68,6 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var viewModel = IslandViewModel(features: features)
     lazy var panels = FloatingPanels(viewModel: viewModel)
     lazy var urlCommands = URLCommandRunner(viewModel: viewModel)
+    lazy var featureRunner = FeatureRunner(
+        features: features, viewModel: viewModel,
+        music: { [weak self] on in on ? self?.features.nowPlaying.start() : self?.features.nowPlaying.stop() },
+        screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() })
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
@@ -216,13 +220,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What a switch in the Features catalog does beyond what each feature's own setting already does.
     private func connectFeatures() {
-        let viewModel = viewModel
-        let features = features
-        features.settings.onFeatureChange = { [weak viewModel] feature in
-            // Off, the clipboard holds nothing and watches nothing; on, it starts again with its size.
-            if feature == .clipboard { features.clipboard.setCapacity(features.settings.effectiveClipboardLimit) }
-            viewModel?.leaveModuleThatIsOff()
-        }
+        let runner = featureRunner
+        features.settings.onFeatureChange = { runner.apply($0) }
+        // After everything else is connected: starts what is on (the music adapter), and nothing that would ask.
+        runner.startAtLaunch()
     }
 
     /// The Shelf's own settings: what is swept, whether screenshots arrive, and whether the clipboard is watched.
@@ -238,7 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyClipboard()
 
         let applyScreenshots = { [screenshotWatcher] in
-            if features.settings.addsScreenshots {
+            if FeatureRunner.wantsScreenshots(features.settings) {
                 screenshotWatcher.start()
             } else {
                 screenshotWatcher.stop()
@@ -318,7 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The weather follows the city in Settings, and stops when it is emptied.
     private func connectWeather() {
         let features = features
-        let apply = { features.weather.configure(city: features.settings.weatherCity) }
+        let apply = { features.weather.configure(city: FeatureRunner.weatherCity(features.settings)) }
         features.weather.onRainSoon = { [viewModel] start in
             viewModel.showBanner(Announcements.rainSoon(start: start), for: .seconds(6), event: .rainSoon)
         }
@@ -330,7 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectLyrics() {
         let features = features
         let apply = {
-            features.nowPlaying.lyrics.setEnabled(features.settings.showsLyrics, for: features.nowPlaying.state)
+            features.nowPlaying.lyrics.setEnabled(FeatureRunner.wantsLyrics(features.settings), for: features.nowPlaying.state)
         }
         features.settings.onLyricsChange = apply
         apply()
@@ -482,12 +483,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Turning a setting on is the choice to be asked, so its prompt may show. The launch only reads what macOS has decided.
         let applyAgenda = { (mayAsk: Bool) in
-            features.agenda.configure(
-                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders, mayAsk: mayAsk)
+            FeatureRunner.configureAgenda(features, mayAsk: mayAsk)
         }
         features.settings.onAgendaChange = { applyAgenda(true) }
         applyAgenda(false)
-        features.agenda.start()
 
         // Focus is only read once something needs it, so macOS asks at a moment that makes sense: when Quiet in Focus is turned on.
         // At launch it starts only if it was already allowed.

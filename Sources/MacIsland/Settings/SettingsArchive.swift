@@ -192,6 +192,8 @@ extension AppSettings {
             replaceCustomWidgets(customWidgets.filter(\.isCommand) + plan.widgets)
             setHomeLayout(plan.layout)
         }
+        // Features this file turned off take their widgets off Home.
+        syncHomeWidgets()
     }
 
     /// Every choice back to what a fresh install has, including Home and every widget you made.
@@ -206,6 +208,7 @@ extension AppSettings {
         replaceCustomWidgets([])
         setHomeLayout(.default)
         for preset in savedHomePresets { deleteHomePreset(preset.id) }
+        clearHomeHiddenByFeature()
     }
 }
 

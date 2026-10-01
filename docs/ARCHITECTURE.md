@@ -1,3 +1,4 @@
+| Home widgets that left because their feature is off | UserDefaults | `home.hiddenByFeature` (widget raw values, so they return when the feature does) |
 # Architecture
 
 How MacIsland works. Back to the [README](../README.md). What it does: [FEATURES.md](FEATURES.md). Every file:
@@ -75,7 +76,9 @@ in the launch can write a setting (see [First run](#first-run)). It builds every
 1. Sets the activation policy to `.accessory` (no Dock icon). Installs a SIGTERM handler so `pkill` quits cleanly and stops
    the adapter subprocess.
 2. `connectEvents()` wires the monitors to the view model: timer and Pomodoro finish, battery, headphones, hotspot,
-   downloads, unlock, agenda, drives and screenshots, file tools, lyrics, weather. Then starts the monitors.
+   downloads, unlock, agenda, drives and screenshots, file tools, lyrics, weather. Then starts the monitors, and last `connectFeatures()`:
+   `FeatureRunner.startAtLaunch()` starts what is on (the Now Playing adapter is no longer started by its model's `init`) and each switch
+   in the Features catalog goes through `FeatureRunner.apply(_:)` from then on.
 3. Creates the `IslandPanel` hosting `IslandView`, sizes it for the screen, and shows it.
 4. Creates the `MouseTracker`, and wires keyboard handling (Esc and arrows in the panel; the global hotkeys).
 5. `connectReach()` wires torn-off windows (`onOpenWindow`) and opening Settings.
@@ -397,6 +400,29 @@ because of a switch, so a module that is switched back on returns to its place. 
 module that is off keeps its room until the module is back. A selected tab whose feature is turned off goes to Home
 (`IslandViewModel.leaveModuleThatIsOff`, called from `onFeatureChange`).
 
+**What a switch turns off.** `FeatureRunner` (`App/FeatureRunner.swift`) is where an off feature stops what it runs: `AppSettings.onFeatureChange`
+calls its `apply(_:)`, and the launch calls `startAtLaunch()`, which starts only what is on and asks for nothing. The two things the
+app delegate owns (the Now Playing adapter, the screenshot search) are closures, so it is tested with counters.
+
+| Feature | Off means | Background work stopped |
+| --- | --- | --- |
+| music | no Media tab, Music widget, or `.media` activity; the peek never shows the player | `NowPlayingModel.start()` is never called (init no longer starts the adapter); lyrics off |
+| clock | no Clock tab, timer chips in the idle peek, or Timers & Shelf widget; `macisland://timer`, `stopwatch`, `pomodoro` ignored | a running timer, stopwatch, or Pomodoro is reset |
+| reminders | no Reminders tab or widget; due reminders not loaded | `FeatureRunner.configureAgenda` passes `reminders: false` |
+| tools | no Tools tab, Quick Tools widget, or idle-peek tools row | Keep Awake, Ring Light, Mirror, and Clean Keys are stopped |
+| shelf | no Shelf; a dragged file does nothing (`effectiveDragTarget == .nothing`); the shortcut, `shelf/add`, and the Shelf segment are gone | `ScreenshotWatcher.stop()` |
+| clipboard | no Clipboard segment in the Shelf | `setCapacity(0)`: the history is memory-only, so it empties |
+| notes | no Notes tab, New Note pencil, or Note widget | a voice note being recorded is stopped and saved |
+| calendar | no meetings in Up Next or Today, no meeting banners | `configureAgenda` passes `calendar: false`; with reminders also off `AgendaMonitor.stop()` ends its 30 s timer and its store listener |
+| weather | no weather in the strip, the idle peek, or the Weather widget | `weather.configure(city: "")`; the city is kept |
+
+**Widgets follow their feature.** `WidgetCatalog.feature(of:)` maps a widget to its feature (Today, Battery, and custom widgets have none). When a
+feature turns off, `AppSettings.syncHomeWidgets()` moves its widgets from Home to Add Widgets (keeping size and options) with
+`HomeLayout.removingWidgets`, and remembers them in `home.hiddenByFeature`; when it turns on, `HomeLayout.restoring` puts each back in the first spot it
+fits, or leaves it in Add Widgets if Home is full. A widget the person took off themselves is never in that list, so it stays off. Home is never empty:
+if everything on it would leave, Today comes first. The gallery doesn't offer a widget whose feature is off.
+
+
 **The archive** writes every feature (`features`) and `restore` applies the names it knows and skips the rest.
 
 ---
@@ -653,7 +679,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **769 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **782 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

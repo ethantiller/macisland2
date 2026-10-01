@@ -16,7 +16,7 @@ struct WidgetGallery: View {
     private var catalog: HomeLayout.Catalog { settings.widgetDescriptor(for:) }
 
     private var addable: [WidgetID] {
-        editor.layout.addable(customs: settings.customWidgets).filter { catalog($0) != nil }
+        editor.layout.addable(customs: settings.customWidgets).filter { catalog($0) != nil && settings.isWidgetAllowed($0) }
     }
 
     /// The chip whose sizes are showing: the one clicked, or else the first.

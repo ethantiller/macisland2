@@ -104,15 +104,16 @@ final class URLCommandRunner {
     func run(_ command: URLCommand) {
         switch command {
         case .timer(let minutes):
-            viewModel.timer.start(minutes: minutes)
+            if viewModel.settings.isOn(.clock) { viewModel.timer.start(minutes: minutes) }
         case .stopwatch:
-            if !viewModel.stopwatch.isRunning { viewModel.stopwatch.toggle() }
+            if viewModel.settings.isOn(.clock), !viewModel.stopwatch.isRunning { viewModel.stopwatch.toggle() }
         case .pomodoro:
-            if !viewModel.pomodoro.isActive { viewModel.pomodoro.toggle() }
+            if viewModel.settings.isOn(.clock), !viewModel.pomodoro.isActive { viewModel.pomodoro.toggle() }
         case .open(let module):
             // A module whose feature is off has no page to open.
             if viewModel.settings.isShown(module) { viewModel.show(module) }
         case .addToShelf(let url):
+            guard viewModel.settings.isOn(.shelf) else { return }
             viewModel.shelf.add([url])
             viewModel.flash(
                 IslandAlert(systemImage: "tray.and.arrow.down.fill", tint: Theme.Tint.neutral, text: "Shelf"),

@@ -325,4 +325,255 @@ struct FeatureCatalogTests {
         }
         #expect(settings.isOn(.tools) && settings.isOn(.notes) && !settings.isOn(.mixer))
     }
+
+    // MARK: What a switch turns off (F2)
+
+    /// Counts what the runner asked the app to start and stop.
+    private final class Calls {
+        var music: [Bool] = []
+        var screenshots: [Bool] = []
+    }
+
+    private func makeRunner(_ viewModel: IslandViewModel, calls: Calls = Calls()) -> FeatureRunner {
+        let runner = FeatureRunner(
+            features: viewModel.features, viewModel: viewModel,
+            music: { calls.music.append($0) }, screenshots: { calls.screenshots.append($0) })
+        viewModel.settings.onFeatureChange = { runner.apply($0) }
+        return runner
+    }
+
+    private func playing() -> NowPlayingState {
+        var state = NowPlayingState()
+        state.title = "Song"
+        state.artist = "Artist"
+        state.isPlaying = true
+        state.playbackRate = 1
+        state.duration = 200
+        state.timestamp = Date()
+        return state
+    }
+
+    @Test func musicOffLeavesTheClosedIslandAndThePeek() {
+        let viewModel = TestSupport.makeViewModel()
+        _ = makeRunner(viewModel)
+        viewModel.nowPlaying.apply(playing())
+        #expect(viewModel.compactActivities == [.media])
+        #expect(viewModel.peekContentHeight == viewModel.mediaContentHeight(peek: true))
+
+        viewModel.settings.setOn(.music, false)
+        #expect(viewModel.compactActivities.isEmpty && viewModel.compactActivity == .none)
+        #expect(viewModel.peekContentHeight == Theme.Metrics.idlePeekHeight)
+
+        viewModel.settings.setOn(.music, true)
+        #expect(viewModel.compactActivities == [.media])
+    }
+
+    @Test func clockOffStopsARunningTimer() {
+        let viewModel = TestSupport.makeViewModel()
+        _ = makeRunner(viewModel)
+        viewModel.timer.start(minutes: 5)
+        viewModel.stopwatch.toggle()
+        #expect(viewModel.compactActivities.contains(.timer))
+
+        viewModel.settings.setOn(.clock, false)
+        #expect(!viewModel.timer.isActive && !viewModel.stopwatch.isActive && !viewModel.pomodoro.isActive)
+        #expect(viewModel.compactActivities.isEmpty)
+
+        let runner = URLCommandRunner(viewModel: viewModel)
+        runner.run(.timer(minutes: 5))
+        runner.run(.stopwatch)
+        runner.run(.pomodoro)
+        #expect(!viewModel.timer.isActive && !viewModel.stopwatch.isActive && !viewModel.pomodoro.isActive)
+    }
+
+    @Test func shelfOffIgnoresADraggedFileAndTheShortcut() throws {
+        let viewModel = TestSupport.makeViewModel()
+        let calls = Calls()
+        _ = makeRunner(viewModel, calls: calls)
+        viewModel.settings.setOn(.shelf, false)
+        #expect(viewModel.settings.effectiveDragTarget == .nothing)
+        #expect(calls.screenshots == [false], "the screenshot search stops")
+
+        viewModel.setFileDragActive(true)
+        #expect(!viewModel.isFileDragActive)
+        viewModel.setDropTargeted(true)
+        #expect(viewModel.selectedTab != .shelf)
+        viewModel.toggleShelfFromKeyboard()
+        #expect(viewModel.state == .compact && viewModel.selectedTab != .shelf && !viewModel.isPinnedOpen)
+
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).txt")
+        try "x".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+        URLCommandRunner(viewModel: viewModel).run(.addToShelf(file))
+        #expect(viewModel.shelf.items.isEmpty)
+
+        viewModel.settings.setOn(.shelf, true)
+        #expect(viewModel.settings.effectiveDragTarget == .shelfAndAirDrop)
+        viewModel.toggleShelfFromKeyboard()
+        #expect(viewModel.selectedTab == .shelf)
+    }
+
+    @Test func aWidgetWhoseFeatureIsOffGoesToAddWidgetsAndComesBack() {
+        let settings = makeSettings()
+        let music = WidgetID.builtIn(.music)
+        let size = settings.homeLayout.widgets.first { $0.widget == music }?.size
+        #expect(size != nil)
+
+        settings.setOn(.music, false)
+        #expect(!settings.homeLayout.isPlaced(music))
+        #expect(settings.homeLayout.hidden.contains { $0.widget == music }, "kept, with its size")
+        #expect(settings.homeHiddenByFeature == [music])
+        #expect(!settings.isWidgetAllowed(music))
+
+        settings.setOn(.music, true)
+        #expect(settings.homeLayout.isPlaced(music))
+        #expect(settings.homeLayout.widgets.first { $0.widget == music }?.size == size)
+        #expect(settings.homeHiddenByFeature.isEmpty)
+
+        // Today and Battery belong to no feature.
+        #expect(WidgetCatalog.feature(of: .builtIn(.today)) == nil && WidgetCatalog.feature(of: .builtIn(.battery)) == nil)
+        #expect(WidgetCatalog.feature(of: .builtIn(.clockActions)) == .clock)
+    }
+
+    @Test func aWidgetTheOwnerTookOffStaysOffWhenItsFeatureReturns() {
+        let settings = makeSettings()
+        let tools = WidgetID.builtIn(.quickTools)
+        let id = settings.homeLayout.widgets.first { $0.widget == tools }!.id
+        settings.setHomeLayout(settings.homeLayout.removing(id))
+        settings.setOn(.tools, false)
+        #expect(settings.homeHiddenByFeature.isEmpty, "it wasn\u{2019}t on Home to leave")
+        settings.setOn(.tools, true)
+        #expect(!settings.homeLayout.isPlaced(tools))
+    }
+
+    @Test func aWidgetComingBackToAFullHomeWaitsInAddWidgets() {
+        let weather = WidgetID.builtIn(.weather)
+        var full = HomeLayout(widgets: [
+            WidgetPlacement(widget: .builtIn(.music), size: GridSize(6, 2)),
+            WidgetPlacement(widget: .builtIn(.quickTools), size: GridSize(6, 1)),
+        ])
+        full.hidden = [WidgetPlacement(widget: weather, size: GridSize(1, 1))]
+        #expect(full.capacityText() == "Home is full")
+        let back = full.restoring([weather])
+        #expect(back == full, "no room: it waits")
+        #expect(!back.isPlaced(weather))
+
+        // With room it returns at the size it had.
+        let roomy = HomeLayout(
+            widgets: [WidgetPlacement(widget: .builtIn(.today), size: GridSize(3, 1))],
+            hidden: [WidgetPlacement(widget: weather, size: GridSize(2, 1))])
+        let returned = roomy.restoring([weather])
+        #expect(returned.widgets.first { $0.widget == weather }?.size == GridSize(2, 1))
+    }
+
+    @Test func homeIsNeverEmpty() {
+        let settings = makeSettings()
+        settings.setHomeLayout(HomeLayout(widgets: [WidgetPlacement(widget: .builtIn(.music), size: GridSize(3, 1))]))
+        settings.setOn(.music, false)
+        #expect(!settings.homeLayout.widgets.isEmpty)
+        #expect(settings.homeLayout.isPlaced(.builtIn(.today)), "Today comes first")
+        #expect(settings.homeHiddenByFeature == [.builtIn(.music)])
+
+        // Everything that can leave, leaves.
+        settings.apply(.minimal)
+        settings.setOn(.music, false)
+        settings.setOn(.clock, false)
+        settings.setOn(.tools, false)
+        #expect(!settings.homeLayout.widgets.isEmpty)
+    }
+
+    @Test func weatherOffKeepsTheCity() {
+        let settings = makeSettings()
+        settings.weatherCity = "Paris"
+        #expect(FeatureRunner.weatherCity(settings) == "Paris")
+        settings.setOn(.weather, false)
+        #expect(FeatureRunner.weatherCity(settings) == "" && settings.weatherCity == "Paris")
+        settings.setOn(.weather, true)
+        #expect(FeatureRunner.weatherCity(settings) == "Paris")
+    }
+
+    @Test func clipboardOffStopsWatching() {
+        let viewModel = TestSupport.makeViewModel()
+        _ = makeRunner(viewModel)
+        let clipboard = viewModel.clipboard
+        defer { clipboard.stop() }
+        clipboard.setCapacity(viewModel.settings.effectiveClipboardLimit)
+        clipboard.record(.text("one"))
+        #expect(clipboard.isWatching && clipboard.entries.count == 1)
+
+        viewModel.settings.setOn(.clipboard, false)
+        #expect(!clipboard.isWatching && clipboard.entries.isEmpty, "memory only, so it is forgotten")
+
+        viewModel.settings.setOn(.clipboard, true)
+        #expect(clipboard.isWatching && clipboard.capacity == viewModel.settings.clipboardLimit)
+
+        // The Shelf has one mode without it.
+        viewModel.setShelfMode(.clipboard)
+        viewModel.settings.setOn(.clipboard, false)
+        #expect(viewModel.shelfMode == .files)
+        viewModel.setShelfMode(.clipboard)
+        #expect(viewModel.shelfMode == .files, "the mode can\u{2019}t be chosen")
+        viewModel.settings.setOn(.clipboard, true)
+    }
+
+    @Test func theAgendaStopsWhenBothSourcesAreOff() {
+        let agenda = AgendaMonitor()
+        defer { agenda.stop() }
+        agenda.configure(calendar: true, reminders: false, mayAsk: false)
+        #expect(agenda.isRefreshing)
+        agenda.configure(calendar: false, reminders: false, mayAsk: false)
+        #expect(!agenda.isRefreshing, "no 30 second timer with nothing to read")
+    }
+
+    @Test func theLaunchStartsOnlyWhatIsOn() {
+        let on = TestSupport.makeViewModel()
+        let onCalls = Calls()
+        makeRunner(on, calls: onCalls).startAtLaunch()
+        #expect(onCalls.music == [true] && onCalls.screenshots.isEmpty, "screenshots follow their own setting")
+
+        let off = TestSupport.makeViewModel()
+        off.settings.setOn(.music, false)
+        let offCalls = Calls()
+        makeRunner(off, calls: offCalls).startAtLaunch()
+        #expect(offCalls.music.isEmpty, "the adapter is never started")
+
+        // A change starts and stops it.
+        let changing = TestSupport.makeViewModel()
+        let calls = Calls()
+        _ = makeRunner(changing, calls: calls)
+        changing.settings.setOn(.music, false)
+        changing.settings.setOn(.music, true)
+        #expect(calls.music == [false, true])
+    }
+
+    @Test func notesOffLeavesNoPencilAndTheTabGoesHome() {
+        let viewModel = TestSupport.makeViewModel()
+        _ = makeRunner(viewModel)
+        viewModel.select(.notes)
+        viewModel.settings.setOn(.notes, false)
+        #expect(viewModel.selectedTab == .home && !viewModel.showsStripPencil)
+    }
+
+    @Test func anEventWhoseFeatureIsOffSaysWhy() {
+        let settings = makeSettings()
+        func why(_ event: AmbientEvent) -> String? { NotificationsPane.requirement(for: event, settings: settings) }
+        #expect(why(.meeting) == "Turn on Calendar in Features.")
+        settings.setOn(.calendar, true)
+        #expect(why(.meeting) == nil)
+
+        settings.setOn(.reminders, false)
+        #expect(why(.reminderDue) == "Turn on Reminders in Features.")
+        settings.setOn(.reminders, true)
+        #expect(why(.reminderDue) == "Turn on Due Reminders in Home.", "then the old note")
+        settings.showsReminders = true
+        #expect(why(.reminderDue) == nil)
+
+        settings.setOn(.weather, false)
+        #expect(why(.rainSoon) == "Turn on Weather in Features.")
+        settings.setOn(.weather, true)
+        #expect(why(.rainSoon) == "Set a city in Home.")
+        settings.weatherCity = "Paris"
+        #expect(why(.rainSoon) == nil)
+        #expect(why(.charging) == nil)
+    }
 }

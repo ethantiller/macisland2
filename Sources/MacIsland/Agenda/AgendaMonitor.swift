@@ -199,6 +199,7 @@ final class AgendaMonitor {
     @ObservationIgnored private var listIsShown = false
     @ObservationIgnored private var announced: Set<String> = []
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var storeObserver: Any?
 
     /// Puts an item in Up Next without asking the calendar: for the Settings preview, which is sample data.
     func showSample(_ item: AgendaItem?, upcoming: [AgendaItem] = [], reminders: [ReminderRow] = []) {
@@ -216,11 +217,21 @@ final class AgendaMonitor {
         timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) {
+        storeObserver = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) {
             [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
     }
+
+    /// Stops the 30 second refresh and listening to the store. Nothing is read while no source is on.
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        if let storeObserver { NotificationCenter.default.removeObserver(storeObserver) }
+        storeObserver = nil
+    }
+
+    var isRefreshing: Bool { timer != nil }
 
     /// `mayAsk` is false for the launch, so a permission that was reset (every rebuild resets them) isn't asked for until the person
     /// chooses; true when a setting is changed, which is the choice.
@@ -228,6 +239,8 @@ final class AgendaMonitor {
         wantsCalendar = calendar
         wantsReminders = reminders
         self.mayAsk = mayAsk
+        // With both sources off there is nothing to look at: no timer, no listener.
+        if calendar || reminders { start() } else { stop() }
         refresh()
     }
 

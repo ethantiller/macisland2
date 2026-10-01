@@ -31,9 +31,14 @@ final class NowPlayingModel {
         self.adapter = adapter
         self.lyrics = lyrics ?? LyricsModel()
         adapter?.onState = { [weak self] in self?.apply($0) }
+    }
+
+    /// Starts reading what is playing. Nothing runs until this: with Music off, the adapter is never started.
+    func start() {
         adapter?.start()
     }
 
+    /// Stops the adapter, and forgets what was playing.
     func stop() {
         adapter?.stop()
     }

@@ -34,7 +34,7 @@ struct IdlePeekView: View {
         VStack(spacing: 10) {
             HStack(spacing: 14) {
                 DateInline()
-                if let conditions = viewModel.weather.conditions {
+                if viewModel.settings.isOn(.weather), let conditions = viewModel.weather.conditions {
                     WeatherGlance(conditions: conditions)
                 }
                 Spacer(minLength: 0)
@@ -47,9 +47,9 @@ struct IdlePeekView: View {
             .frame(height: 44)
 
             HStack(spacing: 12) {
-                QuickToolsRow(viewModel: viewModel)
+                if viewModel.settings.isOn(.tools) { QuickToolsRow(viewModel: viewModel) }
                 Spacer(minLength: 0)
-                QuickTimerChips(viewModel: viewModel, showsPomodoro: false)
+                if viewModel.settings.isOn(.clock) { QuickTimerChips(viewModel: viewModel, showsPomodoro: false) }
             }
             .frame(height: Theme.Metrics.homeQuickHeight)
         }

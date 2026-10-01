@@ -259,6 +259,12 @@ final class AppSettings {
         didSet { defaults.set(featureChoices, forKey: Key.features) }
     }
 
+    /// Home widgets that left because their feature went off, so they return when it comes back. A widget the person took off
+    /// themselves isn't here: it stays off.
+    private(set) var homeHiddenByFeature: [WidgetID] {
+        didSet { defaults.set(homeHiddenByFeature.map(\.rawValue), forKey: Key.hiddenByFeature) }
+    }
+
     var pinLimit: PinLimit {
         didSet { defaults.set(pinLimit.rawValue, forKey: Key.pinLimit) }
     }
@@ -351,6 +357,7 @@ final class AppSettings {
         static let savedHomePresets = "home.savedPresets"
         static let customWidgets = "widgets.custom"
         static let features = "features.available"
+        static let hiddenByFeature = "home.hiddenByFeature"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -418,6 +425,7 @@ final class AppSettings {
             defaults.data(forKey: Key.homeLayout).flatMap { try? JSONDecoder().decode(HomeLayout.self, from: $0) }
             .map { HomeLayout.normalized($0, catalog: { WidgetCatalog.descriptor(for: $0, customs: customs) }) }
             ?? .default
+        homeHiddenByFeature = (defaults.stringArray(forKey: Key.hiddenByFeature) ?? []).compactMap(WidgetID.init)
         savedHomePresets =
             defaults.data(forKey: Key.savedHomePresets).flatMap {
                 try? JSONDecoder().decode([SavedHomePreset].self, from: $0)
@@ -511,6 +519,10 @@ final class AppSettings {
     }
 
     func replacePinned(_ tools: [ToolID]) { pinnedTools = tools }
+
+    func clearHomeHiddenByFeature() {
+        if !homeHiddenByFeature.isEmpty { homeHiddenByFeature = [] }
+    }
 
     func replaceCustomWidgets(_ widgets: [CustomWidget]) { customWidgets = widgets }
 
@@ -610,8 +622,26 @@ final class AppSettings {
         case .volumeHUD: replacesVolumeHUD = on
         default:
             featureChoices[feature.rawValue] = on
+            syncHomeWidgets()
             onFeatureChange?(feature)
         }
+    }
+
+    /// Whether a widget may be on Home: its feature, if it has one, is on.
+    func isWidgetAllowed(_ widget: WidgetID) -> Bool {
+        WidgetCatalog.feature(of: widget).map(isOn) ?? true
+    }
+
+    /// Moves widgets between Home and Add Widgets to match the features: those whose feature is off leave (and are remembered), and
+    /// those remembered return when their feature is on, if they fit. Does nothing unless something moves.
+    func syncHomeWidgets() {
+        var layout = homeLayout.restoring(homeHiddenByFeature.filter(isWidgetAllowed))
+        var waiting = homeHiddenByFeature.filter { !isWidgetAllowed($0) }
+        let (trimmed, taken) = layout.removingWidgets(where: { !isWidgetAllowed($0) })
+        layout = trimmed
+        for widget in taken where !waiting.contains(widget) { waiting.append(widget) }
+        setHomeLayout(layout)
+        if waiting != homeHiddenByFeature { homeHiddenByFeature = waiting }
     }
 
     /// Sets every feature to the preset's: one change for each that flips.
@@ -630,6 +660,9 @@ final class AppSettings {
     func isShown(_ module: IslandModule) -> Bool {
         module.isAvailable && (Feature.module(for: module).map(isOn) ?? true)
     }
+
+    /// What a dragged file does: nothing while the Shelf is off.
+    var effectiveDragTarget: DragTarget { isOn(.shelf) ? dragTarget : .nothing }
 
     /// The clipboard history's size as the model reads it: 0 while the Clipboard feature is off.
     var effectiveClipboardLimit: Int { isOn(.clipboard) ? clipboardLimit : 0 }

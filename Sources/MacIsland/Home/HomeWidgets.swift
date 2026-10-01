@@ -319,7 +319,7 @@ struct HomeActionPill: View {
             shelfCount: viewModel.shelf.items.count,
             timerMinutes: options.timerMinutes ?? [5, 25],
             showsPomodoro: options.showsPomodoro ?? true,
-            showsShelf: options.showsShelf ?? true,
+            showsShelf: (options.showsShelf ?? true) && viewModel.settings.isOn(.shelf),
             segments: HomeAction.segments(forColumns: size.columns)
         )
         HStack(spacing: 0) {

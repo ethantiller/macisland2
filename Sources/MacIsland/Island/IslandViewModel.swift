@@ -283,12 +283,15 @@ final class IslandViewModel {
         // MacIsland's own voice note is already shown as a recording, not as another app on the microphone.
         let recordingItself = features.voice.isRecording && features.privacy.microphoneAppBundleID == nil
         if features.privacy.isMicrophoneInUse, !recordingItself { list.append(.microphone) }
-        if features.timer.isActive { list.append(.timer) }
-        if features.pomodoro.isActive { list.append(.pomodoro) }
-        if features.stopwatch.isActive { list.append(.stopwatch) }
+        let clockIsOn = features.settings.isOn(.clock)
+        if clockIsOn, features.timer.isActive { list.append(.timer) }
+        if clockIsOn, features.pomodoro.isActive { list.append(.pomodoro) }
+        if clockIsOn, features.stopwatch.isActive { list.append(.stopwatch) }
         if let job = features.work.current { list.append(.working(job.title)) }
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
-        if features.settings.showsMusicCompact, features.nowPlaying.state.hasMedia { list.append(.media) }
+        if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
+            list.append(.media)
+        }
         return list
     }
 
@@ -314,7 +317,7 @@ final class IslandViewModel {
             available: trailingStripWidth,
             rightTabs: features.settings.shownRightTabs.count,
             hasStatus: hasStatusIndicators,
-            hasWeather: features.weather.conditions != nil,
+            hasWeather: features.weather.conditions != nil && features.settings.isOn(.weather),
             hasNotesTab: features.settings.shownTabs.contains(.notes)
         )
     }
@@ -400,7 +403,7 @@ final class IslandViewModel {
 
     func setFileDragActive(_ active: Bool) {
         // With "Do Nothing", the island stays as it is while a file is dragged.
-        let active = active && features.settings.dragTarget != .nothing
+        let active = active && features.settings.effectiveDragTarget != .nothing
         guard active != isFileDragActive else { return }
         withAnimation(Theme.Motion.track) { isFileDragActive = active }
     }
@@ -577,8 +580,9 @@ final class IslandViewModel {
 
     /// A feature was switched off: if the page on screen is its module, the island goes to Home.
     func leaveModuleThatIsOff() {
-        guard selectedTab != .home, !features.settings.isShown(selectedTab) else { return }
-        select(.home)
+        // Without the Clipboard feature the Shelf has one mode.
+        if shelfMode == .clipboard, !features.settings.isOn(.clipboard) { shelfMode = .files }
+        if selectedTab != .home, !features.settings.isShown(selectedTab) { select(.home) }
     }
 
     /// Typing needs the island to stay put: it stays open until Esc, the shortcut, or a click outside.
@@ -880,6 +884,7 @@ final class IslandViewModel {
     }
 
     func setShelfMode(_ mode: ShelfMode) {
+        guard mode != .clipboard || features.settings.isOn(.clipboard) else { return }
         withAnimation(Theme.Motion.resize) { shelfMode = mode }
         features.settings.shelfMode = mode
     }
@@ -1049,6 +1054,7 @@ final class IslandViewModel {
     /// The Shelf's shortcut: open and pin the island on the Shelf, even when the Shelf isn't in the tab strip. Open on another tab, it
     /// moves to the Shelf; already on the Shelf, it closes.
     func toggleShelfFromKeyboard() {
+        guard features.settings.isOn(.shelf) else { return }
         if state == .expanded {
             if selectedTab == .shelf {
                 closePinned()
@@ -1124,7 +1130,7 @@ final class IslandViewModel {
     }
 
     func setDropTargeted(_ targeted: Bool) {
-        guard targeted else { return }
+        guard targeted, features.settings.isOn(.shelf) else { return }
         hoverTask?.cancel()
         isHovering = true
         withAnimation(Theme.Motion.open) {

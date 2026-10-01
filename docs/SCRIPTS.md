@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 769 tests, about a second.
+lines; 782 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -178,6 +178,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | File | Contains |
 | --- | --- |
 | `MacIslandApp.swift` | The `@main` `App` (menu-bar capsule, Settings, module menu bars), `AppDelegate` (builds `IslandFeatures`, wires every monitor to the view model, the hotkeys, the panel), `ModuleMenuBars`, `MenuBarModuleView` |
+| `FeatureRunner.swift` | What a Features switch starts and stops (`apply`, `startAtLaunch`), and how settings read once features are taken into account |
 | `URLCommand.swift` | `URLCommand` (the `macisland://` parser and its limits) and `URLCommandRunner` (runs them, rate-limits banners) |
 | `FloatingPanels.swift` | `FloatingPanels` (torn-off windows, one per module, Keep on Desktop), `DetachedPanelState`, `DetachedModuleView` (the glass window's chrome) |
 | `OnboardingWindowController.swift` | `OnboardingPanel` (the guide's window), `OnboardingContext` (what the guide needs from the app), `OnboardingWindowController` (shows, positions, and closes it) |
@@ -222,6 +223,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | File | Contains |
 | --- | --- |
 | `WidgetCatalog.swift` | `BuiltInWidget`, `WidgetID`, `WidgetDescriptor` (width, kind, height, source, refresh, tint, tap) |
+| `HomeLayoutFeatures.swift` | `WidgetCatalog.feature(of:)`, and `removingWidgets` / `restoring`: widgets leave Home and return with their feature |
 | `HomeLayout.swift` | `HomeLayout` (v2: an ordered list of sized `WidgetPlacement`), `WidgetOptions`, the presets, `frames`/`contentHeight`/`capacityText`, `normalized`, and the key-based decoder |
 | `HomeGridSpec.swift` | `GridSize`, `GridCell`, `GridRect`, and `HomeGridSpec`: packing, geometry, and the drag-target maths (pure) |
 | `SavedHomePreset.swift` | A layout saved under a name, and the rules for its name |
@@ -361,7 +363,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 48 files, about 10,700 lines, **769 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 48 files, about 10,700 lines, **782 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |

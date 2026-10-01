@@ -58,12 +58,21 @@ struct NotificationsPane: View {
         }
     }
 
-    private func requirement(_ event: AmbientEvent) -> String? {
+    private func requirement(_ event: AmbientEvent) -> String? { Self.requirement(for: event, settings: settings) }
+
+    /// Why an event can't happen right now, or nil. A feature that is off comes first.
+    static func requirement(for event: AmbientEvent, settings: AppSettings) -> String? {
         switch event {
-        case .meeting: settings.showsCalendar ? nil : "Turn on Calendar Events in Home."
-        case .reminderDue: settings.showsReminders ? nil : "Turn on Due Reminders in Home."
-        case .rainSoon: settings.weatherCity.isEmpty ? "Set a city in Home." : nil
-        default: nil
+        case .meeting:
+            return settings.isOn(.calendar) ? nil : "Turn on Calendar in Features."
+        case .reminderDue:
+            if !settings.isOn(.reminders) { return "Turn on Reminders in Features." }
+            return settings.showsReminders ? nil : "Turn on Due Reminders in Home."
+        case .rainSoon:
+            if !settings.isOn(.weather) { return "Turn on Weather in Features." }
+            return settings.weatherCity.isEmpty ? "Set a city in Home." : nil
+        default:
+            return nil
         }
     }
 

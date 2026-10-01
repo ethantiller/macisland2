@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (769 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (782 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -523,6 +523,9 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Music off and Media selected in the island, nothing is left on screen that names Media; turn it back on and the tab returns where it was
 - [ ] Settings → Shelf → Clipboard History → Off still stops the clipboard history (the same switch as the Clipboard feature), and an install that had it Off before this build still has it off
 - [ ] `open "macisland://open?module=media"` with Music off does nothing; with it on, opens Media
+- [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
+- [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
+- [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
 
 ---
 

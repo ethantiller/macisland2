@@ -50,7 +50,7 @@ struct IslandView: View {
         .environment(\.mediaNamespace, mediaNamespace)
         .modifier(
             DropTarget(
-                enabled: acceptsDrops && viewModel.settings.dragTarget != .nothing,
+                enabled: acceptsDrops && viewModel.settings.effectiveDragTarget != .nothing,
                 delegate: IslandDropDelegate(viewModel: viewModel, zone: $dropZone))
         )
         // When the drag ends, however it ends, the drop target goes with it.
@@ -66,7 +66,7 @@ struct IslandView: View {
             compactContent
             if viewModel.showsDragTarget {
                 HStack(spacing: 0) {
-                    switch viewModel.settings.dragTarget {
+                    switch viewModel.settings.effectiveDragTarget {
                     case .shelfAndAirDrop:
                         dragHint("Shelf", systemImage: "tray.and.arrow.down")
                         dragHint("AirDrop", systemImage: nil, tint: Theme.Tint.airDrop)
@@ -321,7 +321,7 @@ private struct IslandDropDelegate: DropDelegate {
 
     private func zone(for info: DropInfo) -> DropZone {
         DropZone.destination(
-            for: viewModel.settings.dragTarget,
+            for: viewModel.settings.effectiveDragTarget,
             locationX: info.location.x,
             width: viewModel.size.width
         )
