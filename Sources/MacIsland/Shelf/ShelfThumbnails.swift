@@ -30,7 +30,8 @@ final class ShelfThumbnails {
 
     /// The path, the modification date, and the size.
     static func key(for url: URL, size: CGFloat) -> NSString {
-        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        // Read fresh: a `URL` caches its resource values, so an edited file would keep its old key and its old preview.
+        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         let stamp = modified.map { String($0.timeIntervalSinceReferenceDate) } ?? "-"
         return "\(url.path)|\(stamp)|\(Int(size))" as NSString
     }

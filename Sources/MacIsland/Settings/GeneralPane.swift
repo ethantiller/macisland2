@@ -19,8 +19,10 @@ struct GeneralPane: View {
             Section {
                 ShortcutRecorder(settings: settings, slot: .open)
                     .tourAnchor(.shortcut)
+                ShortcutRecorder(settings: settings, slot: .shelf)
+                    .tourAnchor(.shelfShortcut)
             } header: {
-                Text("Shortcut").id(SettingsAnchor.shortcut)
+                Text("Shortcuts").id(SettingsAnchor.shortcut)
             } footer: {
                 Text(
                     "Click it, then press the keys, with \u{2303}, \u{2325}, or \u{2318}. Delete turns it off. If another app already uses the keys, MacIsland says so and keeps the old ones."

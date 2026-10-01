@@ -60,7 +60,7 @@ final class OnboardingModel {
     /// The person's own setup, which the copy follows.
     var setup: GuideSetup {
         GuideSetup(
-            openShortcut: settings.shortcut(.open), hasNotch: geometry().hasNotch, tabs: settings.tabs,
+            openShortcut: settings.shortcut(.open), shelfShortcut: settings.shortcut(.shelf), hasNotch: geometry().hasNotch, tabs: settings.tabs,
             hiddenModules: settings.hiddenModules, dragTarget: settings.dragTarget,
             addsScreenshots: settings.addsScreenshots)
     }

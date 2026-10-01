@@ -44,6 +44,7 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | Something is live | The **compact** island: one activity split around the notch, or two as a pair |
 | Rest the pointer on it | A brief swell, then the **peek** (after 120 ms): the top activity at full size |
 | Click, swipe two fingers down, or press **⌃⌥Space** | The **expanded** island: a tab strip and the selected module |
+| Press **⌃⌥S** | The expanded island on the **Shelf** |
 | ← / → , or a two-finger horizontal swipe | Previous or next tab |
 | Esc, or move the pointer away for 300 ms | Fold back in |
 | Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |

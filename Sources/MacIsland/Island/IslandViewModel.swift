@@ -1040,6 +1040,23 @@ final class IslandViewModel {
         open()
     }
 
+    /// The Shelf's shortcut: open and pin the island on the Shelf, even when the Shelf isn't in the tab strip. Open on another tab, it
+    /// moves to the Shelf; already on the Shelf, it closes.
+    func toggleShelfFromKeyboard() {
+        if state == .expanded {
+            if selectedTab == .shelf {
+                closePinned()
+            } else {
+                isPinnedOpen = true
+                select(.shelf)
+            }
+            return
+        }
+        selectedTab = .shelf
+        isPinnedOpen = true
+        open()
+    }
+
     /// Esc, the shortcut, a swipe up, or a click outside a pinned island. Mirror is the one thing that refuses: it stays until
     /// Done. A menu or panel does not refuse Esc or the shortcut (a stuck hold must never trap the island open); a click outside
     /// is held off by them in `closesOnClickOutside`.

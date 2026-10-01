@@ -17,6 +17,24 @@ struct KeyboardTests {
         #expect(viewModel.state == .compact && !viewModel.isPinnedOpen)
     }
 
+    @Test func theShelfShortcutOpensOnTheShelfThenCloses() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.selectedTab = .home
+        viewModel.toggleShelfFromKeyboard()
+        #expect(viewModel.state == .expanded && viewModel.isPinnedOpen && viewModel.selectedTab == .shelf)
+
+        viewModel.toggleShelfFromKeyboard()
+        #expect(viewModel.state == .compact && !viewModel.isPinnedOpen)
+    }
+
+    @Test func theShelfShortcutMovesAnOpenIslandToTheShelf() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.selectedTab = .home
+        viewModel.toggleFromKeyboard()
+        viewModel.toggleShelfFromKeyboard()
+        #expect(viewModel.state == .expanded && viewModel.isPinnedOpen && viewModel.selectedTab == .shelf)
+    }
+
     @Test func hoveringTakesOverFromThePin() {
         let viewModel = TestSupport.makeViewModel()
         viewModel.toggleFromKeyboard()

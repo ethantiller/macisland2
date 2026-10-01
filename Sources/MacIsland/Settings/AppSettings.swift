@@ -72,6 +72,13 @@ final class AppSettings {
         }
     }
 
+    /// The keys that open the island on the Shelf from anywhere. Nil is off.
+    private(set) var shelfShortcut: KeyCombo? {
+        didSet {
+            defaults.set(try? JSONEncoder().encode(StoredShortcut(combo: shelfShortcut)), forKey: Key.shelfShortcut)
+        }
+    }
+
     /// Hovering the compact island opens the peek after a moment. Off: hovering only swells it, and a click or a
     /// swipe opens it. For accidental peeks while reaching for the menu bar, and for a tremor.
     var peeksOnHover: Bool {
@@ -303,6 +310,7 @@ final class AppSettings {
         static let rightTabs = "tabsRight"
         static let hotkey = "hotkey"
         static let openShortcut = "shortcut.open"
+        static let shelfShortcut = "shortcut.shelf"
         static let peeksOnHover = "peeksOnHover"
         static let swipesEnabled = "swipesEnabled"
         static let islandDisplay = "islandDisplay"
@@ -336,6 +344,7 @@ final class AppSettings {
         self.defaults = defaults
         launchAtLogin = LaunchAtLogin.isEnabled
         openShortcut = Self.storedShortcut(defaults, Key.openShortcut) ?? Self.legacyOpenShortcut(defaults)
+        shelfShortcut = Self.storedShortcut(defaults, Key.shelfShortcut) ?? .shelfDefault
         peeksOnHover = defaults.object(forKey: Key.peeksOnHover) as? Bool ?? true
         swipesEnabled = defaults.object(forKey: Key.swipesEnabled) as? Bool ?? true
         islandDisplay = defaults.string(forKey: Key.islandDisplay).flatMap(IslandDisplay.init) ?? .builtIn
@@ -426,19 +435,26 @@ final class AppSettings {
     func shortcut(_ slot: ShortcutSlot) -> KeyCombo? {
         switch slot {
         case .open: openShortcut
+        case .shelf: shelfShortcut
         }
     }
 
-    /// Records a shortcut, or turns it off with nil. Refuses (false) one without Control, Option, or Command, and one
-    /// the system won't give this app because another app holds it. A refused shortcut leaves the old one in place.
-    /// Does nothing unless it changes something.
+    /// The other slot that already has `combo`, if one does.
+    func slot(holding combo: KeyCombo, besides slot: ShortcutSlot) -> ShortcutSlot? {
+        ShortcutSlot.allCases.first { $0 != slot && shortcut($0) == combo }
+    }
+
+    /// Records a shortcut, or turns it off with nil. Refuses (false) one without Control, Option, or Command, one another
+    /// slot already has, and one the system won't give this app because another app holds it. A refused shortcut leaves
+    /// the old one in place. Does nothing unless it changes something.
     @discardableResult
     func setShortcut(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
-        if let combo, !combo.isValid { return false }
+        if let combo, !combo.isValid || self.slot(holding: combo, besides: slot) != nil { return false }
         guard combo != shortcut(slot) else { return true }
         guard shortcutRegistrar?(slot, combo) ?? true else { return false }
         switch slot {
         case .open: openShortcut = combo
+        case .shelf: shelfShortcut = combo
         }
         return true
     }

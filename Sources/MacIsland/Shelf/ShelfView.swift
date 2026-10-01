@@ -36,6 +36,17 @@ struct ShelfView: View {
     }
 
     var body: some View {
+        content
+            // On the whole view, not on the files branch: the drop tiles leaving swaps branches, and the checks (which can show a
+            // folder prompt) must not run in the middle of a drop.
+            .onAppear {
+                viewModel.sweepShelf()
+                shelf.verify()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if let dropZone, Self.showsDropTiles(zone: dropZone, isFileDragActive: viewModel.isFileDragActive) {
             HStack(spacing: 8) {
                 switch viewModel.settings.dragTarget {
@@ -70,10 +81,6 @@ struct ShelfView: View {
                 }
             }
             .quickLookPreview(quickLook, in: shelf.items)
-            .onAppear {
-                viewModel.sweepShelf()
-                shelf.verify()
-            }
         }
     }
 
@@ -111,14 +118,10 @@ struct ShelfView: View {
         if shelf.items.isEmpty {
             emptyState("Drop files here to keep them handy", systemImage: "tray.and.arrow.down")
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                // As tall as the space under the header, so the row is centered in it whether there is one file or many.
-                HStack(spacing: 8) {
-                    ForEach(shelf.items, id: \.self) { url in
-                        ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
-                    }
+            ShelfRow {
+                ForEach(shelf.items, id: \.self) { url in
+                    ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
                 }
-                .containerRelativeFrame(.vertical, alignment: .center)
             }
         }
     }
@@ -128,22 +131,19 @@ struct ShelfView: View {
         if clipboard.entries.isEmpty {
             emptyState("Things you copy show up here", systemImage: "doc.on.clipboard")
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(clipboard.entries) { entry in
-                        ClipboardCard(
-                            entry: entry, onAction: viewModel.perform,
-                            onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
-                            onPlain: { viewModel.copyPlainText(entry) },
-                            onSnippet: { viewModel.saveAsSnippet(entry) }
-                        ) {
-                            viewModel.copyFromClipboardHistory(entry)
-                        } onRemove: {
-                            clipboard.remove(entry)
-                        }
+            ShelfRow {
+                ForEach(clipboard.entries) { entry in
+                    ClipboardCard(
+                        entry: entry, onAction: viewModel.perform,
+                        onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
+                        onPlain: { viewModel.copyPlainText(entry) },
+                        onSnippet: { viewModel.saveAsSnippet(entry) }
+                    ) {
+                        viewModel.copyFromClipboardHistory(entry)
+                    } onRemove: {
+                        clipboard.remove(entry)
                     }
                 }
-                .containerRelativeFrame(.vertical, alignment: .center)
             }
         }
     }
@@ -157,6 +157,22 @@ struct ShelfView: View {
                     .font(Theme.Typography.bodyEmphasized)
                     .foregroundStyle(Theme.Palette.secondary)
             }
+    }
+}
+
+/// The Shelf's scrolling row of files or clipboard cards, as tall as the space under the header, so the items are centered in it
+/// whether there is one or many. The height comes from a `GeometryReader`: `containerRelativeFrame(.vertical)` on the row inside the
+/// horizontal `ScrollView` collapsed it to nothing in the app, so a dropped file never showed (`ShelfRowTests` checks for that).
+struct ShelfRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) { content }
+                    .frame(height: proxy.size.height)
+            }
+        }
     }
 }
 

@@ -31,7 +31,7 @@ struct SettingsSearchTests {
     @Test func anotherNameForASettingFindsIt() {
         #expect(titles("airpods").first == "Headphones")
         #expect(titles("startup").first == "Launch at Login")
-        #expect(titles("hotkey").first == "Shortcut")
+        #expect(titles("hotkey").first == "Open the Island")
         #expect(titles("do not disturb").first == "Quiet in Focus")
         #expect(titles("umbrella").first == "Rain Soon")
     }

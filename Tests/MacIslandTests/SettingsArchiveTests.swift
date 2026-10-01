@@ -18,6 +18,7 @@ struct SettingsArchiveTests {
         let settings = makeSettings()
         settings.setShortcut(
             .open, KeyCombo(keyCode: UInt32(kVK_ANSI_J), modifiers: UInt32(cmdKey | optionKey), label: "J"))
+        settings.setShortcut(.shelf, nil)
         settings.peeksOnHover = false
         settings.swipesEnabled = false
         settings.islandDisplay = .primary
@@ -60,6 +61,7 @@ struct SettingsArchiveTests {
         target.restore(try SettingsArchive.read(data))
 
         #expect(target.openShortcut == original.openShortcut)
+        #expect(target.shelfShortcut == nil)
         #expect(!target.peeksOnHover && !target.swipesEnabled && target.islandDisplay == .primary)
         #expect(target.leftTabs == original.leftTabs && target.rightTabs == original.rightTabs)
         #expect(target.menuBarModules == original.menuBarModules)

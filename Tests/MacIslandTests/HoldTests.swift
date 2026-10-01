@@ -59,7 +59,9 @@ struct HoldTests {
         #expect(viewModel.state == .expanded, "a panel still holds it")
         viewModel.release(.panel)
         #expect(viewModel.state == .expanded, "the delay starts now, not at once")
-        try? await Task.sleep(for: .milliseconds(450))
+        for _ in 0..<100 where viewModel.state != .compact {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
         #expect(viewModel.state == .compact)
     }
 

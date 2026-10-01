@@ -33,8 +33,9 @@ private struct PowerAssertionKindKey: Hashable {
 
 @MainActor
 struct KeepAwakeTests {
-    private func make(_ stub: StubAssertions = StubAssertions()) -> (KeepAwake, StubAssertions) {
-        (KeepAwake(assertions: stub, observesWake: false), stub)
+    private func make(_ given: StubAssertions? = nil) -> (KeepAwake, StubAssertions) {
+        let stub = given ?? StubAssertions()
+        return (KeepAwake(assertions: stub, observesWake: false), stub)
     }
 
     @Test func itHoldsTheDisplayAndTheSystemAssertionAndReleasesBoth() {

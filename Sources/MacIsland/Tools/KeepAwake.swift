@@ -85,8 +85,8 @@ final class KeepAwake {
     @ObservationIgnored private var expiryTask: Task<Void, Never>?
     @ObservationIgnored private var wakeObserver: Any?
 
-    init(assertions: PowerAssertions = LivePowerAssertions(), observesWake: Bool = true) {
-        self.assertions = assertions
+    init(assertions: PowerAssertions? = nil, observesWake: Bool = true) {
+        self.assertions = assertions ?? LivePowerAssertions()
         guard observesWake else { return }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main

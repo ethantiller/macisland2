@@ -118,6 +118,15 @@ struct OnboardingFlowTests {
         #expect(!GuideCopy.body(.drop, setup: setup(screenshots: false)).contains("screenshots"))
     }
 
+    @Test func theShelfShortcutIsNamedOnlyWhenOn() {
+        var on = setup()
+        on.shelfShortcut = .shelfDefault
+        let text = GuideCopy.body(.drop, setup: on)
+        #expect(text.hasSuffix("\u{2303}\u{2325}S opens the Shelf from anywhere."))
+        #expect(text.count <= 240, "the guide shows three lines")
+        #expect(!GuideCopy.body(.drop, setup: setup()).contains("from anywhere"))
+    }
+
     @Test func modulesCopyNamesTheTabs() {
         let text = GuideCopy.body(.modules, setup: setup())
         #expect(text.hasPrefix("Your tabs are Home, Media, Clock, Reminders"))

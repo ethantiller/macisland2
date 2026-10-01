@@ -51,8 +51,12 @@ enum SettingsSearch {
             // General
             .init(pane: .general, title: "Launch at Login", keywords: ["startup", "start", "open at login", "boot"]),
             .init(
-                pane: .general, title: "Shortcut",
-                keywords: ["hotkey", "keyboard", "keys", "open the island", "record"],
+                pane: .general, title: "Open the Island",
+                keywords: ["shortcut", "hotkey", "keyboard", "keys", "record"],
+                anchor: SettingsAnchor.shortcut),
+            .init(
+                pane: .general, title: "Open the Shelf",
+                keywords: ["shortcut", "hotkey", "keyboard", "keys", "files", "storage", "clipboard", "record"],
                 anchor: SettingsAnchor.shortcut),
             .init(
                 pane: .general, title: "Peek on Hover", keywords: ["hover", "mouse", "swell", "preview"],

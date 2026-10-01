@@ -151,6 +151,7 @@ struct OnboardingFlow: Equatable {
 /// has a notch.
 struct GuideSetup: Equatable {
     var openShortcut: KeyCombo?
+    var shelfShortcut: KeyCombo? = nil
     var hasNotch: Bool
     var tabs: [IslandModule]
     var hiddenModules: [IslandModule]
@@ -252,16 +253,17 @@ enum GuideCopy {
 
     static func dropBody(_ setup: GuideSetup) -> String {
         let screenshots = setup.addsScreenshots ? " New screenshots land on the Shelf by themselves." : ""
+        let keys = setup.shelfShortcut.map { " \($0.display) opens the Shelf from anywhere." } ?? ""
         switch setup.dragTarget {
         case .shelfAndAirDrop:
             return "Drag a file toward \(setup.notch). Drop it on the left half to keep it on the Shelf, or on the right to AirDrop it."
-                + screenshots
+                + screenshots + keys
         case .shelfOnly:
-            return "Drag a file toward \(setup.notch). Drop it on the island to keep it on the Shelf." + screenshots
+            return "Drag a file toward \(setup.notch). Drop it on the island to keep it on the Shelf." + screenshots + keys
         case .airDropOnly:
-            return "Drag a file toward \(setup.notch). Drop it on the island to AirDrop it." + screenshots
+            return "Drag a file toward \(setup.notch). Drop it on the island to AirDrop it." + screenshots + keys
         case .nothing:
-            return "Dragging files to the island is off. Turn it on in Settings \u{2192} Shelf."
+            return "Dragging files to the island is off. Turn it on in Settings \u{2192} Shelf." + keys
         }
     }
 

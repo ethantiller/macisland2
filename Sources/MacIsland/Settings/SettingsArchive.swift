@@ -11,6 +11,7 @@ struct SettingsArchive: Codable, Equatable {
     var version = SettingsArchive.currentVersion
 
     var openShortcut: StoredShortcut?
+    var shelfShortcut: StoredShortcut?
     var peeksOnHover: Bool?
     var swipesEnabled: Bool?
     var islandDisplay: String?
@@ -59,6 +60,7 @@ struct SettingsArchive: Codable, Equatable {
     static func make(from settings: AppSettings) -> SettingsArchive {
         var archive = SettingsArchive()
         archive.openShortcut = StoredShortcut(combo: settings.openShortcut)
+        archive.shelfShortcut = StoredShortcut(combo: settings.shelfShortcut)
         archive.peeksOnHover = settings.peeksOnHover
         archive.swipesEnabled = settings.swipesEnabled
         archive.islandDisplay = settings.islandDisplay.rawValue
@@ -122,6 +124,7 @@ extension AppSettings {
     /// Launch at Login is the system\u{2019}s, so it is not in the file.
     func restore(_ archive: SettingsArchive) {
         if let stored = archive.openShortcut { setShortcut(.open, stored.combo) }
+        if let stored = archive.shelfShortcut { setShortcut(.shelf, stored.combo) }
         if let value = archive.peeksOnHover { peeksOnHover = value }
         if let value = archive.swipesEnabled { swipesEnabled = value }
         if let value = archive.islandDisplay.flatMap(IslandDisplay.init) { islandDisplay = value }

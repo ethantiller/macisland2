@@ -4,10 +4,12 @@ import Carbon.HIToolbox
 /// Which global shortcut.
 enum ShortcutSlot: String, CaseIterable {
     case open
+    case shelf
 
     var title: String {
         switch self {
         case .open: "Open the Island"
+        case .shelf: "Open the Shelf"
         }
     }
 }
@@ -23,6 +25,9 @@ struct KeyCombo: Codable, Equatable, Hashable {
 
     static let openDefault = KeyCombo(
         keyCode: UInt32(kVK_Space), modifiers: UInt32(controlKey | optionKey), label: "Space")
+    /// S for Shelf, beside the island's own.
+    static let shelfDefault = KeyCombo(
+        keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(controlKey | optionKey), label: "S")
     /// The old picker's other choice, kept so an existing choice carries over.
     static let controlOptionI = KeyCombo(
         keyCode: UInt32(kVK_ANSI_I), modifiers: UInt32(controlKey | optionKey), label: "I")

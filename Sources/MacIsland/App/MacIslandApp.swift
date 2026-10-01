@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bluetoothAccess = BluetoothAccess()
     private let diskSpace = DiskSpace()
     private let hotkey = GlobalHotkey()
+    private let shelfHotkey = GlobalHotkey(id: 2)
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
     private var menuHold: MenuHoldObserver?
@@ -530,7 +531,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// and the old one stays.
     private func registerShortcuts() {
         let settings = features.settings
-        let keys: [ShortcutSlot: GlobalHotkey] = [.open: hotkey]
+        let keys: [ShortcutSlot: GlobalHotkey] = [.open: hotkey, .shelf: shelfHotkey]
         func apply(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
             guard let key = keys[slot] else { return false }
             guard let combo else {
@@ -553,6 +554,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // While the first-run guide is up, the shortcut is practised on the island in its window, not on this one.
             if OnboardingWindowController.shared.handleOpenShortcut() { return }
             viewModel.toggleFromKeyboard()
+            if viewModel.isPinnedOpen { panel?.makeKey() }
+        }
+        shelfHotkey.onPress = { [weak panel] in
+            viewModel.toggleShelfFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }
         registerShortcuts()

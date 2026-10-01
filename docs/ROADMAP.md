@@ -35,7 +35,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
-- **First run:** a guide (floating glass in the middle of the screen, the real island as its stage, practice checks, then one step per permission with Grant Permission and Not Now) and a sixteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
+- **First run:** a guide (floating glass in the middle of the screen, the real island as its stage, practice checks, then one step per permission with Grant Permission and Not Now) and a seventeen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
@@ -396,7 +396,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 **Settings and tabs**
 - [ ] Shortcut: record a new open shortcut; a key another app owns says "In use by another app" and keeps the old one;
-      Delete turns one off. Peek on Hover off (hover swells, click opens), Swipe off (the dial still scrubs), Show the Island On with an external display
+      Delete turns one off. Open the Shelf: ⌃⌥S opens the island on the Shelf from another app (and from another tab), again closes it; recording ⌃⌥Space there says "Already used for Open the Island". Peek on Hover off (hover swells, click opens), Swipe off (the dial still scrubs), Show the Island On with an external display
 - [ ] Settings file: Export, then Import into a reset app restores everything; Reset All asks first; a file with a command widget adds none
 - [ ] Shelf choices: drag a file with each mode (Shelf and AirDrop, Shelf Only, AirDrop Only, Do Nothing); Add New Screenshots off; Remove Files after a day;
       Clipboard History Off stops recording; Show Music Beside the Notch off; the tool Row Order drags
@@ -452,6 +452,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 **The Shelf's files (written, not run)**
 - [ ] Previews: images, PDFs, movies, and documents show their own thumbnail (the icon until it arrives); a file with no preview keeps its icon; scrolling a long Shelf stays smooth and idle CPU is unchanged
+- [x] A file on the Shelf draws at all (fixed 2026-09-30: `containerRelativeFrame` sized the row to the panel and pushed it below the island's edge; `ShelfRow` now takes its height from a `GeometryReader`, checked in the app and by `ShelfRowTests`)
 - [ ] The row is centered under the header for one file and for many, and the empty state and the Clipboard row agree
 - [ ] The ✕ on a hovered file is a clean disc, easy to click, and labelled for VoiceOver; it never shows the gray glyph
 - [ ] Dragging out (*cause unconfirmed: my guess is that the NSURL provider let Finder move the file and that the double-click gesture delayed the drag*): drag a file to the Desktop, Finder, Mail, and a browser upload; the original stays where it was (copy, never move); the item stays on the Shelf; the island doesn't fold mid-drag and closes shortly after; the drop target doesn't get stuck. If it is still glitchy, replace `onDrag` with an AppKit `NSDraggingSource`

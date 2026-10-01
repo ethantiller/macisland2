@@ -11,7 +11,7 @@ import SwiftUI
 
 /// What a stop points at. Each is anchored at one view with `.tourAnchor(_:)`.
 enum TourTarget: Hashable {
-    case search, previewBand, shortcut, peekOnHover, notShownTray, menuBarRow, addWidgets, calendarEvents, dragTarget,
+    case search, previewBand, shortcut, shelfShortcut, peekOnHover, notShownTray, menuBarRow, addWidgets, calendarEvents, dragTarget,
         musicCompact, pomodoro, toolsRow, quietInFocus, accessList, guide
     /// The visible part of the pane's scrolling form: a target outside it has been scrolled out of view.
     case paneViewport
@@ -61,6 +61,10 @@ struct TourStop: Identifiable, Equatable {
             id: "shortcut", since: 1, pane: .general, target: .shortcut, placement: .below,
             scrollAnchor: SettingsAnchor.shortcut, preview: nil, title: "Open It From Anywhere",
             copy: "Click here and press the keys you want to open the island from anywhere."),
+        TourStop(
+            id: "shelfShortcut", since: 2, pane: .general, target: .shelfShortcut, placement: .below,
+            scrollAnchor: SettingsAnchor.shortcut, preview: nil, title: "Straight to the Shelf",
+            copy: "These keys open the island straight on the Shelf, from anywhere. Press them again to close it."),
         TourStop(
             id: "input", since: 1, pane: .general, target: .peekOnHover, placement: .below,
             scrollAnchor: SettingsAnchor.input, preview: nil, title: "Hover and Swipe",

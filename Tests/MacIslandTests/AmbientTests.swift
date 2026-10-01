@@ -105,7 +105,10 @@ struct RainForecastTests {
         var announced: [Date] = []
         model.onRainSoon = { announced.append($0) }
         model.configure(city: "Paris")
-        try await Task.sleep(for: .milliseconds(300))
+        for _ in 0..<100 where announced.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try await Task.sleep(for: .milliseconds(100))
         model.configure(city: "")
         #expect(announced == [start.addingTimeInterval(30 * 60)])
     }

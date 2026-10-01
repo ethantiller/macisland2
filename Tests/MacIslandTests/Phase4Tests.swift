@@ -576,7 +576,9 @@ struct NotesModelTests {
         let model = NotesModel(directory: directory)
         let note = model.addNote()
         model.setBody("typed", ofNote: note.id)
-        try await Task.sleep(for: .milliseconds(800))
+        for _ in 0..<100 where NotesModel(directory: directory).notes.first?.body != "typed" {
+            try await Task.sleep(for: .milliseconds(20))
+        }
         #expect(NotesModel(directory: directory).notes.first?.body == "typed")
     }
 

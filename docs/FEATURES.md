@@ -211,7 +211,8 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 
 ![Shelf](images/05-expanded-shelf-empty.png)
 
-A **Files / Clipboard** choice.
+A **Files / Clipboard** choice. **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
+from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab strip; pressing it again on the Shelf closes it.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
   kept; files stay where they are. Each file shows its own preview (QuickLook thumbnails, kept in memory only; the file's icon until one arrives), centered in the row. Double-click opens, drag out to copy it where you drop it (the original never moves), hover for an ✕ that takes it off the Shelf. **Space** over an item previews it with
@@ -344,7 +345,7 @@ shows and where is a setting, how it looks is not.
 
 | Pane | Preview | Choices |
 | --- | --- | --- |
-| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcut** (Open the Island, ⌃⌥Space by default, recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
+| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcuts** (Open the Island, ⌃⌥Space by default, and Open the Shelf, ⌃⌥S by default; recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns, or the other shortcut's key, is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
 | Tabs | Expanded (the tab you select), or Menu Bar | The tabs, dragged and switched (Left of the Notch, Right of the Notch, and the Not Shown tray); or, in the **Menu Bar** view, only a switch per module for the menu bar (the view is a menu-bar strip with an icon for each module that has one, and clicking an icon, or a module in the list (on or off), shows its window, with a dashed ghost icon and a note when it isn't in the menu bar yet; going between Expanded and Menu Bar is one continuous motion: the island shrinks toward the notch and slides out to the left while the menu bar slides in from the right and its window opens from the strip, and the reverse coming back; the tab settings are hidden there, and the menu bar settings are hidden in every other view). **Click a row, or a tab in the preview, to see that tab.** The tabs that are not shown sit in a **Not Shown tray directly under the preview**, so you can see them and the tab strip together. **Drag a tab from the tray onto a tab in the strip to replace it** (the replaced tab lands in the tray); **drag a tab onto another tab to swap them**; **drag a tab onto the tray to hide it**; or **click a tab in the tray to add it**. The hint under the preview names both tabs while you hold one over another ("Release to swap Media and Reminders."). A tab can only replace a tab: there is no dropping into the side of the notch. The list rows below also reorder by dragging |
 | Home | Expanded Home, in edit mode | The widget editor (below); Up Next (Calendar Events, Due Reminders, a button that opens Internet Accounts); Weather city (only the name is sent to Open-Meteo) |
 | Shelf | Compact, with the drop target | **When You Drag a File** (Show Shelf and AirDrop, Show Shelf Only, Show AirDrop Only, or Do Nothing); Add New Screenshots to the Shelf; Remove Files from the Shelf (Never, After a Day, After a Week; only the reference goes, never the file); Clipboard History (Off, 10, 25, or 50 items) |
@@ -355,7 +356,7 @@ shows and where is a setting, how it looks is not.
 | Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state (Calendars, Reminders, Camera, Microphone, Speech Recognition, Screen Recording, Accessibility, Bluetooth), read without asking, with Open System Settings |
 
 **The Settings tour.** The first time Settings opens, a black callout with an arrow points at a real control, with a ring in the system accent
-color around it, and walks through all nine panes in sixteen stops (Find Any Setting, Your Island Live, Open It From Anywhere, and so on).
+color around it, and walks through all nine panes in seventeen stops (Find Any Setting, Your Island Live, Open It From Anywhere, Straight to the Shelf, and so on).
 It follows the control when the window resizes or the pane scrolls; Next, Back, End Tour, and Return move through it, choosing a pane in
 the sidebar jumps to that pane's first stop, and closing the window ends it. It never starts over the guide or when Settings was opened
 for **Edit Home…**. Picture: `docs/images/43-tour-03-shortcut.png`.
@@ -387,7 +388,7 @@ use as its stage (drawn from sample data, as in Settings). It has nineteen steps
 | 4 | Change Tabs | An open island on Home, the arrows as key caps, and a practice line |
 | 5 | Fold It Away | An open island on Home, Esc, and a practice line |
 | 6 | Seven Modules | A chip per module; the stage shows the one you choose |
-| 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line |
+| 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line; the copy ends with your Shelf shortcut when it is on |
 | 8 | Keep a Module Close | The menu bar sliding in |
 | 9 to 18 | One step per permission: See Your Next Meeting (Calendars), See What's Due (Reminders), Know When Headphones Connect (Bluetooth), Watch Your Downloads (Downloads), Check Yourself in Mirror (Camera), Record Voice Notes (Microphone and Speech), Record Your Screen (Screen Recording), Clean Your Keyboard (Accessibility), Stay Quiet in Focus (Focus), Control Music and Spotify (Automation) | What it gives and what you lose without it, in a banner or tab picture on the stage, and its state: Not asked yet, Allowed (green check), Asked, or Off (red) with **Open System Settings**. While it is waiting, the footer offers **Not Now** (goes on, asks nothing) and **Grant Permission** (the system prompt appears only now); after an answer it is Continue. Screen Recording also offers **Reopen MacIsland**. Left out when already allowed |
 | 19 | Make It Yours | Open at Login, Open Settings, Done |
@@ -414,6 +415,7 @@ Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-
 | --- | --- |
 | Hover | Swell, then peek after 120 ms |
 | Click, two-finger swipe down, **⌃⌥Space** | Expanded |
+| **⌃⌥S** | Expanded on the Shelf (again on the Shelf: close) |
 | Pointer away for 300 ms | Compact |
 | Two-finger swipe up (expanded) | Close |
 | Two-finger swipe left or right (expanded) | Previous or next tab (once per swipe; follows your finger). Over the timer dial it scrubs the dial instead |
