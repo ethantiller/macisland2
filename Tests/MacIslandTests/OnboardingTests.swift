@@ -126,11 +126,13 @@ struct OnboardingTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = AppSettings(defaults: defaults)
         settings.setShortcut(.open, nil)
+        settings.setShortcut(.shelf, nil)
         settings.peeksOnHover = false
         settings.swipesEnabled = false
         settings.islandDisplay = .primary
         settings.move(.notes, to: .right)
         settings.setInMenuBar(.clock, true)
+        settings.setOn(.music, false)
         settings.showsCalendar = true
         settings.showsReminders = true
         settings.weatherCity = "Paris"

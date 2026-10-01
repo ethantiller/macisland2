@@ -44,6 +44,8 @@ struct SettingsArchiveTests {
         settings.pomodoroSessions = 6
         settings.setMuted(.hotspot, true)
         settings.setMuted(.lowDisk, true)
+        settings.setOn(.music, false)
+        settings.setOn(.agents, true)
         settings.saveCustomWidget(
             CustomWidget(
                 title: "Stocks", systemImage: "chart.line.uptrend.xyaxis",
@@ -73,6 +75,7 @@ struct SettingsArchiveTests {
         #expect(target.quietDuringFocus && target.fullChargeLevel == 90)
         #expect(target.pomodoroPlan == PomodoroPlan(focus: 50, shortBreak: 10, longBreak: 30, sessions: 6))
         #expect(target.mutedEvents == [.hotspot, .lowDisk])
+        #expect(!target.isOn(.music) && target.isOn(.agents) && target.isOn(.tools))
         #expect(target.customWidgets.map(\.title) == ["Stocks"])
         #expect(target.homeLayout.widgets[1].widget == .custom(target.customWidgets[0].id))
     }

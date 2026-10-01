@@ -110,7 +110,8 @@ final class URLCommandRunner {
         case .pomodoro:
             if !viewModel.pomodoro.isActive { viewModel.pomodoro.toggle() }
         case .open(let module):
-            viewModel.show(module)
+            // A module whose feature is off has no page to open.
+            if viewModel.settings.isShown(module) { viewModel.show(module) }
         case .addToShelf(let url):
             viewModel.shelf.add([url])
             viewModel.flash(

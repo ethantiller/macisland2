@@ -98,13 +98,13 @@ final class TabEditor {
         isOverTray = false
         dragging = nil
         guard settings.isInTabs(dragged) else { return false }
-        guard settings.tabs.count > 1 else {
+        guard settings.shownTabs.count > 1 else {
             message = "There has to be at least one tab."
             return false
         }
         settings.setEnabled(dragged, false)
         guard !settings.isInTabs(dragged) else { return false }
-        if preview?.viewModel.selectedTab == dragged, let first = settings.tabs.first { select(first) }
+        if preview?.viewModel.selectedTab == dragged, let first = settings.shownTabs.first { select(first) }
         message = "\(dragged.title) is now in Not Shown."
         return true
     }

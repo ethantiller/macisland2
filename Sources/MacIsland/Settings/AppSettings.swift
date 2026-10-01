@@ -62,6 +62,8 @@ final class AppSettings {
     @ObservationIgnored var onLyricsChange: (() -> Void)?
     /// Replace the Volume HUD was turned on or off.
     @ObservationIgnored var onVolumeHUDChange: (() -> Void)?
+    /// A feature was switched on or off, by any route (its own setting included). Set by the app.
+    @ObservationIgnored var onFeatureChange: ((Feature) -> Void)?
 
     private(set) var launchAtLogin: Bool
 
@@ -147,11 +149,12 @@ final class AppSettings {
         }
     }
 
-    /// Off until turned on, so macOS only asks for access when the person wants it.
+    /// Off until turned on, so macOS only asks for access when the person wants it. This is the Calendar feature's switch.
     var showsCalendar: Bool {
         didSet {
             defaults.set(showsCalendar, forKey: Key.calendar)
             onAgendaChange?()
+            if showsCalendar != oldValue { onFeatureChange?(.calendar) }
         }
     }
 
@@ -240,11 +243,20 @@ final class AppSettings {
 
     /// The island's volume HUD instead of the system's: MacIsland takes the volume keys, which needs Accessibility access, so it is off
     /// until turned on and stays off until that is granted.
+    /// This is the Volume HUD feature's switch.
     var replacesVolumeHUD: Bool {
         didSet {
             defaults.set(replacesVolumeHUD, forKey: Key.volumeHUD)
             onVolumeHUDChange?()
+            if replacesVolumeHUD != oldValue { onFeatureChange?(.volumeHUD) }
         }
+    }
+
+    /// The features the person switched on or off, by raw value. A feature that isn't here has its default, and `calendar` and
+    /// `volumeHUD` are never here: their switches are `showsCalendar` and `replacesVolumeHUD`. Keys this build doesn't know (from a
+    /// newer one) are kept.
+    private(set) var featureChoices: [String: Bool] {
+        didSet { defaults.set(featureChoices, forKey: Key.features) }
     }
 
     var pinLimit: PinLimit {
@@ -338,6 +350,7 @@ final class AppSettings {
         static let homeLayout = "home.layout"
         static let savedHomePresets = "home.savedPresets"
         static let customWidgets = "widgets.custom"
+        static let features = "features.available"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -351,8 +364,17 @@ final class AppSettings {
         dragTarget = defaults.string(forKey: Key.dragTarget).flatMap(DragTarget.init) ?? .shelfAndAirDrop
         addsScreenshots = defaults.object(forKey: Key.addsScreenshots) as? Bool ?? true
         shelfRetention = defaults.string(forKey: Key.shelfRetention).flatMap(ShelfRetention.init) ?? .never
+        var choices = Self.storedFeatureChoices(defaults)
         let storedLimit = defaults.object(forKey: Key.clipboardLimit) as? Int ?? ClipboardHistory.limit
-        clipboardLimit = ClipboardHistory.limits.contains(storedLimit) ? storedLimit : ClipboardHistory.limit
+        // The clipboard history used to be turned off with a limit of 0; that is the Clipboard feature now.
+        if storedLimit == 0 {
+            choices[Feature.clipboard.rawValue] = false
+            defaults.set(choices, forKey: Key.features)
+            defaults.set(ClipboardHistory.limit, forKey: Key.clipboardLimit)
+        }
+        featureChoices = choices
+        let validLimit = ClipboardHistory.limits.contains(storedLimit) && storedLimit != 0
+        clipboardLimit = validLimit ? storedLimit : ClipboardHistory.limit
         shelfMode = defaults.string(forKey: Key.shelfMode).flatMap(ShelfMode.init) ?? .files
         showsMusicCompact = defaults.object(forKey: Key.showsMusicCompact) as? Bool ?? true
         mutedEvents = Set((defaults.stringArray(forKey: Key.mutedEvents) ?? []).compactMap(AmbientEvent.init))
@@ -411,6 +433,10 @@ final class AppSettings {
             stored(Key.leftTabs) ?? (legacy == IslandModule.previousDefaultTabs ? IslandModule.defaultTabs : legacy)
             ?? []
         (leftTabs, rightTabs) = Self.normalized(left: left, right: stored(Key.rightTabs) ?? [])
+    }
+
+    private static func storedFeatureChoices(_ defaults: UserDefaults) -> [String: Bool] {
+        (defaults.dictionary(forKey: Key.features) ?? [:]).compactMapValues { $0 as? Bool }
     }
 
     /// A saved shortcut: `.some(nil)` is one turned off, and nil is one never chosen.
@@ -563,9 +589,58 @@ final class AppSettings {
         setHomeLayout(layout)
     }
 
+    // MARK: Features
+
+    /// Whether a feature is on. Two features keep the setting they always had: Calendar is `showsCalendar` and the Volume HUD is
+    /// `replacesVolumeHUD`. The rest are in `featureChoices`, or have their default.
+    func isOn(_ feature: Feature) -> Bool {
+        switch feature {
+        case .calendar: showsCalendar
+        case .volumeHUD: replacesVolumeHUD
+        default: featureChoices[feature.rawValue] ?? feature.isOnByDefault
+        }
+    }
+
+    /// Does nothing unless it changes something (a binding may call it again with the same value). Whatever the feature gates
+    /// keeps its settings; this only changes whether it shows and runs.
+    func setOn(_ feature: Feature, _ on: Bool) {
+        guard isOn(feature) != on else { return }
+        switch feature {
+        case .calendar: showsCalendar = on  // these two tell `onFeatureChange` themselves
+        case .volumeHUD: replacesVolumeHUD = on
+        default:
+            featureChoices[feature.rawValue] = on
+            onFeatureChange?(feature)
+        }
+    }
+
+    /// Sets every feature to the preset's: one change for each that flips.
+    func apply(_ preset: FeaturePreset) {
+        for feature in Feature.allCases { setOn(feature, preset.features.contains(feature)) }
+    }
+
+    /// The preset the features are exactly at, or nil when they are the person's own.
+    func matchingPreset() -> FeaturePreset? {
+        FeaturePreset.allCases.first { preset in
+            Feature.allCases.allSatisfy { isOn($0) == preset.features.contains($0) }
+        }
+    }
+
+    /// Whether a module shows: it has a view, and its feature (if it has one) is on. Home is always shown.
+    func isShown(_ module: IslandModule) -> Bool {
+        module.isAvailable && (Feature.module(for: module).map(isOn) ?? true)
+    }
+
+    /// The clipboard history's size as the model reads it: 0 while the Clipboard feature is off.
+    var effectiveClipboardLimit: Int { isOn(.clipboard) ? clipboardLimit : 0 }
+
     // MARK: Menu bar
 
     func isInMenuBar(_ module: IslandModule) -> Bool { menuBarModules.contains(module) }
+
+    /// Whether the module has its icon in the menu bar now: the person chose it, and its feature is on. A feature that is off keeps
+    /// the choice, so the icon returns with it.
+    func showsInMenuBar(_ module: IslandModule) -> Bool { isShown(module) && isInMenuBar(module) }
 
     /// Does nothing unless it changes something. SwiftUI calls this from a menu-bar scene's binding to keep the two
     /// in step, and a write that changed nothing would still count as a change and set it off again, forever.
@@ -618,9 +693,24 @@ final class AppSettings {
 
     func tabs(on side: TabSide) -> [IslandModule] { side == .left ? leftTabs : rightTabs }
 
+    /// The tabs left of the notch that show: `leftTabs` without the modules whose feature is off. The stored lists never change
+    /// because of a switch, so a module that is switched back on returns to its place. With nothing left, Home.
+    var shownLeftTabs: [IslandModule] {
+        let left = leftTabs.filter(isShown)
+        return left.isEmpty && rightTabs.allSatisfy({ !isShown($0) }) ? [.home] : left
+    }
+
+    /// The tab right of the notch, if it shows.
+    var shownRightTabs: [IslandModule] { rightTabs.filter(isShown) }
+
+    /// Every tab that shows, left to right. Never empty.
+    var shownTabs: [IslandModule] { shownLeftTabs + shownRightTabs }
+
+    func shownTabs(on side: TabSide) -> [IslandModule] { side == .left ? shownLeftTabs : shownRightTabs }
+
     /// Modules that could be shown but aren't, in module order.
     var hiddenModules: [IslandModule] {
-        IslandModule.allCases.filter { $0.isAvailable && !isInTabs($0) }
+        IslandModule.allCases.filter { isShown($0) && !shownTabs.contains($0) }
     }
 
     func hasRoom(on side: TabSide) -> Bool { tabs(on: side).count < side.capacity }
@@ -640,7 +730,7 @@ final class AppSettings {
                 rightTabs.append(module)
             }
         } else {
-            guard isInTabs(module), tabs.count > 1 else { return }
+            guard isInTabs(module), shownTabs.count > 1 else { return }
             leftTabs.removeAll { $0 == module }
             rightTabs.removeAll { $0 == module }
         }

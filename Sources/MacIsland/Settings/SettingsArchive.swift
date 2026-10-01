@@ -42,6 +42,8 @@ struct SettingsArchive: Codable, Equatable {
     var pomodoroShortBreak: Int?
     var pomodoroLongBreak: Int?
     var pomodoroSessions: Int?
+    /// Every feature's switch by raw value, written in full. A name this build doesn't know is skipped on reading.
+    var features: [String: Bool]?
 
     enum ReadError: LocalizedError, Equatable {
         case notAnArchive, tooNew
@@ -89,6 +91,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.pomodoroShortBreak = settings.pomodoroShortBreak
         archive.pomodoroLongBreak = settings.pomodoroLongBreak
         archive.pomodoroSessions = settings.pomodoroSessions
+        archive.features = Dictionary(uniqueKeysWithValues: Feature.allCases.map { ($0.rawValue, settings.isOn($0)) })
         return archive
     }
 
@@ -145,7 +148,11 @@ extension AppSettings {
         if let value = archive.dragTarget.flatMap(DragTarget.init) { dragTarget = value }
         if let value = archive.addsScreenshots { addsScreenshots = value }
         if let value = archive.shelfRetention.flatMap(ShelfRetention.init) { shelfRetention = value }
-        if let value = archive.clipboardLimit, ClipboardHistory.limits.contains(value) { clipboardLimit = value }
+        if let value = archive.clipboardLimit, ClipboardHistory.limits.contains(value) {
+            // A file from before the Clipboard feature turned the history off with a limit of 0.
+            if value == 0 { setOn(.clipboard, false) }
+            clipboardLimit = value == 0 ? ClipboardHistory.limit : value
+        }
         if let value = archive.shelfMode.flatMap(ShelfMode.init) { shelfMode = value }
         if let value = archive.showsLyrics { showsLyrics = value }
         if let value = archive.replacesVolumeHUD, value != replacesVolumeHUD { replacesVolumeHUD = value }
@@ -168,6 +175,12 @@ extension AppSettings {
         }
         if let value = archive.pomodoroSessions, PomodoroPlan.sessionsRange.contains(value) {
             pomodoroSessions = value
+        }
+        // After the settings the switches share (Calendar, the Volume HUD, the clipboard's 0), so a file's features win.
+        if let choices = archive.features {
+            for feature in Feature.allCases {
+                if let on = choices[feature.rawValue] { setOn(feature, on) }
+            }
         }
         if let names = archive.mutedEvents {
             let muted = Set(names.compactMap(AmbientEvent.init))

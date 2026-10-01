@@ -30,7 +30,7 @@ struct TabSection: View {
     private var title: String { side == .left ? "Left of the Notch" : "Right of the Notch" }
 
     var body: some View {
-        let tabs = settings.tabs(on: side)
+        let tabs = settings.shownTabs(on: side)
         Section {
             ForEach(tabs) { module in
                 TabRow(settings: settings, module: module, preview: preview)
@@ -86,7 +86,7 @@ private struct TabRow: View {
             )
             .labelsHidden()
             .toggleStyle(.switch)
-            .disabled(side == nil ? !settings.canAddTab : settings.tabs.count <= 1)
+            .disabled(side == nil ? !settings.canAddTab : settings.shownTabs.count <= 1)
         }
         .padding(.vertical, 2)
         .background(
@@ -145,11 +145,14 @@ private struct MenuBarSection: View {
     let settings: AppSettings
     let preview: IslandPreviewModel?
 
+    /// Only modules that are on can have an icon.
+    private var shown: [IslandModule] { IslandModule.allCases.filter(settings.isShown) }
+
     var body: some View {
         Section {
-            ForEach(IslandModule.allCases.filter(\.isAvailable)) { module in
+            ForEach(shown) { module in
                 row(module)
-                    .tourAnchor(module == IslandModule.allCases.first(where: \.isAvailable) ? .menuBarRow : nil)
+                    .tourAnchor(module == shown.first ? .menuBarRow : nil)
             }
         } header: {
             Text("Menu Bar").id(SettingsAnchor.menuBar)

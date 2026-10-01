@@ -175,7 +175,7 @@ struct OnboardingView: View {
         let inTabs = model.setup.tabs.contains(model.chosenModule)
         return VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
             FlowLayout(spacing: Theme.Metrics.rowSpacing) {
-                ForEach(IslandModule.allCases.filter(\.isAvailable)) { module in
+                ForEach(model.shownModules) { module in
                     ChipButton(
                         title: module.title, systemImage: module.systemImage, isSelected: module == model.chosenModule
                     ) { model.choose(module) }

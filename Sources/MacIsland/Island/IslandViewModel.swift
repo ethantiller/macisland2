@@ -312,15 +312,15 @@ final class IslandViewModel {
     private var trailingStripPlan: TrailingStrip.Plan {
         TrailingStrip.plan(
             available: trailingStripWidth,
-            rightTabs: features.settings.rightTabs.count,
+            rightTabs: features.settings.shownRightTabs.count,
             hasStatus: hasStatusIndicators,
             hasWeather: features.weather.conditions != nil,
-            hasNotesTab: features.settings.isInTabs(.notes)
+            hasNotesTab: features.settings.shownTabs.contains(.notes)
         )
     }
 
     /// The New Note pencil, when there is room and Notes isn't already a tab.
-    var showsStripPencil: Bool { trailingStripPlan.pencil }
+    var showsStripPencil: Bool { trailingStripPlan.pencil && features.settings.isShown(.notes) }
 
     /// The weather, whenever it fits beside the tab, the status, and Settings: it must never crowd the notch.
     var showsStripWeather: Bool { trailingStripPlan.weather }
@@ -573,6 +573,12 @@ final class IslandViewModel {
         withAnimation(Theme.Motion.resize) {
             selectedTab = tab
         }
+    }
+
+    /// A feature was switched off: if the page on screen is its module, the island goes to Home.
+    func leaveModuleThatIsOff() {
+        guard selectedTab != .home, !features.settings.isShown(selectedTab) else { return }
+        select(.home)
     }
 
     /// Typing needs the island to stay put: it stays open until Esc, the shortcut, or a click outside.
@@ -1108,9 +1114,9 @@ final class IslandViewModel {
         select(tabs[next])
     }
 
-    func visibleTabs() -> [IslandModule] { features.settings.tabs }
-    func leftTabs() -> [IslandModule] { features.settings.leftTabs }
-    func rightTabs() -> [IslandModule] { features.settings.rightTabs }
+    func visibleTabs() -> [IslandModule] { features.settings.shownTabs }
+    func leftTabs() -> [IslandModule] { features.settings.shownLeftTabs }
+    func rightTabs() -> [IslandModule] { features.settings.shownRightTabs }
 
     /// Puts away Shelf files that stayed longer than the person wants. Runs on launch and when the Shelf appears.
     func sweepShelf() {

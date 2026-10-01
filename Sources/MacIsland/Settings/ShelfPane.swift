@@ -30,8 +30,16 @@ struct ShelfPane: View {
                 )
             }
             Section {
+                // Off is the Clipboard feature switched off. Until the Features pane has its switch, it is still chosen here.
                 SettingsDropdown(
-                    title: "Clipboard History", selection: Bindable(settings).clipboardLimit,
+                    title: "Clipboard History",
+                    selection: Binding(
+                        get: { settings.effectiveClipboardLimit },
+                        set: { limit in
+                            if limit != 0 { settings.clipboardLimit = limit }
+                            settings.setOn(.clipboard, limit != 0)
+                        }
+                    ),
                     options: [DropdownOption(0, "Off")] + DropdownOption.all([10, 25, 50]) { "\($0) Items" })
             } header: {
                 Text("Clipboard").id(SettingsAnchor.clipboard)

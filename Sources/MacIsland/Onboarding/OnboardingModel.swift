@@ -62,10 +62,13 @@ final class OnboardingModel {
     /// The person's own setup, which the copy follows.
     var setup: GuideSetup {
         GuideSetup(
-            openShortcut: settings.shortcut(.open), shelfShortcut: settings.shortcut(.shelf), hasNotch: geometry().hasNotch, tabs: settings.tabs,
+            openShortcut: settings.shortcut(.open), shelfShortcut: settings.shortcut(.shelf), hasNotch: geometry().hasNotch, tabs: settings.shownTabs,
             hiddenModules: settings.hiddenModules, dragTarget: settings.dragTarget,
             addsScreenshots: settings.addsScreenshots)
     }
+
+    /// The modules that are on, which the guide's chips and copy are about.
+    var shownModules: [IslandModule] { IslandModule.allCases.filter(settings.isShown) }
 
     var step: GuideStep { flow.current }
     var title: String { GuideCopy.title(step.id) }

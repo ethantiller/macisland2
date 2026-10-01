@@ -211,6 +211,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.network.start()
         volumeMonitor.start()
         connectShelfChoices()
+        connectFeatures()
+    }
+
+    /// What a switch in the Features catalog does beyond what each feature's own setting already does.
+    private func connectFeatures() {
+        let viewModel = viewModel
+        let features = features
+        features.settings.onFeatureChange = { [weak viewModel] feature in
+            // Off, the clipboard holds nothing and watches nothing; on, it starts again with its size.
+            if feature == .clipboard { features.clipboard.setCapacity(features.settings.effectiveClipboardLimit) }
+            viewModel?.leaveModuleThatIsOff()
+        }
     }
 
     /// The Shelf's own settings: what is swept, whether screenshots arrive, and whether the clipboard is watched.
@@ -220,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.sweepShelf()
 
         let applyClipboard = {
-            features.clipboard.setCapacity(features.settings.clipboardLimit)
+            features.clipboard.setCapacity(features.settings.effectiveClipboardLimit)
         }
         features.settings.onClipboardChange = applyClipboard
         applyClipboard()
@@ -688,8 +700,8 @@ struct ModuleMenuBars: Scene {
             module.title,
             systemImage: module.systemImage,
             isInserted: Binding(
-                get: { gate.isOpen && viewModel.settings.isInMenuBar(module) },
-                set: { if gate.isOpen { viewModel.settings.setInMenuBar(module, $0) } }
+                get: { gate.isOpen && viewModel.settings.showsInMenuBar(module) },
+                set: { if gate.isOpen, viewModel.settings.isShown(module) { viewModel.settings.setInMenuBar(module, $0) } }
             )
         ) {
             MenuBarModuleView(module: module, viewModel: viewModel, panels: panels)
