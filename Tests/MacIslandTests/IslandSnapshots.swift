@@ -245,6 +245,31 @@ struct IslandSnapshots {
 
     private func makeViewModel() -> IslandViewModel { TestSupport.makeViewModel() }
 
+    /// The Mixer's panel in the Media tab (M2): with the access, and without it.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderMixer() {
+        let list = StubAppList()
+        list.apps = [
+            MixerApp(id: "com.apple.Music", name: "Music", processObjects: [1], isPlaying: true),
+            MixerApp(id: "com.spotify.client", name: "Spotify", processObjects: [2], isPlaying: true),
+            MixerApp(id: "us.zoom.xos", name: "zoom.us", processObjects: [3], isPlaying: true),
+        ]
+        for (name, access) in [
+            ("04g-expanded-media-mixer", OptionalAccessState.allowed),
+            ("04h-expanded-media-mixer-needs-access", .notAsked),
+        ] {
+            let viewModel = TestSupport.makeViewModel(mixerApps: list, mixerAccess: access)
+            viewModel.settings.setOn(.mixer, true)
+            viewModel.settings.mixerLevels = ["com.spotify.client": 0.6]
+            viewModel.nowPlaying.apply(sampleTrack())
+            viewModel.mixer.start()
+            viewModel.selectedTab = .media
+            viewModel.state = .expanded
+            viewModel.showsMediaOutputs = true
+            render(viewModel, name)
+        }
+    }
+
     /// The two drop tiles the Shelf shows while a file is dragged, as they look with the pointer over each half.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderDropTiles() {

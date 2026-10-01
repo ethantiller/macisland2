@@ -268,6 +268,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `NowPlayingModel.swift` | State, artwork, accent color, transport (direct to Music/Spotify, else the adapter), shuffle, repeat, Favorite, app volume |
 | `NowPlayingState.swift` | The state struct, `RepeatMode`, and the parser for the adapter's JSON lines |
 | `MediaRemoteAdapter.swift` | Runs the perl adapter: the `stream` process (restarted if it exits) and one-shot commands |
+| `MixerPanel.swift` | The Mixer's panel in the Media tab: the output chips, a row per app (slider, percent, output menu), and the permission lines |
 | `NowPlayingView.swift` | The player layout, scrubber, volume, output picker, lyric line, the compact play control, and the shared `mediaNamespace` |
 | `EqualizerView.swift` | The sound bars: a Core Animation loop (`EqualizerBarsView`), a still SwiftUI stand-in for snapshots, and `\.isSnapshot` |
 | `PlayerScripting.swift` | `ScriptablePlayer` (Music, Spotify), `PlayerCommand`, and AppleScript for volume, Favorite, transport, seek |
@@ -386,7 +387,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 55 files, about 13,200 lines, 919 tests. Swift Testing.
+`Tests/MacIslandTests/`: 55 files, about 13,400 lines, 929 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |

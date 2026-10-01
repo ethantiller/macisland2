@@ -544,6 +544,10 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Turning the Mixer off, or quitting, returns every app's sound; with the access denied in System Settings nothing is left silent
 - [ ] Lip sync in a browser video at 150% (added latency of about one buffer, 5 ms more above 100%)
 
+**Mixer in the Media tab (M2)** *(written, not run)*
+- [ ] Turn the Mixer on in Features and press Allow; macOS asks for System Audio Recording. In Media, the AirPlay button opens the panel, sliders change each app as M1 promised, the output menu routes an app, Esc and the chevron close it, and with the Mixer off the Media tab is as before (compare `04-expanded-media`)
+- [ ] With only a browser video playing (nothing in Now Playing) the Media tab shows the panel; denying the permission shows the red line and nothing is left silent
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget

@@ -199,6 +199,8 @@ final class IslandViewModel {
         didSet { if selectedTab != .tools { features.mirror.stop() } }
     }
     var clockMode: ClockMode = .timer
+    /// The Media tab's Audio Output and Volume panel is open: the output chips and volume, or the Mixer when it is on.
+    var showsMediaOutputs = false
     var agentsMode: AgentsMode = .now
     var usageRange: UsageRange = .today
     /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
@@ -418,12 +420,37 @@ final class IslandViewModel {
     /// The music player: the art, the scrubber, and the transport, a few points apart, and the lyric line when there is one. The
     /// Media tab has bigger art and sits a little lower than the peek. With nothing playing it is a single line.
     func mediaContentHeight(peek: Bool) -> CGFloat {
+        let gap = Theme.Metrics.playerSpacing
+        // The Mixer: with nothing playing in Now Playing but apps making sound, its panel stands alone; otherwise it replaces the
+        // scrubber, lyric line, and transport while the Audio Output button has it open.
+        if !peek, isMixerOn {
+            if !features.nowPlaying.state.hasMedia {
+                if showsMixerAlone { return Theme.Metrics.playerScrubber + gap + mixerBodyHeight }
+            } else if showsMediaOutputs {
+                return Theme.Metrics.playerTopInset + Theme.Metrics.playerArtwork + gap + Theme.Metrics.playerScrubber + gap
+                    + mixerBodyHeight
+            }
+        }
         guard features.nowPlaying.state.hasMedia else { return Theme.Metrics.glanceHeight }
         let art = peek ? Theme.Metrics.playerPeekArtwork : Theme.Metrics.playerArtwork
         let inset = peek ? 0 : Theme.Metrics.playerTopInset
         let lyrics = features.nowPlaying.lyrics.lines.isEmpty ? 0 : Theme.Metrics.lyricsRowHeight
-        let gap = Theme.Metrics.playerSpacing
         return inset + art + gap + Theme.Metrics.playerScrubber + gap + Theme.Metrics.playerTransport + lyrics
+    }
+
+    // MARK: The Mixer's panel
+
+    var isMixerOn: Bool { features.settings.isOn(.mixer) }
+
+    /// The Media tab shows the Mixer's panel alone: Now Playing has nothing, but apps are making sound.
+    var showsMixerAlone: Bool {
+        isMixerOn && !features.nowPlaying.state.hasMedia && !features.mixer.rows.isEmpty
+    }
+
+    /// What is under the panel's output row: one line for a message or for nothing playing, else a row per app, up to the cap.
+    var mixerBodyHeight: CGFloat {
+        let rows = features.mixer.access == .notAsked || features.mixer.access == .denied ? 1 : features.mixer.rows.count
+        return CGFloat(min(max(rows, 1), Theme.Metrics.mixerMaxRows)) * Theme.Metrics.mixerRowHeight
     }
 
     var showsDragTarget: Bool { isFileDragActive && presentation == .compact }
@@ -1068,6 +1095,10 @@ final class IslandViewModel {
         }
         if !clipboardQuery.isEmpty {
             clipboardQuery = ""
+            return true
+        }
+        if showsMediaOutputs, selectedTab == .media, isMixerOn, features.nowPlaying.state.hasMedia {
+            withAnimation(Theme.Motion.resize) { showsMediaOutputs = false }
             return true
         }
         return false

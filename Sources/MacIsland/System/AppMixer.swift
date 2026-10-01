@@ -1,6 +1,15 @@
+import AppKit
 import CoreAudio
 import Foundation
 import Observation
+
+/// One app in the Mixer's panel.
+struct MixerRow: Identifiable, Equatable {
+    var id: String
+    var name: String
+    var isPlaying: Bool
+    var isNeverTapped: Bool
+}
 
 /// Per-app volume (0 to 200%) and output, with no driver: an app that is adjusted is tapped and played again by MacIsland, and an app
 /// that is not is not touched.
@@ -100,7 +109,34 @@ final class AppMixer {
         reconcile()
     }
 
+    // MARK: What the panel lists
+
+    /// The apps that are playing, and those that have been adjusted (so a level can be set between songs): playing first, by name.
+    var rows: [MixerRow] {
+        guard isRunning else { return [] }
+        let adjusted = Set(levels.keys).union(outputs.keys)
+        var result = apps.filter { $0.isPlaying || adjusted.contains($0.id) }
+            .map { MixerRow(id: $0.id, name: $0.name, isPlaying: $0.isPlaying, isNeverTapped: $0.isNeverTapped) }
+        let listed = Set(result.map(\.id))
+        result += adjusted.subtracting(listed).map {
+            MixerRow(id: $0, name: Self.displayName(for: $0), isPlaying: false, isNeverTapped: false)
+        }
+        return result.sorted { ($0.isPlaying ? 0 : 1, $0.name.lowercased()) < ($1.isPlaying ? 0 : 1, $1.name.lowercased()) }
+    }
+
+    /// An app's name from its bundle ID, for an adjusted app that isn't running.
+    static func displayName(for bundleID: String) -> String {
+        if let name = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.localizedName { return name }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+        }
+        return bundleID.split(separator: ".").last.map(String.init) ?? bundleID
+    }
+
     // MARK: Levels and outputs
+
+    /// A slider's level: a drag that ends this close to 100% lands on it.
+    static func snapped(_ level: Double) -> Double { abs(level - 1) < 0.04 ? 1 : level }
 
     func level(for id: String) -> Double { levels[id] ?? 1 }
 
@@ -121,6 +157,12 @@ final class AppMixer {
         if value == 1 { settings.mixerLevels[id] = nil } else { settings.mixerLevels[id] = value }
         hasActed = true
         reconcile()
+    }
+
+    /// While a slider is dragged: the running tap follows at once, and nothing is stored until the level is committed.
+    func previewLevel(_ level: Double, for id: String) {
+        guard !Self.neverTapped(bundleID: id) else { return }
+        taps[id]?.tap.setLevel(Float(min(max(level, Self.range.lowerBound), Self.range.upperBound)))
     }
 
     func setOutput(_ uid: String?, for id: String) {

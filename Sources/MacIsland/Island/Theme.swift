@@ -231,6 +231,10 @@ enum Theme {
         static let keyCapRadius: CGFloat = 6
         /// The dot under a day in the month view that has an event.
         static let monthEventDot: CGFloat = 4
+        /// One app in the Mixer's panel: its name, a slider, the percent, and its output.
+        static let mixerRowHeight: CGFloat = 28
+        /// The most rows the Mixer shows before it scrolls.
+        static let mixerMaxRows = 4
         /// The Agents module, in every mode: its header, then what fits under it (two tasks and the limits; the usage; the map).
         static let agentsHeight: CGFloat = 176
         /// The header's two choosers: the modes, and the range of the usage.

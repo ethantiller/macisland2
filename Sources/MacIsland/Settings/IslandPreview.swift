@@ -25,6 +25,8 @@ struct PreviewContext: Equatable {
     var showsVolume = false
     /// A file is being dragged toward the island: the compact preview shows the drop target the setting chose.
     var fileDrag = false
+    /// The Media tab's Mixer panel is open.
+    var showsMixer = false
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
     var clockMode: ClockMode?
 }
@@ -139,6 +141,7 @@ final class IslandPreviewModel {
             case .expanded:
                 clearAnnouncements()
                 viewModel.selectedTab = context.tab
+                viewModel.showsMediaOutputs = context.showsMixer
                 if let mode = context.clockMode { viewModel.clockMode = mode }
                 viewModel.state = .expanded
             case .menuBar:

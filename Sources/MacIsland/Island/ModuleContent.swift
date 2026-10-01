@@ -14,7 +14,10 @@ struct ModuleContent: View {
         case .media:
             if viewModel.nowPlaying.state.hasMedia {
                 NowPlayingView(
-                    nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth)
+                    nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth,
+                    viewModel: viewModel)
+            } else if viewModel.showsMixerAlone {
+                MixerPanel(viewModel: viewModel, canHide: false)
             } else {
                 Label("Not Playing", systemImage: "music.note")
                     .font(Theme.Typography.bodyEmphasized)

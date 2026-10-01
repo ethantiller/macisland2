@@ -128,7 +128,7 @@ enum Feature: String, CaseIterable, Identifiable {
     /// the Features pane doesn't list it.
     static let built: Set<Feature> = [
         .music, .clock, .reminders, .tools, .shelf, .clipboard, .notes, .calendar, .weather, .volumeHUD,
-        .system, .agents,
+        .system, .agents, .mixer,
     ]
 
     var isBuilt: Bool { Self.built.contains(self) }

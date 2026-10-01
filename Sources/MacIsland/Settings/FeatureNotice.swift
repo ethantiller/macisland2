@@ -73,7 +73,8 @@ extension Feature {
         case .volumeHUD: PreviewContext(presentation: .banner, showsVolume: true)
         case .system: PreviewContext(presentation: .expanded, tab: .home)
         case .agents: PreviewContext(presentation: .expanded, tab: .agents)
-        case .mixer, .downloads, .chooseActivity, .notifications: nil
+        case .mixer: PreviewContext(presentation: .expanded, tab: .media, showsMixer: true)
+        case .downloads, .chooseActivity, .notifications: nil
         }
     }
 

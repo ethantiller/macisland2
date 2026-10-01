@@ -353,3 +353,139 @@ struct AppMixerTests {
         #expect(states == [true, false, true, true])
     }
 }
+
+// MARK: The panel in the Media tab
+
+@MainActor
+struct MixerPanelTests {
+    private func playing(_ count: Int) -> [MixerApp] {
+        (0..<count).map {
+            MixerApp(id: "com.example.app\($0)", name: "App \($0)", processObjects: [AudioObjectID($0 + 1)], isPlaying: true)
+        }
+    }
+
+    private func make(
+        access: OptionalAccessState = .allowed, apps: Int = 0, media: Bool = true, mixerOn: Bool = true
+    ) -> (viewModel: IslandViewModel, list: StubAppList) {
+        let list = StubAppList()
+        list.apps = playing(apps)
+        let viewModel = TestSupport.makeViewModel(mixerApps: list, mixerAccess: access)
+        viewModel.settings.setOn(.mixer, mixerOn)
+        if media {
+            var state = NowPlayingState()
+            state.title = "Midnight City"
+            state.isPlaying = true
+            viewModel.nowPlaying.apply(state)
+        }
+        viewModel.mixer.start()
+        viewModel.selectedTab = .media
+        viewModel.state = .expanded
+        return (viewModel, list)
+    }
+
+    private var chrome: CGFloat {
+        let gap = Theme.Metrics.playerSpacing
+        return Theme.Metrics.playerTopInset + Theme.Metrics.playerArtwork + gap + Theme.Metrics.playerScrubber + gap
+    }
+
+    @Test func theMediaHeightFollowsTheRows() {
+        let (viewModel, list) = make()
+        viewModel.showsMediaOutputs = true
+        for count in 0...6 {
+            list.publish(playing(count))
+            let rows = CGFloat(min(max(count, 1), Theme.Metrics.mixerMaxRows))
+            #expect(viewModel.mediaContentHeight(peek: false) == chrome + rows * Theme.Metrics.mixerRowHeight, "\(count) apps")
+        }
+        #expect(
+            chrome + CGFloat(Theme.Metrics.mixerMaxRows) * Theme.Metrics.mixerRowHeight <= Theme.Metrics.homeMaxContentHeight,
+            "the tallest panel fits the tallest Home")
+        // Closed, the player is as tall as it was.
+        viewModel.showsMediaOutputs = false
+        let closed = viewModel.mediaContentHeight(peek: false)
+        #expect(closed == chrome + Theme.Metrics.playerTransport)
+        #expect(viewModel.mediaContentHeight(peek: true) < closed, "the peek never grows")
+    }
+
+    @Test func thePanelReplacesNotPlayingWhenAppsMakeSound() {
+        let (viewModel, list) = make(apps: 2, media: false)
+        #expect(viewModel.showsMixerAlone)
+        let rows = CGFloat(2)
+        #expect(
+            viewModel.mediaContentHeight(peek: false)
+                == Theme.Metrics.playerScrubber + Theme.Metrics.playerSpacing + rows * Theme.Metrics.mixerRowHeight)
+        list.publish([])
+        #expect(!viewModel.showsMixerAlone && viewModel.mediaContentHeight(peek: false) == Theme.Metrics.glanceHeight)
+        // Off, it is still "Not Playing".
+        let off = make(apps: 2, media: false, mixerOn: false).viewModel
+        off.mixer.start()
+        #expect(!off.showsMixerAlone)
+    }
+
+    @Test func withTheMixerOffTheButtonDoesWhatItDidBefore() {
+        let (viewModel, _) = make(apps: 3, mixerOn: false)
+        let closed = viewModel.mediaContentHeight(peek: false)
+        viewModel.showsMediaOutputs = true
+        #expect(viewModel.mediaContentHeight(peek: false) == closed, "the chips replace the scrubber at the same height")
+        viewModel.selectedTab = .media
+        #expect(!viewModel.stepBack(), "Esc leaves the old picker as it was")
+    }
+
+    @Test func eachPermissionStateShowsItsLine() {
+        #expect(MixerPanel.line(for: .notAsked) == "The Mixer needs System Audio Recording.")
+        #expect(MixerPanel.line(for: .denied) == "System Audio Recording is off.")
+        #expect(MixerPanel.line(for: .asked) == nil && MixerPanel.line(for: .allowed) == nil)
+        for state in [OptionalAccessState.notAsked, .denied] {
+            let (viewModel, _) = make(access: state, apps: 4)
+            viewModel.showsMediaOutputs = true
+            #expect(viewModel.mixerBodyHeight == Theme.Metrics.mixerRowHeight, "a message takes one row: \(state)")
+        }
+    }
+
+    @Test func aSliderSetsTheAppsGain() {
+        let (viewModel, list) = make(apps: 1)
+        let app = list.apps[0]
+        // The slider runs 0 to 1 over 0 to 200%: halfway is 100%, a quarter is 50%, and a hair off 100% lands on it.
+        viewModel.mixer.setLevel(AppMixer.snapped(0.25 * 2), for: app.id)
+        #expect(viewModel.mixer.level(for: app.id) == 0.5)
+        #expect(AppMixer.snapped(0.51 * 2) == 1 && AppMixer.snapped(1.2) == 1.2 && AppMixer.snapped(0) == 0)
+        viewModel.mixer.setLevel(AppMixer.snapped(0.99), for: app.id)
+        #expect(viewModel.mixer.level(for: app.id) == 1 && viewModel.settings.mixerLevels.isEmpty)
+        // Previewing while dragging stores nothing.
+        viewModel.mixer.previewLevel(1.7, for: app.id)
+        #expect(viewModel.settings.mixerLevels.isEmpty)
+    }
+
+    @Test func anAdjustedAppStaysInTheListBetweenSongs() {
+        let (viewModel, list) = make(apps: 2)
+        let first = list.apps[0]
+        viewModel.mixer.setLevel(0.5, for: first.id)
+        list.publish([list.apps[1]])
+        #expect(viewModel.mixer.rows.map(\.id).contains(first.id))
+        #expect(viewModel.mixer.rows.first?.id == list.apps[1].id, "playing apps come first")
+        #expect(viewModel.mixer.rows.last?.isPlaying == false)
+    }
+
+    @Test func escClosesThePanelFirst() {
+        let (viewModel, _) = make(apps: 2)
+        viewModel.showsMediaOutputs = true
+        #expect(viewModel.stepBack() && !viewModel.showsMediaOutputs)
+        #expect(!viewModel.stepBack(), "the next Esc closes the island")
+    }
+
+    @Test func thePreviewDrawsThePanelWithSampleApps() {
+        let live = TestSupport.makeViewModel()
+        live.settings.setOn(.mixer, true)
+        let preview = IslandPreviewModel(live: live.features)
+        defer { preview.stop() }
+        preview.show(Feature.mixer.previewContext ?? PreviewContext())
+        #expect(preview.viewModel.showsMediaOutputs && preview.viewModel.selectedTab == .media)
+        #expect(preview.viewModel.mixer.rows.count == 4)
+        #expect(preview.viewModel.mixer.tappedApps.count >= 1, "sample levels, on taps that do nothing")
+        #expect(live.mixer.tappedApps.isEmpty, "the live mixer is untouched")
+    }
+
+    @Test func theMixerIsInTheFeaturesPaneNow() {
+        #expect(Feature.mixer.isBuilt && Feature.mixer.previewContext?.showsMixer == true)
+        #expect(Feature.mixer.optionalAccess == [.systemAudio])
+    }
+}

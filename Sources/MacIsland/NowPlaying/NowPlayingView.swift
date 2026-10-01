@@ -48,8 +48,21 @@ struct NowPlayingView: View {
     /// Drawn inside a Home widget: the peek's player, without the art and bars flying to the other presentations,
     /// the lyric line, or the output picker.
     var inWidget = false
+    /// The island, when this is the Media tab: the Audio Output button's panel is kept there (so its height and Esc can see it), and
+    /// it opens the Mixer instead of the output chips while the Mixer is on.
+    var viewModel: IslandViewModel?
 
-    @State private var showsOutputs = false
+    @State private var localShowsOutputs = false
+
+    private var showsOutputs: Bool {
+        get { viewModel?.showsMediaOutputs ?? localShowsOutputs }
+        nonmutating set {
+            if let viewModel { viewModel.showsMediaOutputs = newValue } else { localShowsOutputs = newValue }
+        }
+    }
+
+    /// The Mixer's panel is what the button opened.
+    private var showsMixer: Bool { showsOutputs && !isCompact && viewModel?.isMixerOn == true }
 
     private var state: NowPlayingState { nowPlaying.state }
     private var isCompact: Bool { isPeek || inWidget }
@@ -59,7 +72,10 @@ struct NowPlayingView: View {
         VStack(spacing: Theme.Metrics.playerSpacing) {
             header
 
-            if showsOutputs {
+            if showsMixer, let viewModel {
+                MixerPanel(viewModel: viewModel, canHide: true)
+                    .transition(.opacity)
+            } else if showsOutputs {
                 HStack(spacing: 12) {
                     if nowPlaying.appVolume != nil {
                         VolumeControl(nowPlaying: nowPlaying)
@@ -73,11 +89,13 @@ struct NowPlayingView: View {
                     .transition(.opacity)
             }
 
-            transport
+            if !showsMixer {
+                transport
 
-            if !inWidget, !nowPlaying.lyrics.lines.isEmpty {
-                LyricLineView(nowPlaying: nowPlaying)
-                    .transition(.opacity)
+                if !inWidget, !nowPlaying.lyrics.lines.isEmpty {
+                    LyricLineView(nowPlaying: nowPlaying)
+                        .transition(.opacity)
+                }
             }
         }
         .padding(.top, isCompact ? 0 : Theme.Metrics.playerTopInset)
@@ -266,7 +284,7 @@ private struct ScrubberRow: View {
     }
 }
 
-private struct OutputPicker: View {
+struct OutputPicker: View {
     let outputs: AudioOutputs
     let bluetooth: BluetoothDevices
 

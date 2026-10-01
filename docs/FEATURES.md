@@ -210,6 +210,10 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
   apps use the system's command.
 - **Favorite** (Apple Music only) is a heart. **App volume** (Music and Spotify) is a slider beside the output chips, behind
   the AirPlay button. **Audio output**: chips for each output device, then a *Not Connected* group with your paired Bluetooth headphones and speakers: click one to connect it (blue "Connecting" while it works; the headphones banner confirms, or "Couldn't Connect"). Right-click a connected Bluetooth output to *Disconnect*. The paired list is read only when the picker opens. In the palette, `connect airpods` finds them too.
+- **Mixer** (off until it is switched on in Settings → Features, which asks for System Audio Recording when you press Allow). With it on, the same AirPlay button opens the Mixer instead of the output chips alone: a row for each app that is making sound (or that you have adjusted), with a slider from 0 to 200% (the middle is 100%; double-click the percent to go back to it), and a menu to send that app to its own output. Boosting above 100% is limited so it doesn't clip. Calls and pro-audio apps are listed and left alone. Esc or the chevron closes it. With nothing in Now Playing but apps making sound, the Media tab shows the Mixer instead of "Not Playing". Without the permission it says so and offers Open Settings. An app at 100% on the default output is never touched.
+
+  ![The Mixer](images/04g-expanded-media-mixer.png)
+
 - **Synced lyrics** under the scrubber, from LRCLIB, while the track has them. Turn off in Settings.
 - Compact: the artwork and, on the right, a play button that becomes bouncing bars while playing. Click it to play or pause.
 

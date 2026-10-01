@@ -9,12 +9,17 @@ import AppKit
 enum TestSupport {
     static func makeViewModel(
         bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
-        screen: StubScreen? = nil, transcriber: StubTranscriber? = nil
+        screen: StubScreen? = nil, transcriber: StubTranscriber? = nil,
+        mixerApps: StubAppList? = nil, mixerTaps: StubTapper? = nil, mixerAccess: OptionalAccessState? = nil
     ) -> IslandViewModel {
         // A private suite per view model, so tests running in parallel never see each other's settings.
         let suite = "MacIslandTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
+        if let access = mixerAccess, access != .notAsked {
+            OptionalAccessRecord.record(.asked, for: .systemAudio, defaults: defaults)
+            if access != .asked { OptionalAccessRecord.record(access, for: .systemAudio, defaults: defaults) }
+        }
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let shelf = ShelfModel(defaults: defaults, ownedFolder: scratch.appendingPathComponent("Shelf Results"))
         let work = WorkTracker()
@@ -62,7 +67,8 @@ enum TestSupport {
                 system: SystemModel(sampler: StubSystemSampler()),
                 agents: AgentActivity(),
                 mixer: AppMixer(
-                    settings: settings, listing: StubAppList(), tapper: StubTapper(), defaults: defaults)
+                    settings: settings, listing: mixerApps ?? StubAppList(), tapper: mixerTaps ?? StubTapper(),
+                    defaults: defaults)
             ))
         viewModel.geometry = geometry
         return viewModel
