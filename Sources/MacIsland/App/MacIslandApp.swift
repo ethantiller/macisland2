@@ -63,7 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf),
             widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
             system: SystemModel(sampler: LiveSystemSampler()),
-            agents: AgentActivity()
+            agents: AgentActivity(),
+            mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper())
         )
     }
 
@@ -74,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features: features, viewModel: viewModel,
         music: { [weak self] on in on ? self?.features.nowPlaying.start() : self?.features.nowPlaying.stop() },
         screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() },
-        agents: { [weak self] on in self?.applyAgents(on) }))
+        agents: { [weak self] on in self?.applyAgents(on) },
+        mixer: { [weak self] on in self?.applyMixer(on) }))
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
@@ -134,6 +136,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         features.fileTools.cleanUpStaging()
         features.notes.save()
         features.nowPlaying.stop()
+        // Every app is heard directly again.
+        features.mixer.tearDown()
     }
 
     private func connectEvents() {
@@ -255,6 +259,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 event: .agentLimit)
         }
         usage.start()
+    }
+
+    /// The Mixer listens to the apps' sound only while it is on, and gives every app's sound back when it is off or the outputs change.
+    private func applyMixer(_ on: Bool) {
+        let mixer = features.mixer
+        let outputs = features.outputs
+        mixer.availableOutputs = { Set(outputs.devices.compactMap(\.uid)) }
+        mixer.defaultOutput = { outputs.devices.first { $0.id == outputs.defaultDeviceID }?.uid }
+        outputs.onChange = { [weak mixer] in mixer?.devicesChanged() }
+        guard on else {
+            mixer.stop()
+            return
+        }
+        mixer.start()
     }
 
     /// What a switch in the Features catalog does beyond what each feature's own setting already does.
@@ -543,6 +561,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let onboarding = onboarding
         SettingsWindowController.shared.onboarding = onboarding
         let access = LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess, transfers: features.transfers)
+        // The Mixer's Allow: a brief tap of MacIsland's own process, which is what makes macOS ask.
+        let tapper = CoreAudioTapper()
+        access.systemAudioProbe = { await tapper.probe() }
         // Settings \u{2192} Privacy and the guide ask through this one, so a grant in either counts in both.
         let model = AccessModel(
             provider: access, settings: features.settings,

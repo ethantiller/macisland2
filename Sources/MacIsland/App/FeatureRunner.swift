@@ -11,12 +11,15 @@ final class FeatureRunner {
     private let music: (Bool) -> Void
     private let screenshots: (Bool) -> Void
     private let agents: (Bool) -> Void
+    private let mixer: (Bool) -> Void
 
     init(
         features: IslandFeatures, viewModel: IslandViewModel, music: @escaping (Bool) -> Void,
-        screenshots: @escaping (Bool) -> Void, agents: @escaping (Bool) -> Void = { _ in }
+        screenshots: @escaping (Bool) -> Void, agents: @escaping (Bool) -> Void = { _ in },
+        mixer: @escaping (Bool) -> Void = { _ in }
     ) {
         self.agents = agents
+        self.mixer = mixer
         self.features = features
         self.viewModel = viewModel
         self.music = music
@@ -54,6 +57,7 @@ final class FeatureRunner {
     func startAtLaunch() {
         if settings.isOn(.music) { music(true) }
         if settings.isOn(.agents) { agents(true) }
+        if settings.isOn(.mixer) { mixer(true) }
         settings.syncHomeWidgets()
         viewModel.leaveModuleThatIsOff()
     }
@@ -91,7 +95,10 @@ final class FeatureRunner {
             // Off, the stream is torn down and what was seen is forgotten; on (or the agents read changed), it starts again.
             if !on { features.agents.reset() }
             agents(on)
-        case .volumeHUD, .mixer, .system, .downloads, .chooseActivity, .notifications:
+        case .mixer:
+            // Off, every tap is given back; on, it listens again (and taps nothing until something is adjusted and the access allows).
+            mixer(on)
+        case .volumeHUD, .system, .downloads, .chooseActivity, .notifications:
             break  // `volumeHUD` follows its own setting; the rest arrive with their packages
         }
         viewModel.leaveModuleThatIsOff()

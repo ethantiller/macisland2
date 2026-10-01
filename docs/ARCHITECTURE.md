@@ -451,6 +451,22 @@ The Agents module (`Agents/`, `IslandModule.agents`, feature `agents`, off by de
 
 ---
 
+## The Mixer
+
+The Mixer (`System/AppMixer.swift`, feature `mixer`, off by default) sets any app's volume from 0 to 200% and sends it to its own output, with no driver. Its UI is the Media tab's panel (below); this section is the engine.
+
+**The tap rule (what answers "breaks the idle budget").** An app at 100% on the default output has no tap. An adjusted app has a Core Audio process tap and a private aggregate device (the chosen output as its main sub-device, the tap in its tap list with drift compensation) only while it is running output; when it stops, both are destroyed (no IO), and they are made again when output starts. With nothing adjusted the Mixer costs only its listeners: `CoreAudioAppList` listens to the process list and to each process's `kAudioProcessPropertyIsRunningOutput` (the `PrivacyMonitor` pattern; no polling). The tap is `CATapDescription(stereoMixdownOfProcesses:)`, `.mutedWhenTapped`, private; the IO proc copies the tap's input buffers to the output's, times the level, through `BoostLimiter`.
+
+**The limiter.** Up to 100% the sound is multiplied and not delayed (unity passes samples unchanged). Above it, `BoostLimiter` (pure; interleaved Float32; no allocation after `init`) looks 5 ms ahead with a monotone queue of the gain each frame needs to stay inside ±1.0, so every sample is held inside and the sound is that much later; the gain climbs back over about 80 ms. The look-ahead scales with the output's sample rate, read when the tap starts (a rate change while a tap runs is not followed; the next device change makes the taps again, **verify** for crackle).
+
+**Apps.** The process list gives each process its pid and bundle ID; helpers are grouped under their app by walking parent pids with `proc_pidinfo(PROC_PIDTBSDINFO)` to the nearest `NSRunningApplication` with a bundle that isn't `.prohibited` (`AppGrouping.owner`, pure; the private "responsible pid" call is not used). **Verify** whether tapping by `bundleIDs` (macOS 26) catches an app's helpers, and prefer it if it does. **Never tapped** (listed, no slider): MacIsland itself, call apps (Zoom, FaceTime, Teams), and pro-audio apps (`AppMixer.neverTappedBundleIDs`).
+
+**Permission.** System Audio Recording has no API to ask about, so its state is evidence (`OptionalAccessRecord`). No tap is made at launch unless it is already `allowed`; the island never asks. Allow in Features runs `CoreAudioTapper.probe()`, a 0.4 s tap of MacIsland's own process (**verify** which step brings the prompt). After that the state reads `asked` (can't be checked), and the first adjustment is trusted. A tap that cannot be made, or that hears only silence for two seconds while its app is playing, marks it `denied` and **tears every tap down at once**, so a muted-when-tapped app is never left silent; sound through a tap marks it `allowed`, after which silence never denies. A device change (an output gone, the default changed) destroys every tap and makes the wanted ones again against what exists; a chosen output that is gone counts as the default (the choice is kept for when it returns). Turning the feature off and quitting (`applicationWillTerminate`) destroy every tap; the taps are private to the process, so a crash returns every app's sound too (**verify**).
+
+**Storage.** `mixer.levels` (bundle ID to level, only the ones that aren't 100%) is in the settings file; `mixer.outputs` (bundle ID to device UID) is not, because UIDs belong to this Mac. Both are evidence keys.
+
+---
+
 ## Floating surfaces
 
 `FloatingGlassPanel` is an `NSPanel` for a module torn off the island: resizable, moved by its background, no chrome, closed by its own button.
@@ -544,7 +560,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Microphone | Voice Note | `NSMicrophoneUsageDescription` |
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
 | Screen Recording | Record Screen | (system prompt via `CGRequestScreenCaptureAccess`; no key) |
-| System Audio Recording (**optional**) | The Mixer (not built yet); asked only from Allow in Features | `NSAudioCaptureUsageDescription` |
+| System Audio Recording (**optional**) | The Mixer; asked only from Allow in Features | `NSAudioCaptureUsageDescription` |
 
 **Optional access.** `OptionalAccess` (`Onboarding/OptionalAccess.swift`) is separate from `AccessKind`, the ten the guide walks through, so `allAllowed`, `missing`, `SetupGate`, and the guide never see it: a feature that starts off must not close the island. There is no public API that reads or requests System Audio Recording (checked in the SDK's CoreAudio, AVFAudio, and ScreenCaptureKit headers); macOS asks the first time a process tap starts. Its state is therefore evidence, kept in `access.optional` (`OptionalAccessRecord`, not an install-evidence key, cleared by `make first-run`): `notAsked` until MacIsland has asked, `allowed` once a tap has delivered sound, `denied` once a tap delivered only silence while its app was playing, and `asked` in between (shown as "Can't Be Checked"). `AccessProviding` has `state(of: OptionalAccess)` and `request(_:)` with default implementations, so test doubles compile unchanged; `LiveAccess.systemAudioProbe` is the hook the Mixer sets. **The ask:** turning a feature on opens a line under its row in Features (the reason in a sentence, **Allow**, **Not Now**); only Allow reaches the system prompt, a preset never asks (its rows show the line), a refusal shows "is off" with **Open System Settings**, and the island itself never asks. Settings → Privacy lists the state under Optional Access once a feature that needs one is built.
 `LSUIElement` is true (no Dock icon). The app is signed with a **self-signed "MacIsland Dev" certificate**, which the first build

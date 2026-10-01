@@ -252,6 +252,22 @@ final class AppSettings {
         }
     }
 
+    /// The Mixer's levels, by app bundle ID: only the ones that aren't 100%, from 0 to 2.
+    var mixerLevels: [String: Double] {
+        didSet {
+            guard mixerLevels != oldValue else { return }
+            defaults.set(mixerLevels, forKey: Key.mixerLevels)
+        }
+    }
+
+    /// The output each app was sent to, by bundle ID, as a device UID. These belong to this Mac and are not exported.
+    var mixerOutputs: [String: String] {
+        didSet {
+            guard mixerOutputs != oldValue else { return }
+            defaults.set(mixerOutputs, forKey: Key.mixerOutputs)
+        }
+    }
+
     func hasCountdown(_ id: String) -> Bool { countdowns[id] != nil }
 
     /// Adds or removes a countdown. Does nothing unless it changes something.
@@ -482,6 +498,8 @@ final class AppSettings {
         static let agentsMinimum = "agents.minimum"
         static let agentsThreshold = "agents.limitThreshold"
         static let agentsLeft = "agents.limitsLeft"
+        static let mixerLevels = "mixer.levels"
+        static let mixerOutputs = "mixer.outputs"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
 
@@ -527,6 +545,10 @@ final class AppSettings {
         let threshold = defaults.object(forKey: Key.agentsThreshold) as? Int ?? 80
         agentLimitThreshold = Self.agentThresholds.contains(threshold) ? threshold : 80
         showsLimitsLeft = defaults.object(forKey: Key.agentsLeft) as? Bool ?? false
+        mixerLevels = (defaults.dictionary(forKey: Key.mixerLevels) as? [String: Double] ?? [:]).filter {
+            AppMixer.range.contains($0.value) && $0.value != 1
+        }
+        mixerOutputs = defaults.dictionary(forKey: Key.mixerOutputs) as? [String: String] ?? [:]
         countdowns = (defaults.dictionary(forKey: Key.countdowns) as? [String: Double] ?? [:])
             .mapValues { Date(timeIntervalSince1970: $0) }
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""

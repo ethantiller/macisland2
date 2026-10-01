@@ -179,6 +179,7 @@ struct IslandFeatures {
     let widgets: CustomWidgetValues
     let system: SystemModel
     let agents: AgentActivity
+    let mixer: AppMixer
 }
 
 @MainActor

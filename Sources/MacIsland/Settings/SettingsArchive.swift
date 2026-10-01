@@ -30,6 +30,8 @@ struct SettingsArchive: Codable, Equatable {
     var agentFinishMinimum: Int?
     var agentLimitThreshold: Int?
     var showsLimitsLeft: Bool?
+    /// App levels in the Mixer. Their outputs are device UIDs of this Mac and are left out.
+    var mixerLevels: [String: Double]?
     var weatherCity: String?
     var dragTarget: String?
     var addsScreenshots: Bool?
@@ -88,6 +90,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.agentFinishMinimum = settings.agentFinishMinimum
         archive.agentLimitThreshold = settings.agentLimitThreshold
         archive.showsLimitsLeft = settings.showsLimitsLeft
+        archive.mixerLevels = settings.mixerLevels
         archive.weatherCity = settings.weatherCity
         archive.dragTarget = settings.dragTarget.rawValue
         archive.addsScreenshots = settings.addsScreenshots
@@ -173,6 +176,11 @@ extension AppSettings {
         if let value = archive.agentFinishMinimum, Self.agentMinimums.contains(value) { agentFinishMinimum = value }
         if let value = archive.agentLimitThreshold, Self.agentThresholds.contains(value) { agentLimitThreshold = value }
         if let value = archive.showsLimitsLeft { showsLimitsLeft = value }
+        if let value = archive.mixerLevels {
+            mixerLevels = value.filter {
+                AppMixer.range.contains($0.value) && $0.value != 1 && !AppMixer.neverTapped(bundleID: $0.key)
+            }
+        }
         if let value = archive.weatherCity { weatherCity = value }
         if let value = archive.dragTarget.flatMap(DragTarget.init) { dragTarget = value }
         if let value = archive.addsScreenshots { addsScreenshots = value }

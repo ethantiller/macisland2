@@ -60,7 +60,9 @@ enum TestSupport {
                 ),
                 widgets: CustomWidgetValues(fetcher: StubWidgetFetcher()),
                 system: SystemModel(sampler: StubSystemSampler()),
-                agents: AgentActivity()
+                agents: AgentActivity(),
+                mixer: AppMixer(
+                    settings: settings, listing: StubAppList(), tapper: StubTapper(), defaults: defaults)
             ))
         viewModel.geometry = geometry
         return viewModel

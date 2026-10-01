@@ -345,6 +345,10 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `System/PrivacyMonitor.swift` | Which app is using the microphone, from CoreAudio property listeners (no polling) |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
 | `System/SystemSampler.swift` | `SystemMath` (pure), `LiveSystemSampler` (Mach calls, memory pressure), and `SystemModel` (samples only while the widget runs it) |
+| `System/AppMixer.swift` | The Mixer's rules: which apps are tapped, levels and outputs, and the permission evidence |
+| `System/AppAudio.swift` | `MixerApp`, `AppGrouping` (pure), and the Core Audio process list behind `AppAudioListing` |
+| `System/AppAudioTap.swift` | `AudioTap` and `AudioTapping`, the audio thread's `TapState`, and the live process tap and aggregate device |
+| `System/BoostLimiter.swift` | The look-ahead peak limiter for gain above 100% (pure) |
 | `System/FocusMode.swift` | Whether a Focus is on, read when needed or while the Focus button shows; switching through Shortcuts |
 | `System/DiskSpace.swift` | `DiskRule` (warn under 10 GB, re-arm above 15 GB) and `DiskSpace`, checked on events |
 | `System/BluetoothDevices.swift` | Paired audio devices, connecting, and `IOBluetoothProvider` behind `BluetoothDeviceProviding` |
@@ -382,7 +386,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 54 files, about 12,800 lines, 899 tests. Swift Testing.
+`Tests/MacIslandTests/`: 55 files, about 13,200 lines, 919 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -413,6 +417,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
+| `MixerTests.swift` | The limiter on buffers, helper grouping, and the Mixer's rules with a stub list and stub taps |
 | `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |
 | `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |

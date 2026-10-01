@@ -53,6 +53,7 @@ Where the app ended up differently from what was first planned, and why. The des
 | 7 modules; **5 tabs left of the notch and 1 right**, arranged in Settings | User request |
 | Default tabs Home, Media, **Clock, Reminders**, Tools. Shelf and Notes are in *Not Shown* | Reminders became its own tab; Shelf still opens on a drop |
 | Reminders is its own module, not part of Home | User request |
+| The Mixer is built after all, as per-app process taps made only for an app that is adjusted and playing | It was dropped for "breaking the idle budget"; a tap that exists only while its app plays costs nothing when nothing is adjusted (see [ARCHITECTURE](ARCHITECTURE.md#the-mixer)) |
 | The command palette and everything for it (search engines, translation, answers, currency rates, the app and Shortcuts index, its shortcut, `macisland://palette`) was **removed** | User: it was not useful. Shortcuts stay as Home widgets |
 | Home is two rows of boxes: Up Next, music, four tools, timers and Shelf. Battery and stats are not on it | Iterated with the user |
 | **Home is a uniform 6-column grid**: each widget has a few sizes, each with its own layout; Home is 1 to 3 rows tall and grows and shrinks with its widgets; widgets fill in reading order (agreed 2026-09-30). A uniform grid can't draw the old default exactly, so row 1 is pixel-identical and row 2 changed: Quick Tools 72 wide (was 80), the pill 392 (was 384), row 2 64 tall (was 68), Home 138 tall (was 142) | The editor needs one simple model: snap to a grid, sizes not dimensions. The panel is 276 tall (was 260) |
@@ -538,6 +539,11 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] A window at 80% flashes the red "Claude at 80%" once and not again until it resets; turning Agents off deletes `~/Library/Caches/com.ethantiller.MacIsland/Agents/usage.json`
 - [ ] Activity shows your last 91 days with today's cell last, the streak is right, and hovering a cell names its day; the Agents widget (Add Widgets) fits at 2 × 1 and 3 × 1
 
+**Mixer engine (M1)** *(written, not run; no UI until M2)*
+- [ ] With the Mixer feature on and System Audio Recording allowed, Music at 50% (set from M2) is half as loud, Safari at 150% is louder without crackle, Spotify can play on headphones while Music stays on the speakers; with nothing adjusted idle CPU is unchanged
+- [ ] Turning the Mixer off, or quitting, returns every app's sound; with the access denied in System Settings nothing is left silent
+- [ ] Lip sync in a browser video at 150% (added latency of about one buffer, 5 ms more above 100%)
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget
@@ -649,7 +655,7 @@ Considered during planning and ruled out, each for a concrete reason. Check here
 | Lock Screen Widgets | Apps can't draw on the lock screen |
 | Keyboard Backlight | Private CoreBrightness |
 | External Display Control | DDC/CI is private on Apple silicon |
-| Sound Mixer, EQ, Live Audio Spectrum | Audio process taps; breaks the idle budget |
+| EQ, Live Audio Spectrum | A different engine from the Mixer's per-app taps |
 | Alt HUD Styles, Caps Lock HUD, a brightness HUD | Brightness: no public API. The system volume HUD **can** be replaced by taking the key (see [plans/volume-hud.md](plans/volume-hud.md) and Replace the Volume HUD in Settings → Notifications), so the old reason no longer stands for volume |
 | Keystroke HUD | Input Monitoring for a niche use |
 | Window Snapping | A separate product |

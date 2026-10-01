@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import CoreAudio
 
 /// The island's features built from sample data, for the Settings preview. It reads the live `AppSettings`, so a
 /// change applies at once, but everything else is the preview's own: nothing here reaches the network, the
@@ -80,7 +81,8 @@ enum PreviewFeatures {
                 folder: scratch.directory.appendingPathComponent("Voice")),
             widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher()),
             system: SystemModel(sampler: PreviewSystemSampler()),
-            agents: PreviewSamples.agents()
+            agents: PreviewSamples.agents(),
+            mixer: PreviewSamples.mixer(defaults: defaults)
         )
     }
 }
@@ -167,6 +169,18 @@ enum PreviewSamples {
             ],
         ]
         return (try? JSONSerialization.data(withJSONObject: root)) ?? Data()
+    }
+
+    /// Four apps and a level, with nothing behind them: no process list and no tap. Access reads as given, so the panel draws.
+    @MainActor
+    static func mixer(defaults: UserDefaults) -> AppMixer {
+        OptionalAccessRecord.record(.asked, for: .systemAudio, defaults: defaults)
+        OptionalAccessRecord.record(.allowed, for: .systemAudio, defaults: defaults)
+        let settings = AppSettings(defaults: defaults)
+        settings.mixerLevels = ["com.spotify.client": 0.6, "com.apple.Safari": 1.5]
+        let mixer = AppMixer(settings: settings, listing: PreviewAppList(), tapper: InertTapper(), defaults: defaults)
+        mixer.start()
+        return mixer
     }
 
     /// A task for the Agents module and the closed island.
@@ -308,4 +322,33 @@ final class InertTranscriber: Transcribing {
     var level: Float { 0 }
     func start(writingTo file: URL) async throws { throw VoiceError.microphoneDenied }
     func stop() async throws -> String { "" }
+}
+
+/// The Settings preview's apps: fixed, so it never reads the Mac's audio.
+@MainActor
+final class PreviewAppList: AppAudioListing {
+    var onChange: (() -> Void)?
+    func start() {}
+    func stop() {}
+    func current() -> [MixerApp] {
+        [
+            MixerApp(id: "com.apple.Music", name: "Music", processObjects: [1], isPlaying: true),
+            MixerApp(id: "com.spotify.client", name: "Spotify", processObjects: [2], isPlaying: true),
+            MixerApp(id: "com.apple.Safari", name: "Safari", processObjects: [3], isPlaying: true),
+            MixerApp(id: "us.zoom.xos", name: "zoom.us", processObjects: [4], isPlaying: true),
+        ]
+    }
+}
+
+/// Makes taps that do nothing, and hear sound, so the preview's Mixer never changes how anything sounds.
+@MainActor
+final class InertTapper: AudioTapping {
+    private final class Tap: AudioTap {
+        var heardSound: Bool { true }
+        func setLevel(_ level: Float) {}
+        func stop() {}
+    }
+
+    func start(processObjects: [AudioObjectID], outputUID: String?, level: Float) -> AudioTap? { Tap() }
+    func probe() async {}
 }

@@ -9,6 +9,8 @@ final class AudioOutputs {
         let id: AudioDeviceID
         let name: String
         let transportType: UInt32
+        /// The device's persistent identifier, which the Mixer stores to send an app to it.
+        var uid: String?
 
         var isBluetooth: Bool {
             transportType == kAudioDeviceTransportTypeBluetooth || transportType == kAudioDeviceTransportTypeBluetoothLE
@@ -29,6 +31,8 @@ final class AudioOutputs {
     private(set) var defaultDeviceID = AudioDeviceID(kAudioObjectUnknown)
 
     @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?
+    /// The devices or the default changed.
+    @ObservationIgnored var onChange: (() -> Void)?
 
     private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
@@ -65,7 +69,7 @@ final class AudioOutputs {
                 transport != kAudioDeviceTransportTypeAggregate,
                 let name = Self.name(of: id)
             else { return nil }
-            return Device(id: id, name: name, transportType: transport)
+            return Device(id: id, name: name, transportType: transport, uid: CoreAudioTapper.deviceUID(id))
         }
 
         var defaultID = AudioDeviceID(kAudioObjectUnknown)
@@ -74,6 +78,7 @@ final class AudioOutputs {
         if AudioObjectGetPropertyData(Self.systemObject, &defaultAddress, 0, nil, &defaultSize, &defaultID) == noErr {
             defaultDeviceID = defaultID
         }
+        onChange?()
     }
 
     private static func address(
