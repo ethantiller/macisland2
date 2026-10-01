@@ -30,7 +30,7 @@ Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
 ./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start (the first build makes a signing identity)
-./scripts/test.sh                                                     # 946 tests, under a second
+./scripts/test.sh                                                     # 983 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -42,11 +42,11 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | Do this | Get this |
 | --- | --- |
 | Something is live | The **compact** island: one activity split around the notch, or two as a pair |
-| Rest the pointer on it | A brief swell, then the **peek** (after 120 ms): the top activity at full size |
+| Rest the pointer on it | A brief swell, then the **peek** (after 120 ms by default; Settings → General → Input): the top activity at full size |
 | Click, swipe two fingers down, or press **⌃⌥Space** | The **expanded** island: a tab strip and the selected module |
 | Press **⌃⌥S** | The expanded island on the **Shelf** |
 | ← / → , or a two-finger horizontal swipe | Previous or next tab |
-| Esc, or move the pointer away for 300 ms | Fold back in |
+| Esc, or move the pointer away for 300 ms | Step back one level (a picked day, the Tools grid, the Mixer, a search), then fold back in |
 | Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |
 | First launch | A short **guide** shows the gestures and modules with the real island, and asks for each permission in turn, one step at a time. Every permission is required: the island stays hidden until the guide is finished and all are allowed. Replay it, or the Settings tour, from Settings → General → Guide |
 
@@ -66,6 +66,7 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | --- | --- |
 | ![AirPods](docs/images/11-banner-airpods.png) | A device connecting, in a ring that turns red when it is low |
 | ![Low battery](docs/images/12-banner-low-battery.png) | A problem, centered, with nothing to press |
+| ![Notification](docs/images/12c-banner-mirrored.png) | A notification macOS showed, with Open and Dismiss (Notifications on, In the Island) |
 
 ### Peeks: hover for the top activity
 
@@ -140,6 +141,8 @@ The full story, with state machines, data flow, and the lessons learned, is in
 ## Privacy and permissions
 
 When AI Agents is on, it reads the Claude Code and Codex logs in your home folder, and the Claude app's usage file (`~/Library/Application Support/Claude/plan-usage-history.json`) for plan limits; a summary of the last 91 days is cached in `~/Library/Caches/com.ethantiller.MacIsland/Agents` and deleted when the feature is turned off. Nothing is sent.
+
+When Notifications is on, it reads the text of the banners macOS shows (the app, title, and body) through Accessibility, keeps the newest fifty in memory only, and empties them when the screen locks or the feature is turned off. They are never written to disk or sent anywhere.
 
 Nothing leaves the Mac except: the **city name** you type in Settings (to Open-Meteo, for weather), and the **track's
 name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off). Clipboard history stays in memory.

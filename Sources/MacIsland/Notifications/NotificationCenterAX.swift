@@ -136,7 +136,8 @@ extension NotificationReader.Environment {
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier == NotificationCenterObserver.bundleIdentifier
             },
             openApp: { NotificationCenterApps.open(named: $0) },
-            closeNames: NotificationCenterApps.closeNames)
+            closeNames: NotificationCenterApps.closeNames,
+            dumpsTree: ProcessInfo.processInfo.environment["MACISLAND_NOTIFICATION_DEBUG"] != nil)
     }
 }
 

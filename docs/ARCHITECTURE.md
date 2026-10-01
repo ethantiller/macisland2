@@ -115,7 +115,7 @@ never written and never accepted**, even from a hand-edited file. Launch at Logi
 
 ### Ambient events
 
-`AmbientEvent` names the twelve interruptions that arrive on their own. `flash` and `showBanner` take `event:` and drop the call when
+`AmbientEvent` names the fifteen interruptions that arrive on their own (the last, `notification`, is the mirrored notifications and is listed only while that feature is on). `flash` and `showBanner` take `event:` and drop the call when
 it is muted (a banner's follow-up alert too); what the person just did (Copied, Zipped, a timer finishing) passes none and always
 shows. `Announcements` builds each event's banner or alert in one place, so the Settings preview draws exactly what the island
 does. Peek on Hover off makes `setHovering` skip the dwell task (the swell stays); `MouseTracker` ignores swipes when swiping is
@@ -292,6 +292,8 @@ stateDiagram-v2
 The presentation decides the size and corner radius: compact uses a small radius, everything that hangs below the notch uses the
 large one (32, continuous). Peek and banner share a width (380), so one becomes the other by changing height only.
 
+**Keeping out of the way (General → Input).** The peek's dwell is `settings.peekDelay.duration` (`PeekDelay`: `Theme.Timing.peekDwell`, 300 ms, 600 ms), read each time the pointer settles. `isPillHidden` (the closed island is not drawn) is true on a display with no notch and nothing live, as before, and now also while `hidesForFullScreen` and, with `hidesUntilPointer`, while the pointer is away and no alert shows (a banner is a different presentation, so it still draws; `MouseTracker` keeps working, so pointing at the notch brings it back). **Hide in Full Screen** is `FullScreenWatcher` (`App/FullScreenWatcher.swift`): started only while the setting is on, it listens to two notifications (`activeSpaceDidChange` and `didActivateApplication`) and looks then, through `FullScreenDetector.isFullScreen`, at the public window list (`CGWindowListCopyWindowInfo`; owner, layer, and bounds need no permission): the front app has a layer-0 window whose bounds equal the island display's, menu bar included, so a window that is merely maximized (menu bar showing) does not count. It does not use the private Spaces call that other apps use. `IslandViewModel.setFullScreen` cancels the dwell and folds a peek; while `hidesForFullScreen`, `showBanner` drops the banner, `flash` drops an alert (one that `staysUntilSeen` is held in `waitingAlert` and shown when it ends), and `setHovering` does not open a peek. **Known gap:** a maximized window on a display whose menu bar auto-hides covers the whole screen and reads as full screen. **Open On** is applied by `open(applyingOpenOn:)` only when the island opens from closed and the caller didn't already choose a page (the Shelf shortcut passes false; an alert's own page wins): `OpenOn.live` goes to `IslandViewModel.module(for: compactActivity)`. **Show Media From** is `NowPlayingModel.accepts`, set in `connectFeatures` from `MediaSource.accepts(bundleID:)` (known music apps, or the app's `LSApplicationCategoryType`, read once per app); `refilter()` applies a change at once. Esc (`stepBack`) takes back one level at a time, innermost first: the clipboard search, the Mixer's panel, the Tools grid, a picked day, the month; Mirror ignores the grid step because it stays until Done.
+
 ---
 
 ## Activities: what is live
@@ -417,6 +419,7 @@ app delegate owns (the Now Playing adapter, the screenshot search) are closures,
 | notes | no Notes tab, New Note pencil, or Note widget | a voice note being recorded is stopped and saved |
 | calendar | no meetings in Up Next or Today, no meeting banners | `configureAgenda` passes `calendar: false`; with reminders also off `AgendaMonitor.stop()` ends its 30 s timer and its store listener |
 | weather | no weather in the strip, the idle peek, or the Weather widget | `weather.configure(city: "")`; the city is kept |
+| notifications | no Mirrored section in Notifications, no Notifications widget; macOS's banners are never touched | `NotificationMirror.stop()`: the `AXObserver` is removed, the inbox emptied, the lock listener removed |
 
 **Countdowns.** `CompactActivity.countdown(AgendaItem)` is the event the closed island counts down to (`IslandViewModel.activeCountdown`, from `AgendaRules.countdown`): an event with a start time that starts within the hour, that was chosen (`agenda.countdowns`: id to end, pruned after it ends) or any event with `agenda.countdownAll` on, and only while Calendar is on. It ranks right after the stopwatch; leading is a calendar glyph in `Tint.clock`, trailing `CompactCountdownText` (ticking once a second only while shown, and asking the agenda to look again when the event starts so the activity ends then). The peek is `CountdownPeekView` with Join. The id is the event's identifier and start, so an event moved in Calendar loses its countdown.
 
@@ -454,6 +457,22 @@ The Agents module (`Agents/`, `IslandModule.agents`, feature `agents`, off by de
 ## Downloads in the Shelf
 
 `ShelfMode.downloads` is a third mode, offered by `ShelfMode.available(clipboard:downloads:)` only while the `downloads` feature is on (a stored mode with it off reads as Files; `setShelfMode` refuses it). `DownloadsFolder` (`Shelf/DownloadsFolder.swift`, `IslandFeatures.downloads`) lists the newest 20 entries of `~/Downloads` by `addedToDirectoryDate` with `DownloadsScan` (one directory listing, hidden files skipped, no recursion) and watches the folder with a single `DispatchSourceFileSystemObject` **only while the mode is showing** (`IslandViewModel.isDownloadsShowing`; `ShelfView` starts and stops it, and `FeatureRunner` stops it when the feature goes off). A change is listed again 300 ms after it settles. Partial files (`.download`, `.crdownload`, `.part`) are arriving; their progress comes from `TransferMonitor` by name. Tiles are `ShelfItemView` with `ShelfItemSource.downloads`: no remove button, **Add to Shelf** in the menu. A folder that can't be listed (Downloads not allowed) says so.
+
+---
+
+## Notifications
+
+The Notifications feature (`Notifications/`, feature `notifications`, off by default) learns that macOS showed a notification, keeps the recent ones, and can take over showing them. It needs **no Full Disk Access and no private API**: it reads the **Accessibility** tree of `com.apple.notificationcenterui`, and Accessibility is already one of the ten permissions. It reverses ROADMAP's old "No API to read Notification Center": there is still no API, but the tree can be read. **It is brittle by design.** Everything it looks for is undocumented (`NotificationRoles`), and any macOS release can change it, after which the reader finds nothing rather than something wrong.
+
+**The tree.** A banner is a node with subrole `AXNotificationCenterBanner` (it goes by itself) or `AXNotificationCenterAlert` (it stays until answered), possibly inside a stack. Its text is the `AXStaticText` descendants with identifier `header` (the app), `title`, `subtitle`, and `body`; its identity is the UUID in its identifier (or in a descendant's), and without one the hash of what it says. **These names are from the plan, not yet checked on a Mac:** `MACISLAND_NOTIFICATION_DEBUG=1` makes each scan log the tree (roles, subroles, identifiers, action names, and the *length* of each text, never the words) through `NSLog`, to compare against `NotificationRoles` on the machine, and `log stream --process MacIsland` shows it.
+
+**The reader.** `NotificationCenterObserver` makes an `AXObserver` on the Notification Center process (found by bundle identifier; it follows a restart through `didLaunchApplicationNotification`) for window created, layout changed, and element destroyed, on the main run loop, with a 0.1 s messaging timeout. A change schedules a scan 0.12 s later (`NotificationReader.schedule`, debounced); there is no timer, so nothing runs between notifications. The scan (`BannerScanner`, pure, behind `AXNodeReading` so tests walk a fixture tree) runs off the main thread under caps of 0.8 s, 384 nodes, and depth 10, and only one runs at a time (a change during one asks for another after it). The first scan after starting only records what is showing; nothing is read while Notification Center itself is the front app; a banner already seen is not announced again (the last 200 identifiers are remembered). `Status` is `off`, `needsAccess` (no Accessibility: nothing starts, nothing asks, and the feature's row in Settings says so with **Open System Settings** and **Check Again**), `running`, or `unreadable` (the observer couldn't be made: "Notifications couldn't be read on this version of macOS"). Losing Accessibility while running is noticed on the next scan.
+
+**The inbox** (`NotificationInbox`) is memory only: newest first, at most 50, emptied when the screen locks (`com.apple.screenIsLocked`) and when the feature turns off. It is never written to disk, never in the settings file, and never sent anywhere.
+
+**Open** (`NotificationReader.open`) scans again and presses the banner (`AXPress`) if one with the same identifier is still showing; otherwise it opens the app named in the banner's header (a running one is activated; else `/Applications`, `/System/Applications`, and the utilities folders are tried, since a banner has the app's name and not its bundle identifier).
+
+**Where Notifications Show** (`NotificationPlacement`, `notifications.placement`): *In the Corner, with an Inbox* (the default) adds to the inbox and does nothing else; *In the Island* also shows `Announcements.mirrored` (a two-action banner, Open and Dismiss, event `.notification`). Showing it once means closing macOS's banner, so `NotificationMirror.arrived` asks `IslandViewModel.canShowBanner(for: .notification)` first (not muted, no full-screen app, no Focus holding banners) and leaves macOS's banner alone if the island wouldn't show it. Then it **closes first, shows second** (the plan said the reverse): if the close fails the notification stays in the corner and the island says "Notifications Stay in the Corner" once, rather than showing a second copy. `BannerCloser` performs the banner's close action (an action named `Name:Close` in the language Notification Center uses, read from its own strings with English always accepted; **unverified**) and, if there is none, moves the banner's window far off screen and puts it back 1.5 s later, because Notification Center reuses the window for the next banner. A persistent alert is never closed, and is shown on the island too. The Notifications Home widget (`BuiltInWidget.notifications`, tied to the feature) draws the inbox and reads nothing.
 
 ---
 
@@ -526,6 +545,9 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Quiet in Focus | UserDefaults | `quietDuringFocus` |
 | Calendar events / due reminders in Up Next | UserDefaults | `showsCalendar`, `showsReminders` |
 | Weather city | UserDefaults | `weatherCity` |
+| Input choices | UserDefaults | `peekDelay` (Short, Medium, Long), `hidesUntilPointer`, `hidesInFullScreen`, `openOn` (Last Tab, Home, What Is Live) |
+| Show Media From, Keep Awake's time left | UserDefaults | `media.source` (Any App, Music Apps Only), `keepAwake.compact` |
+| Where Notifications Show | UserDefaults | `notifications.placement` (the notifications read are never stored) |
 | Custom widgets (Home) | UserDefaults | `widgets.custom` (JSON `[CustomWidget]`; values are never stored) |
 | Time left, calendars left out | UserDefaults | `agenda.timeLeft` (in the settings file), `agenda.hiddenCalendars` (calendar identifiers excluded, so a new calendar counts; per Mac, so not in the file) |
 | Home's layout | UserDefaults | `home.layout` (JSON `HomeLayout`, version 2, under 5 KB; a version 1 blob is read and migrated, and written as version 2 on the next edit; a layout that won't decode shows the default and keeps its bytes until the next edit) |
@@ -544,6 +566,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Voice Notes | .m4a files | `~/Library/Application Support/MacIsland/Voice Notes/` (kept; the text goes in a note) |
 | Screen recordings | .mov files | `~/Movies/Screen Recording <date>.mov` (kept; also on the Shelf) |
 | Clipboard history | Memory only | Never written to disk |
+| Notification inbox | Memory only | Never written to disk; emptied on lock and when the feature turns off |
 | Lyrics cache | Memory only | Per track, per launch |
 
 ---
@@ -563,7 +586,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Downloads folder | Download progress, and a folder widget on it | `NSDownloadsFolderUsageDescription` |
 | Desktop, Documents folders | A folder widget on one of them | `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription` |
 | Automation (Apple Events) | Music and Spotify: volume, Favorite, play/pause | `NSAppleEventsUsageDescription` |
-| Accessibility | Clean Keys (an event tap); listed in Settings → Privacy | (system prompt; no key) |
+| Accessibility | Clean Keys (an event tap), the volume keys, and reading Notification Center's banners; listed in Settings → Privacy | (system prompt; no key) |
 | Camera | Mirror | `NSCameraUsageDescription` |
 | Microphone | Voice Note | `NSMicrophoneUsageDescription` |
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
@@ -730,7 +753,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: ** tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **983 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

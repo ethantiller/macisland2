@@ -180,6 +180,29 @@ enum BannerScanner {
     }
 }
 
+/// Describes a tree in lines, for the spike on a new macOS: the roles, subroles, identifiers, action names, and how long each text is.
+/// Never the words themselves, so a log of it holds nothing anyone wrote.
+enum AXTreeDump {
+    static func lines(_ root: any AXNodeReading, limits: ScanLimits = ScanLimits()) -> [String] {
+        var lines: [String] = []
+        var visited = 0
+        func walk(_ node: any AXNodeReading, depth: Int) {
+            guard depth <= limits.depth, visited < limits.nodes else { return }
+            visited += 1
+            var parts = [node.role ?? "-"]
+            if let subrole = node.subrole { parts.append("subrole=\(subrole)") }
+            if let identifier = node.identifier { parts.append("id=\(identifier)") }
+            if let value = node.value { parts.append("text=\(value.count) chars") }
+            let actions = node.actions
+            if !actions.isEmpty { parts.append("actions=" + actions.map { $0.replacingOccurrences(of: "\n", with: " ") }.joined(separator: " | ")) }
+            lines.append(String(repeating: "  ", count: depth) + parts.joined(separator: " "))
+            for child in node.children { walk(child, depth: depth + 1) }
+        }
+        walk(root, depth: 0)
+        return lines
+    }
+}
+
 /// Takes a banner away from the screen, so the island can show it instead.
 enum BannerCloser {
     /// Where a window with no close action is sent, far from any display.
@@ -250,6 +273,9 @@ final class NotificationReader {
         /// The names of the close action ("Close", and its translation).
         var closeNames: Set<String>
         var debounce: Duration = .milliseconds(120)
+        /// Write what each scan saw to the log (`MACISLAND_NOTIFICATION_DEBUG=1`), without any words, to check the roles on a new macOS.
+        var dumpsTree = false
+        var log: (String) -> Void = { NSLog("%@", $0) }
     }
 
     private(set) var status: Status = .off
@@ -332,9 +358,17 @@ final class NotificationReader {
         guard let root = environment.root() else { return }
         isScanning = true
         let limits = limits
-        let result = await Task.detached(priority: .utility) { BannerScanner.scan(root, limits: limits) }.value
+        let dumps = environment.dumpsTree
+        let (result, dump) = await Task.detached(priority: .utility) {
+            (BannerScanner.scan(root, limits: limits), dumps ? AXTreeDump.lines(root, limits: limits) : [])
+        }.value
         isScanning = false
         guard status == .running else { return }
+        if dumps {
+            environment.log(
+                "Notification Center tree (\(result.banners.count) banners read, \(result.visited) nodes):\n"
+                    + dump.joined(separator: "\n"))
+        }
         announce(result)
         if rescanQueued {
             rescanQueued = false

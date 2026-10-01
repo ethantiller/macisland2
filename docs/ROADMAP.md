@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` ( tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (983 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -38,6 +38,8 @@ app after UI changes before saying to look; the user reviews visually and iterat
 - **First run:** a guide (floating glass in the middle of the screen, the real island as its stage, practice checks, then one step per permission with Grant Permission; every permission is required, and the island stays hidden until Done) and a seventeen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
+- **Vorssaint parity (2026-10):** a Features catalog and pane with presets and optional permissions, the Content pane, clipboard search and paste, calendar time left, chosen calendars, month events and countdowns, the System card, AI Agents (live work, usage at API prices, plan limits), the Mixer, Choose the Activity, Downloads in the Shelf, the Input choices (Peek After, hiding, Open On, Show Media From, Keep Awake's time left, Esc stepping back), and Notifications. **All of it was written without a Swift toolchain and has not been compiled or run.** The first job on a Mac is `./scripts/test.sh`, expecting compile errors somewhere, then the *(written, not run)* groups in the checklist below.
+
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
 peeks, and direct control of Music and Spotify.
 
@@ -54,6 +56,11 @@ Where the app ended up differently from what was first planned, and why. The des
 | Default tabs Home, Media, **Clock, Reminders**, Tools. Shelf and Notes are in *Not Shown* | Reminders became its own tab; Shelf still opens on a drop |
 | Reminders is its own module, not part of Home | User request |
 | The Mixer is built after all, as per-app process taps made only for an app that is adjusted and playing | It was dropped for "breaking the idle budget"; a tap that exists only while its app plays costs nothing when nothing is adjusted (see [ARCHITECTURE](ARCHITECTURE.md#the-mixer)) |
+| **Notification Mirror is built after all**, off by default, through the Accessibility tree of Notification Center (N1, N2) | "No API to read Notification Center" is still true; the tree can be read. It needs only Accessibility, which the guide already asks for, and it listens (no timer). It is brittle: the roles are undocumented, so a macOS update can make it find nothing, and the feature's row says so. The notifications are kept in memory only |
+| A mirrored notification closes macOS's banner **before** it shows its own | The plan showed first and closed second, but a close that fails then leaves two copies; closing first lets a failure fall back to the corner and say so once |
+| A persistent alert is shown on the island and also left on screen | It waits for an answer (a call, an invitation) that the island's two buttons can't give, so it is never closed |
+| Hide in Full Screen reads the public window list, not the private Spaces call | A layer-0 window the size of the display, menu bar included, needs no permission and no private API. The cost: a maximized window on a display whose menu bar auto-hides looks full screen |
+| Show Media From is Any App or Music Apps Only, not a player picker | The adapter reports the one player macOS chose; choosing between two needs its player list extended. Music Apps Only covers a browser video taking over |
 | The command palette and everything for it (search engines, translation, answers, currency rates, the app and Shortcuts index, its shortcut, `macisland://palette`) was **removed** | User: it was not useful. Shortcuts stay as Home widgets |
 | Home is two rows of boxes: Up Next, music, four tools, timers and Shelf. Battery and stats are not on it | Iterated with the user |
 | **Home is a uniform 6-column grid**: each widget has a few sizes, each with its own layout; Home is 1 to 3 rows tall and grows and shrinks with its widgets; widgets fill in reading order (agreed 2026-09-30). A uniform grid can't draw the old default exactly, so row 1 is pixel-identical and row 2 changed: Quick Tools 72 wide (was 80), the pill 392 (was 384), row 2 64 tall (was 68), Home 138 tall (was 142) | The editor needs one simple model: snap to a grid, sizes not dimensions. The panel is 276 tall (was 260) |
@@ -556,6 +563,23 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Downloads on in Features, the Shelf's header has a third segment; a Safari download shows as arriving with a ring and then as a file, dragging it out copies it, Add to Shelf keeps it, and nothing in this mode can delete a file
 - [ ] With the mode hidden, no file-system source is open (`lsof -p $(pgrep -x MacIsland) | grep Downloads` shows nothing)
 
+**Smaller gaps (G2)** *(written, not run)*
+- [ ] General → Input: Peek After Short, Medium, and Long open the peek at about 120, 300, and 600 ms; the control is dimmed while Peek on Hover is off
+- [ ] Hide the Island Until You Point at It: the closed island draws nothing until the pointer reaches the notch, then swells and peeks; a banner (plug in the charger) and an alert still show; a click on the notch opens it
+- [ ] Hide in Full Screen: a full-screen video (Safari, QuickTime) or Keynote hides the island, no peek opens, a banner is dropped, and a Low Battery alert that stays until seen shows once you leave full screen; a maximized window with the menu bar showing does not hide it; a maximized window with the menu bar auto-hidden (the known gap), and a second display, behave as the docs say
+- [ ] Open On Home goes to Home from closed, What Is Live goes to Clock with a timer running and to Media with music, and Last Tab leaves it; ⌃⌥S still opens the Shelf
+- [ ] Show Media From, Music Apps Only: a Safari video no longer takes over the island and Music or Spotify still does; back to Any App shows the video
+- [ ] Keep Awake for 1 Hour with the option on: a cup and "59m" sit beside the notch and drop a minute each minute (check the minute rolls over), "1h35" reads past an hour, Indefinitely shows nothing; it pairs under a timer or music
+- [ ] Esc steps back: month, pick a day, Esc to the month, Esc to Home's widgets, Esc closes; the Tools grid, the Mixer's panel, and the clipboard search each step back once; Mirror still stays until Done
+
+**Notifications (N1, N2)** *(written, not run; the roles are from the plan and unverified)*
+- [ ] **The spike first.** Turn Notifications on, allow Accessibility, then `MACISLAND_NOTIFICATION_DEBUG=1 build/MacIsland.app/Contents/MacOS/MacIsland` and `log stream --process MacIsland` while a Messages notification shows. The dump should show a node with subrole `AXNotificationCenterBanner` (an alert, `AXNotificationCenterAlert`), `AXStaticText` children with identifiers `header`, `title`, `subtitle`, `body`, a UUID in an identifier, and a close action named `Name:Close` (or its translation). If any is different, fix `NotificationRoles` and the close names before the rest; if there is nothing to read, stop and put the row back in Dropped for good
+- [ ] With In the Corner, a Messages notification, a Calendar alert, and a Mail banner are each read with the right app and words (the Notifications widget lists them, newest first) and macOS's banner is untouched; Open on a widget row opens the conversation (the banner is pressed while it is still showing, the app opens after)
+- [ ] With In the Island, a Messages notification shows once, on the island only, with Open and Dismiss; macOS's banner is gone (if the close action fails and the fallback moves the window, it comes back for the next banner); a call or a meeting alert that waits for an answer stays on screen as well
+- [ ] While a Focus holds banners, or a full-screen video plays, macOS's banner is left alone; with the Mirrored Notifications switch off the same
+- [ ] Lock the screen, unlock: the inbox is empty. Turn the feature off: the inbox empties and the listener goes (`lsof`/Activity Monitor shows no extra work); idle CPU with no notifications arriving is unchanged
+- [ ] With Accessibility turned off in System Settings, the Features row says why with Open System Settings and Check Again, and nothing is read; Check Again after turning it on starts it without a relaunch
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget
@@ -663,7 +687,6 @@ Considered during planning and ruled out, each for a concrete reason. Check here
 | Knock to Control | No public accelerometer or force API |
 | Call Island | No incoming-call API |
 | Message Island | Needs Full Disk Access to the Messages database |
-| Notification Mirror | No API to read Notification Center |
 | Lock Screen Widgets | Apps can't draw on the lock screen |
 | Keyboard Backlight | Private CoreBrightness |
 | External Display Control | DDC/CI is private on Apple silicon |

@@ -18,7 +18,7 @@ The island is always in one of four presentations. Sizes are in points.
 | --- | --- | --- | --- |
 | **Compact** | Something is live | One activity split around the notch, or two as a pair | Notch plus a side on each end |
 | **Banner** | An event worth noticing once | Glyph, title, one detail line, at most one action | 380 wide, or 290 when it has nothing to press (an alert); notch + 56 tall |
-| **Peek** | Pointer rests on the island (swells at once, opens after 120 ms) | The top live activity at full size, no tabs. With nothing live, the day and everyday tools | 380 wide |
+| **Peek** | Pointer rests on the island (swells at once, opens after the **Peek After** delay: 120 ms, 300 ms, or 600 ms) | The top live activity at full size, no tabs. With nothing live, the day and everyday tools | 380 wide |
 | **Expanded** | Click, two-finger swipe down, or ⌃⌥Space | The tab strip and the selected module | 520 wide |
 
 The pointer leaving for 300 ms folds it back in. Opening it with the keyboard (⌃⌥Space) *pins* it open until Esc, the
@@ -72,6 +72,7 @@ Compact shows the **top two** live activities, ranked. Highest first:
 | 8 | **Working** (zipping, converting, running a Shortcut) | Pulsing gear, blue | What it is doing |
 | 9 | **Download in progress** | File icon in a ring | Percent |
 | 10 | **Music** | Album art | Play/pause, or sound bars while playing |
+| 11 | **Keep Awake** (off until Settings → Content → Tools → Show Keep Awake's Time Left Beside the Notch) | A cup, white | The time left: "45m" up to an hour, "1h35" past it. Only when it has an end; *Indefinitely* shows nothing |
 
 ![A pair](images/09b-compact-pair-timer-media.png)
 
@@ -80,6 +81,8 @@ In a pair, each side shows only its activity's glyph, ring, or artwork. Music's 
 **Choose the Activity** (off until it is switched on in Settings → Features). With two or more things live, the peek starts with a row of chips, one for each (Timer, Music, Download, the job's name, and so on), the leading one selected. Choose one and it leads the closed island and fills the peek; the other stays beside it. An alert or banner still comes first, and the choice ends with the activity.
 
 ![Choosing the activity](images/03i-peek-choose-activity.png)
+
+**Hiding the closed island** (Settings → General → Input). **Hide the Island Until You Point at It** draws nothing while it is closed until the pointer reaches it; a banner or an alert still shows, and a click where the notch is still opens it. **Hide in Full Screen** draws nothing while the app in front covers the whole display (a video, Keynote, a game): the peek does not open, a banner is dropped, and an alert that stays until seen waits for the full-screen app to end. It looks at the window list (owner and size only, no permission) when the active space or the front app changes, and at no other time. A window that is only maximized, with the menu bar showing, does not count. **Open On** chooses the page the island opens on from closed: the last one (the default), Home, or the page of what is live (the Clock for a timer, Media for music, and so on).
 
 ### Color
 
@@ -118,7 +121,17 @@ actions (with two, the first is filled). Alerts that need you (a timer finishing
 | The Mac unlocks | "Unlocked" with a Touch ID glyph |
 | Zip, convert, or a Shortcut finishes | Green "Zipped", "Converted", "Done"; or a red banner with the reason |
 | Rain is due within 30 minutes (only with a city set) | Banner "Rain Soon", "Starts around 3:45 PM"; once per rain spell, and again only after a dry hour |
+| A notification arrives (Notifications on, **In the Island**) | Banner "Messages: Maya" over the first line of what it says, with **Open** and **Dismiss**, and macOS's own banner closed. Persistent alerts are also shown but never closed. See below |
 | Free space falls under 10 GB | Red banner "Low Disk Space", "8.2 GB free", with **Open Storage**; a red alert stays until seen. Checked on unlock, on wake, and after a finished job or download, never on a schedule; it warns again only after space passes 15 GB |
+
+**Notifications on the island** (off until it is switched on in Settings → Features; it reads macOS's banners through **Accessibility**, which the guide already asked for). Nothing here uses a private interface: it listens to Notification Center's accessibility tree, and when a banner appears it reads the app, title, subtitle, and body. That is brittle by nature (a macOS update can rename what it looks for; the feature's row then says "Notifications couldn't be read on this version of macOS"). The words are kept in memory only, at most fifty, newest first, and are emptied when the screen locks and when the feature is turned off; they are never written to disk or sent anywhere. **Where Notifications Show** (Settings → Notifications → Mirrored) has two choices, never both:
+
+- **In the Corner, with an Inbox** (the default): macOS shows its banner where it always does; MacIsland keeps the inbox and the **Notifications** widget.
+- **In the Island**: each notification arrives as a banner on the island, and macOS's banner is closed so you see it once. If macOS's banner can't be closed, that notification stays in the corner and the island says so, once. An alert that waits for an answer (a call, an invitation) is never closed. While a Focus holds banners, while a full-screen app has the display, or with the **Notifications** switch in the Mirrored section off, macOS's banner is left alone and is not closed.
+
+**Open** presses the banner if it is still on the screen and otherwise opens the app that sent it; **Dismiss** takes it off the island and the inbox. The first scan after starting only records what is already showing, and nothing is read while Notification Center itself is open. The feature costs nothing between notifications: there is no timer.
+
+![A mirrored notification](images/12c-banner-mirrored.png)
 
 **Quiet in Focus** (Settings): while a Focus is on, banners and short alerts are held back. Alerts that stay until seen, and
 feedback to something you just did, still arrive.
@@ -170,7 +183,7 @@ Home & Widgets in Settings arranges it (see below).
 **Music**, **Quick Tools** (a 2 by 2 of round buttons; your first four pinned tools, or four you pick), **Timers & Shelf** (two
 timer lengths, Pomodoro, Shelf; each can be changed or hidden), **Weather** (the city from Settings; the unit follows macOS's
 own Temperature choice), **Battery** (red at 20% or less, not charging), **System** (CPU, memory, battery, and how hot the Mac is; off until the System feature is on), **Reminders** (the first two, checked
-off in place), and **Note** (the first lines of your latest note, or one you pick). Presets: **Everyday** (the default),
+off in place), **Notifications** (the newest mirrored ones; off until the Notifications feature is on), and **Note** (the first lines of your latest note, or one you pick). Presets: **Everyday** (the default),
 **Focus**, **Listening** (the player at 6 by 2), **Minimal**, and **Dashboard** (music, weather, today, tools, and timers in three rows). A widget that doesn't fit goes off Home, with its options and size, never deleted. (The old Timer Chips widget is now Timers & Shelf.)
 
 **Sizes.** Each widget has a few sizes (columns by rows), each with its own layout. Change one in Settings, under **Size** in the widget's options; a size that would leave something off Home is dimmed.
@@ -184,6 +197,7 @@ off in place), and **Note** (the first lines of your latest note, or one you pic
 | Weather | **1 × 1**: symbol, temperature, place; 2 × 1: and the condition; 3 × 1: and the high and low; 6 × 1: now and the next five hours; 3 × 2: now and five days |
 | Battery | **1 × 1**: percent; 2 × 1: and whether it is charging |
 | System (off until the System feature is on) | **2 × 1**: CPU and memory; 1 × 1: CPU; 3 × 1: and the battery (or how hot the Mac is on one without); 3 × 2: each on its own row with a bar, and the thermal state in words. Read every 2 seconds only while Home is showing. Red appears only for memory pressure that is critical, the Mac running hot, or a battery at 20% or less that isn't charging |
+| Notifications (off until the Notifications feature is on) | **3 × 1**: the latest two; 3 × 2 and 6 × 2: the latest four. A click opens one and takes it off the list; **Clear Notifications** is in the right-click menu. It draws the inbox and reads nothing |
 | Reminders | **3 × 1**: two, with due text; 2 × 1: two, titles only; 3 × 2 and 6 × 2: four |
 | Note | **3 × 1**: the title and two lines; 2 × 1: one line; 3 × 2 and 6 × 2: up to six |
 | Your own | **2 × 1**: glyph beside the value; 1 × 1: glyph over the value; 3 × 1 (a button has 1 × 1 and 2 × 1) |
@@ -218,6 +232,7 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 
   ![The Mixer](images/04g-expanded-media-mixer.png)
 
+- **Show Media From** (Settings → Content → Media): *Any App* (the default) or *Music Apps Only*, which ignores a video playing in a browser. macOS reports one player at a time, so this can't choose between two; it only says whether a browser's video counts.
 - **Synced lyrics** under the scrubber, from LRCLIB, while the track has them. Turn off in Settings.
 - Compact: the artwork and, on the right, a play button that becomes bouncing bars while playing. Click it to play or pause.
 
@@ -302,7 +317,7 @@ Right-click a tool to pin it. The row is always full: unpinning fills the gap wi
 
 | Tool | Does |
 | --- | --- |
-| **Keep Awake** | Stops the display sleeping (and also asks macOS not to sleep the system). Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick, and say "A shut lid can still sleep it": closing the lid of a Mac that isn't on power with an external display sleeps it whatever is asked, and MacIsland asks for no password to change that. After a wake, if macOS dropped the hold, the tool shows Off |
+| **Keep Awake** | (Its time left can sit beside the notch; see Live activities.) Stops the display sleeping (and also asks macOS not to sleep the system). Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick, and say "A shut lid can still sleep it": closing the lid of a Mac that isn't on power with an external display sleeps it whatever is asked, and MacIsland asks for no password to change that. After a wake, if macOS dropped the hold, the tool shows Off |
 | **Ring Light** | A soft white glow around the screen edge, for video calls; brightness and width sliders |
 | **Mute Mic** | Mutes the default input device |
 | **Pick Color** | The system eyedropper; copies the hex code |
@@ -364,11 +379,11 @@ shows and where is a setting, how it looks is not.
 
 | Pane | Preview | Choices |
 | --- | --- | --- |
-| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcuts** (Open the Island, ⌃⌥Space by default, and Open the Shelf, ⌃⌥S by default; recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns, or the other shortcut's key, is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
+| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcuts** (Open the Island, ⌃⌥Space by default, and Open the Shelf, ⌃⌥S by default; recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns, or the other shortcut's key, is refused and the old one stays); **Input**: **Peek on Hover**, **Peek After** (Short 120 ms, Medium 300 ms, Long 600 ms; dimmed while Peek on Hover is off), **Swipe to Open and Switch Tabs**, **Hide the Island Until You Point at It**, **Hide in Full Screen**, **Open On** (Last Tab, Home, or What Is Live), and **Show the Island On** (Built-in or Primary Display) |
 | Features | Expanded Home, or where the chosen feature lands | **Start From** (Minimal, Everyday, Everything, or Your Own; each asks first, and nothing is deleted); a switch for every feature that exists, in **Modules** and **Island Extensions**, each with what it gives and what it costs while the island is closed (Nothing runs, Listens for changes, or Checks every so often). Off, a feature has no tab, widget, or tool, shows nothing in the closed island, and runs nothing; its settings are kept, and turning it off says what stopped ("The running timer was stopped."). **Calendar** and **Volume HUD** are switches here (they were Home → Up Next → Calendar Events and Notifications → Replace the Volume HUD). A pane about a feature that is off says so, with **Open Features** |
-| Content | Expanded (the tab you select), or Menu Bar | The tabs, dragged and switched (Left of the Notch, Right of the Notch, and the Not Shown tray); or, in the **Menu Bar** view, only a switch per module for the menu bar (the view is a menu-bar strip with an icon for each module that has one, and clicking an icon, or a module in the list (on or off), shows its window, with a dashed ghost icon and a note when it isn't in the menu bar yet; going between Expanded and Menu Bar is one continuous motion: the island shrinks toward the notch and slides out to the left while the menu bar slides in from the right and its window opens from the strip, and the reverse coming back; the tab settings are hidden there, and the menu bar settings are hidden in every other view). **Click a row, or a tab in the preview, to see that tab.** The tabs that are not shown sit in a **Not Shown tray directly under the preview**, so you can see them and the tab strip together. **Drag a tab from the tray onto a tab in the strip to replace it** (the replaced tab lands in the tray); **drag a tab onto another tab to swap them**; **drag a tab onto the tray to hide it**; or **click a tab in the tray to add it**. The hint under the preview names both tabs while you hold one over another ("Release to swap Media and Reminders."). A tab can only replace a tab: there is no dropping into the side of the notch. The list rows below also reorder by dragging |. **Off in Features** lists the modules that are switched off, with Open Features. Under the rows are **the selected module's options** (click a row, a tab in the preview, or a tray tab; it starts on Home): Home points to the Home pane; **Media** (Show Music Beside the Notch, Synced Lyrics); **Clock** (the Pomodoro's four lengths, previewed on the ring); **Shelf** (When You Drag a File, screenshots, how long files stay, the clipboard's size); **Tools** (how many in the row, Shortcut Tools, Row Order); **Reminders** (Due Reminders in Up Next); Notes has none |
+| Content | Expanded (the tab you select), or Menu Bar | The tabs, dragged and switched (Left of the Notch, Right of the Notch, and the Not Shown tray); or, in the **Menu Bar** view, only a switch per module for the menu bar (the view is a menu-bar strip with an icon for each module that has one, and clicking an icon, or a module in the list (on or off), shows its window, with a dashed ghost icon and a note when it isn't in the menu bar yet; going between Expanded and Menu Bar is one continuous motion: the island shrinks toward the notch and slides out to the left while the menu bar slides in from the right and its window opens from the strip, and the reverse coming back; the tab settings are hidden there, and the menu bar settings are hidden in every other view). **Click a row, or a tab in the preview, to see that tab.** The tabs that are not shown sit in a **Not Shown tray directly under the preview**, so you can see them and the tab strip together. **Drag a tab from the tray onto a tab in the strip to replace it** (the replaced tab lands in the tray); **drag a tab onto another tab to swap them**; **drag a tab onto the tray to hide it**; or **click a tab in the tray to add it**. The hint under the preview names both tabs while you hold one over another ("Release to swap Media and Reminders."). A tab can only replace a tab: there is no dropping into the side of the notch. The list rows below also reorder by dragging |. **Off in Features** lists the modules that are switched off, with Open Features. Under the rows are **the selected module's options** (click a row, a tab in the preview, or a tray tab; it starts on Home): Home points to the Home pane; **Media** (Show Music Beside the Notch, Show Media From, Synced Lyrics); **Clock** (the Pomodoro's four lengths, previewed on the ring); **Shelf** (When You Drag a File, screenshots, how long files stay, the clipboard's size); **Tools** (how many in the row, Show Keep Awake's Time Left Beside the Notch, Shortcut Tools, Row Order); **Reminders** (Due Reminders in Up Next); Notes has none |
 | Home | Expanded Home, in edit mode | The widget editor (below); Up Next (a button that opens Internet Accounts; Due Reminders is in Content); Weather city (only the name is sent to Open-Meteo) |
-| Notifications | Banner or alert (the selected event's real one) | **Replace the Volume HUD** (off by default: the island shows the volume when you use the volume or mute keys, instead of the system's square; needs Accessibility, asked when you turn it on; Option+Shift is a quarter step; only while the island is folded and nothing needs you, and on an output that has a volume); Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
+| Notifications | Banner or alert (the selected event's real one) | **Replace the Volume HUD** (off by default: the island shows the volume when you use the volume or mute keys, instead of the system's square; needs Accessibility, asked when you turn it on; Option+Shift is a quarter step; only while the island is folded and nothing needs you, and on an output that has a volume); Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space; and, while the Notifications feature is on, **Mirrored** (the Notifications switch and **Where Notifications Show**). What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
 | Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state (Calendars, Reminders, Camera, Microphone, Speech Recognition, Screen Recording, Accessibility, Bluetooth), read without asking, with Open System Settings |
 
 **The Settings tour.** The first time Settings opens, a black callout with an arrow points at a real control, with a ring in the system accent
@@ -427,14 +442,14 @@ Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-
 
 | Input | Result |
 | --- | --- |
-| Hover | Swell, then peek after 120 ms |
+| Hover | Swell, then peek after the Peek After delay (120 ms by default) |
 | Click, two-finger swipe down, **⌃⌥Space** | Expanded |
 | **⌃⌥S** | Expanded on the Shelf (again on the Shelf: close) |
 | Pointer away for 300 ms | Compact |
 | Two-finger swipe up (expanded) | Close |
 | Two-finger swipe left or right (expanded) | Previous or next tab (once per swipe; follows your finger). Over the timer dial it scrubs the dial instead |
 | ← / → | Previous or next tab |
-| Esc | Close |
+| Esc | Steps back one level at a time, innermost first: the clipboard search, the Mixer's panel, the Tools grid, a day picked in the month, then the month; with nothing left to step back from, it closes the island |
 
 ---
 
