@@ -30,7 +30,7 @@ final class FeatureRunner {
         let settings = features.settings
         features.agenda.configure(
             calendar: settings.showsCalendar, reminders: settings.showsReminders && settings.isOn(.reminders),
-            mayAsk: mayAsk)
+            mayAsk: mayAsk, showsTimeLeft: settings.showsTimeLeft, hiddenCalendars: settings.hiddenCalendars)
     }
 
     /// The city the weather follows: none while Weather is off (the city itself is kept).

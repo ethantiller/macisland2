@@ -8,6 +8,8 @@ struct HomePane: View {
     let editor: HomeEditor
 
     @State private var editing: CustomWidget?
+    /// The accounts and their calendars, read when the pane opens and when Calendar is switched on.
+    @State private var calendarGroups: [CalendarGroup] = []
 
     var body: some View {
         Form {
@@ -22,14 +24,38 @@ struct HomePane: View {
             HomeLayoutEditor(editor: editor)
             Section {
                 FeatureOffNote(settings: settings, feature: .calendar)
+                Toggle("Time Left in the Current Event", isOn: Bindable(settings).showsTimeLeft)
+                    .disabled(!settings.isOn(.calendar))
                 Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
                     .tourAnchor(.calendarEvents)
             } header: {
                 Text("Up Next").id(SettingsAnchor.upNext)
             } footer: {
                 Text(
-                    "Meetings (Calendar, in Features) and due reminders (Content, Reminders) show in Up Next on Home, and announce themselves as banners. Outlook, Google, and Exchange calendars come from Internet Accounts."
+                    "Meetings (Calendar, in Features) and due reminders (Content, Reminders) show in Up Next on Home, and announce themselves as banners. Time left keeps a meeting that is on until it ends. Outlook, Google, and Exchange calendars come from Internet Accounts."
                 )
+            }
+            if settings.isOn(.calendar), !calendarGroups.isEmpty {
+                Section {
+                    ForEach(calendarGroups) { group in
+                        Text(group.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        ForEach(group.calendars) { calendar in
+                            Toggle(
+                                calendar.title,
+                                isOn: Binding(
+                                    get: { !settings.isCalendarHidden(calendar.id) },
+                                    set: { settings.setCalendarHidden(calendar.id, !$0) }))
+                        }
+                    }
+                } header: {
+                    Text("Calendars").id(SettingsAnchor.calendars)
+                } footer: {
+                    Text(
+                        "Only these calendars count for Up Next, the banner before a meeting, and the dots in the month. One you add later counts until you switch it off."
+                    )
+                }
             }
             Section {
                 FeatureOffNote(settings: settings, feature: .weather)
@@ -44,6 +70,7 @@ struct HomePane: View {
             }
         }
         .formStyle(.grouped)
+        .task(id: settings.showsCalendar) { calendarGroups = features.agenda.calendarGroups() }
         .sheet(item: $editing) { widget in
             CustomWidgetSheet(widget: widget) { saved in
                 settings.saveCustomWidget(saved)

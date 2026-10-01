@@ -417,6 +417,8 @@ app delegate owns (the Now Playing adapter, the screenshot search) are closures,
 | calendar | no meetings in Up Next or Today, no meeting banners | `configureAgenda` passes `calendar: false`; with reminders also off `AgendaMonitor.stop()` ends its 30 s timer and its store listener |
 | weather | no weather in the strip, the idle peek, or the Weather widget | `weather.configure(city: "")`; the city is kept |
 
+**The agenda's queries.** `AgendaMonitor.configure` also takes `showsTimeLeft` and the calendars left out; event queries pass the allowed `EKCalendar`s (nil when none are left out). `AgendaRules.keepsEvent` keeps an event until ten minutes after it starts, or until it ends with time left on; `next(in:prefersInProgress:)` puts an event that is on now before a later one then. `eventDays(in:)` (the dots) is read when the month view appears and when its month changes, with `AgendaRules.eventDays` placing a multi-day event on each day it touches; `calendarGroups()` groups by the account's source identifier because two accounts can both be called iCloud.
+
 **Widgets follow their feature.** `WidgetCatalog.feature(of:)` maps a widget to its feature (Today, Battery, and custom widgets have none). When a
 feature turns off, `AppSettings.syncHomeWidgets()` moves its widgets from Home to Add Widgets (keeping size and options) with
 `HomeLayout.removingWidgets`, and remembers them in `home.hiddenByFeature`; when it turns on, `HomeLayout.restoring` puts each back in the first spot it
@@ -480,6 +482,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Calendar events / due reminders in Up Next | UserDefaults | `showsCalendar`, `showsReminders` |
 | Weather city | UserDefaults | `weatherCity` |
 | Custom widgets (Home) | UserDefaults | `widgets.custom` (JSON `[CustomWidget]`; values are never stored) |
+| Time left, calendars left out | UserDefaults | `agenda.timeLeft` (in the settings file), `agenda.hiddenCalendars` (calendar identifiers excluded, so a new calendar counts; per Mac, so not in the file) |
 | Home's layout | UserDefaults | `home.layout` (JSON `HomeLayout`, version 2, under 5 KB; a version 1 blob is read and migrated, and written as version 2 on the next edit; a layout that won't decode shows the default and keeps its bytes until the next edit) |
 | Saved Home layouts | UserDefaults | `home.savedPresets` (JSON `[SavedHomePreset]`: a name and a `HomeLayout` of the widgets, sizes, and options; local only, not in the settings file; cleared by Reset All) |
 | Left and right tabs | UserDefaults | `tabsLeft`, `tabsRight` (legacy `tabs` is read once) |
@@ -682,7 +685,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **812 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **823 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

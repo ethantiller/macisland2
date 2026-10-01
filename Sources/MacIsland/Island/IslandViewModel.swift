@@ -211,6 +211,7 @@ final class IslandViewModel {
             if state == .compact {
                 toolsExpanded = false
                 calendarExpanded = false
+                calendarSelectedDay = nil
                 features.mirror.stop()
             }
         }
@@ -219,6 +220,8 @@ final class IslandViewModel {
     private(set) var toolsExpanded = false
     /// Home shows the month calendar instead of the agenda.
     private(set) var calendarExpanded = false
+    /// The day of the month chosen in the month view: the header names its first event. Esc and a second click put the month back.
+    var calendarSelectedDay: Int?
     var shelfMode: ShelfMode
     /// The Shelf file being previewed with Quick Look.
     var quickLookURL: URL? {
@@ -852,6 +855,7 @@ final class IslandViewModel {
     }
 
     func setCalendarExpanded(_ expanded: Bool) {
+        if !expanded { calendarSelectedDay = nil }
         withAnimation(Theme.Motion.resize) { calendarExpanded = expanded }
     }
 
@@ -1022,6 +1026,10 @@ final class IslandViewModel {
 
     /// Esc takes back one thing before it closes the island: the clipboard search. True when it did.
     func stepBack() -> Bool {
+        if calendarSelectedDay != nil {
+            calendarSelectedDay = nil
+            return true
+        }
         if !clipboardQuery.isEmpty {
             clipboardQuery = ""
             return true

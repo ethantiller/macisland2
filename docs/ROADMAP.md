@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (812 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (823 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -526,6 +526,11 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
+
+**Calendar: time left, calendars, the month (K1)** *(written, not run)*
+- [ ] With Time Left on, a meeting in progress reads "Ends in 25 min" in Up Next, the Today widget, and the idle peek; off, it leaves ten minutes after it starts
+- [ ] Switching a calendar off in Home → Up Next → Calendars takes its events out of Up Next, the banner, and the month; one added in Calendar.app shows by default
+- [ ] The month's dots match Calendar.app for the month shown; clicking a day names its first event, clicking again (or Esc) brings the month back; idle CPU is unchanged with the month closed
 
 **Clipboard search and paste (C)** *(written, not run)*
 - [ ] Typing in the Shelf's Clipboard filters and marks the words that matched; "Nothing matches" when none do

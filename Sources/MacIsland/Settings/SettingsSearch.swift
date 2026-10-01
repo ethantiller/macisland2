@@ -28,6 +28,7 @@ enum SettingsAnchor {
     static let layout = "home.layout"
     static let upNext = "home.upnext"
     static let weather = "home.weather"
+    static let calendars = "home.calendars"
     static let files = "tabs.files"
     static let clipboard = "tabs.clipboard"
     static let music = "tabs.media"
@@ -137,6 +138,14 @@ enum SettingsSearch {
             .init(
                 pane: .tabs, title: "Due Reminders", keywords: ["up next", "reminders", "tasks"],
                 anchor: SettingsAnchor.dueReminders, module: .reminders),
+            .init(
+                pane: .home, title: "Time Left in the Current Event",
+                keywords: ["meeting", "ends", "remaining", "calendar", "up next", "in progress"],
+                anchor: SettingsAnchor.upNext),
+            .init(
+                pane: .home, title: "Calendars",
+                keywords: ["accounts", "icloud", "google", "outlook", "hide", "show", "which", "up next", "month"],
+                anchor: SettingsAnchor.calendars),
             .init(
                 pane: .home, title: "Internet Accounts",
                 keywords: ["calendar", "outlook", "google", "exchange", "accounts"],

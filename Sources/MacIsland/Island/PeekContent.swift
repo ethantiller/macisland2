@@ -39,7 +39,7 @@ struct IdlePeekView: View {
                 }
                 Spacer(minLength: 0)
                 if let next = viewModel.agenda.next {
-                    UpNextLabel(item: next, emptyTitle: "")
+                    UpNextLabel(item: next, emptyTitle: "", showsTimeLeft: viewModel.settings.showsTimeLeft)
                 } else {
                     MacBatteryGlance()
                 }

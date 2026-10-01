@@ -165,6 +165,29 @@ final class AppSettings {
         }
     }
 
+    /// An event that is on now stays in Up Next until it ends, and reads how long it has left. Off, it leaves ten minutes after it starts.
+    var showsTimeLeft: Bool {
+        didSet {
+            defaults.set(showsTimeLeft, forKey: Key.timeLeft)
+            if showsTimeLeft != oldValue { onAgendaChange?() }
+        }
+    }
+
+    /// Calendars left out of Up Next, the banner, and the month (their identifiers). Left out, not chosen, so a calendar added later
+    /// counts until it is switched off. Identifiers belong to this Mac, so they are not in the settings file.
+    private(set) var hiddenCalendars: Set<String> {
+        didSet { defaults.set(hiddenCalendars.sorted(), forKey: Key.hiddenCalendars) }
+    }
+
+    func isCalendarHidden(_ id: String) -> Bool { hiddenCalendars.contains(id) }
+
+    /// Does nothing unless it changes something.
+    func setCalendarHidden(_ id: String, _ hidden: Bool) {
+        guard hiddenCalendars.contains(id) != hidden else { return }
+        if hidden { hiddenCalendars.insert(id) } else { hiddenCalendars.remove(id) }
+        onAgendaChange?()
+    }
+
     /// The charge level that raises the "fully charged" alert, from 80 to 100.
     var fullChargeLevel: Int {
         didSet {
@@ -357,6 +380,8 @@ final class AppSettings {
         static let savedHomePresets = "home.savedPresets"
         static let customWidgets = "widgets.custom"
         static let features = "features.available"
+        static let timeLeft = "agenda.timeLeft"
+        static let hiddenCalendars = "agenda.hiddenCalendars"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
 
@@ -388,6 +413,8 @@ final class AppSettings {
         quietDuringFocus = defaults.bool(forKey: Key.quiet)
         showsCalendar = defaults.bool(forKey: Key.calendar)
         showsReminders = defaults.bool(forKey: Key.reminders)
+        showsTimeLeft = defaults.bool(forKey: Key.timeLeft)
+        hiddenCalendars = Set(defaults.stringArray(forKey: Key.hiddenCalendars) ?? [])
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
         showsLyrics = defaults.object(forKey: Key.lyrics) as? Bool ?? true
         replacesVolumeHUD = defaults.bool(forKey: Key.volumeHUD)

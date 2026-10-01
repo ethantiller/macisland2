@@ -44,6 +44,7 @@ enum PreviewFeatures {
         let agenda = AgendaMonitor()
         agenda.showSample(
             PreviewSamples.nextEvent(), upcoming: PreviewSamples.upcoming(), reminders: PreviewSamples.reminders())
+        agenda.showSampleCalendars(groups: PreviewSamples.calendarGroups(), eventDays: PreviewSamples.eventDays())
 
         return IslandFeatures(
             nowPlaying: nowPlaying,
@@ -157,7 +158,30 @@ enum PreviewSamples {
     static func nextEvent() -> AgendaItem {
         AgendaItem(
             id: "preview-event", kind: .event, title: "Design review",
-            date: Date().addingTimeInterval(25 * 60), reminderID: nil, joinURL: nil)
+            date: Date().addingTimeInterval(25 * 60), reminderID: nil, joinURL: nil,
+            end: Date().addingTimeInterval(85 * 60))
+    }
+
+    /// Two accounts, for Settings' list of calendars.
+    static func calendarGroups() -> [CalendarGroup] {
+        [
+            CalendarGroup(
+                id: "preview-icloud", title: "iCloud",
+                calendars: [.init(id: "preview-home", title: "Home"), .init(id: "preview-work", title: "Work")]),
+            CalendarGroup(id: "preview-google", title: "Google", calendars: [.init(id: "preview-sam", title: "Sam")]),
+        ]
+    }
+
+    /// A few days of this month with events, for the dots in the month view.
+    static func eventDays() -> [Int: [AgendaItem]] {
+        let calendar = Calendar.current
+        let today = calendar.component(.day, from: Date())
+        func item(_ title: String, hour: Int) -> AgendaItem {
+            let start = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+            return AgendaItem(
+                id: "preview-\(title)", kind: .event, title: title, date: start, end: start.addingTimeInterval(3600))
+        }
+        return [today: [item("Design review", hour: 10)], min(today + 3, 28): [item("Lunch with Sam", hour: 12)]]
     }
 
     /// The next few things, for Today at its taller sizes; the first is `nextEvent()`.

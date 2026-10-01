@@ -16,6 +16,11 @@ struct AgendaItem: Equatable, Identifiable {
     var reminderID: String?
     /// A Zoom, Meet, Teams, or Webex link found in the event.
     var joinURL: URL?
+    /// When an event ends, for the time left in one that is on now. Nil for a reminder.
+    var end: Date?
+    /// The calendar an event is in, so a calendar left out can be told from the rest.
+    var calendarID: String?
+    var isAllDay = false
 }
 
 /// One open reminder in the Reminders tab.
@@ -145,9 +150,23 @@ enum AgendaRules {
     /// Reminders that came due while the island was off aren't announced later than this.
     static let reminderGrace: TimeInterval = 10 * 60
 
-    /// Whichever comes first.
-    static func next(in items: [AgendaItem]) -> AgendaItem? {
-        items.min { $0.date < $1.date }
+    /// Whichever comes first. With `prefersInProgress`, an event that is on now comes before one that starts later.
+    static func next(in items: [AgendaItem], now: Date = Date(), prefersInProgress: Bool = false) -> AgendaItem? {
+        if prefersInProgress, let current = items.filter({ isInProgress($0, now: now) }).min(by: { $0.date < $1.date }) {
+            return current
+        }
+        return items.min { $0.date < $1.date }
+    }
+
+    /// An event that has started and not ended.
+    static func isInProgress(_ item: AgendaItem, now: Date) -> Bool {
+        guard item.kind == .event, let end = item.end else { return false }
+        return item.date <= now && now < end
+    }
+
+    /// Whether a looked-up event is kept. As always, until ten minutes after it starts; with time left on, until it ends.
+    static func keepsEvent(start: Date, end: Date, now: Date, showsTimeLeft: Bool) -> Bool {
+        start >= now.addingTimeInterval(-600) || (showsTimeLeft && end > now)
     }
 
     /// The soonest few, in order.
@@ -162,12 +181,82 @@ enum AgendaRules {
         }
     }
 
-    static func timeText(for item: AgendaItem, now: Date) -> String {
+    static func timeText(for item: AgendaItem, now: Date, showsTimeLeft: Bool = false) -> String {
+        if showsTimeLeft, isInProgress(item, now: now), let end = item.end {
+            let left = end.timeIntervalSince(now)
+            return left < 3600
+                ? "Ends in \(max(Int((left / 60).rounded(.up)), 1)) min"
+                : "Ends " + end.formatted(date: .omitted, time: .shortened)
+        }
         let interval = item.date.timeIntervalSince(now)
         if interval < -60 { return item.kind == .reminder ? "Overdue" : "Started" }
         if interval < 60 { return "Now" }
         if interval < 3600 { return "in \(Int((interval / 60).rounded(.up))) min" }
         return item.date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+extension AgendaRules {
+    /// The days of the month `month` falls in that have an event, as the day of the month to the events on it, soonest first. An event
+    /// that spans days is on each of them.
+    static func eventDays(
+        _ items: [AgendaItem], inMonthOf month: Date, calendar: Calendar = .current
+    ) -> [Int: [AgendaItem]] {
+        guard let interval = calendar.dateInterval(of: .month, for: month) else { return [:] }
+        var days: [Int: [AgendaItem]] = [:]
+        for item in items.sorted(by: { $0.date < $1.date }) {
+            var day = max(calendar.startOfDay(for: item.date), interval.start)
+            // An all-day event ends at midnight: the day it ends is not one of its days.
+            let last = (item.end ?? item.date).addingTimeInterval(item.end == nil ? 0 : -1)
+            while day < interval.end, day <= max(last, item.date) {
+                days[calendar.component(.day, from: day), default: []].append(item)
+                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                day = next
+            }
+        }
+        return days
+    }
+
+    /// The line that replaces the month's name when a day is chosen: "Tue 14 · Design review, 10:00 · 2 more".
+    static func dayLine(for date: Date, items: [AgendaItem], calendar: Calendar = .current) -> String {
+        let day = date.formatted(.dateTime.weekday(.abbreviated).day())
+        guard let first = items.first else { return day }
+        let time = first.isAllDay ? "all day" : first.date.formatted(date: .omitted, time: .shortened)
+        var line = "\(day) \u{B7} \(first.title), \(time)"
+        if items.count > 1 { line += " \u{B7} \(items.count - 1) more" }
+        return line
+    }
+}
+
+/// The calendars of one account, for choosing which count. Grouped by the account's identifier, not its name: two accounts can both
+/// be called iCloud.
+struct CalendarGroup: Identifiable, Equatable {
+    struct Entry: Identifiable, Equatable {
+        let id: String
+        let title: String
+    }
+
+    let id: String
+    let title: String
+    var calendars: [Entry]
+
+    /// `(account id, account title, calendar id, calendar title)` for each calendar, grouped by account and sorted by name.
+    static func groups(from rows: [(source: String, sourceTitle: String, id: String, title: String)]) -> [CalendarGroup] {
+        var groups: [String: CalendarGroup] = [:]
+        for row in rows {
+            groups[row.source, default: CalendarGroup(id: row.source, title: row.sourceTitle, calendars: [])]
+                .calendars.append(Entry(id: row.id, title: row.title))
+        }
+        return groups.values
+            .map { group in
+                var group = group
+                group.calendars.sort { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                return group
+            }
+            .sorted {
+                let order = $0.title.localizedStandardCompare($1.title)
+                return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
+            }
     }
 }
 
@@ -193,6 +282,13 @@ final class AgendaMonitor {
     @ObservationIgnored private let store = EKEventStore()
     @ObservationIgnored private var wantsCalendar = false
     @ObservationIgnored private var wantsReminders = false
+    /// An event on now stays in Up Next until it ends, with its time left.
+    @ObservationIgnored private var showsTimeLeft = false
+    /// Calendars left out (their identifiers). Empty is every calendar, including ones added later.
+    @ObservationIgnored private var hiddenCalendars: Set<String> = []
+    /// Calendars and month events for the Settings preview, which never asks the calendar.
+    @ObservationIgnored private var sampleGroups: [CalendarGroup]?
+    @ObservationIgnored private var sampleDays: [Int: [AgendaItem]]?
     /// Whether loading in the background may show the system prompt. False at launch: a permission macOS hasn't decided is only
     /// read, never asked for, until the person turns a setting on or opens the Reminders tab.
     @ObservationIgnored private var mayAsk = false
@@ -206,6 +302,12 @@ final class AgendaMonitor {
         next = item
         self.upcoming = upcoming
         reminderRows = reminders
+    }
+
+    /// Calendars and the month's events for the preview.
+    func showSampleCalendars(groups: [CalendarGroup], eventDays: [Int: [AgendaItem]]) {
+        sampleGroups = groups
+        sampleDays = eventDays
     }
 
     func start() {
@@ -235,10 +337,15 @@ final class AgendaMonitor {
 
     /// `mayAsk` is false for the launch, so a permission that was reset (every rebuild resets them) isn't asked for until the person
     /// chooses; true when a setting is changed, which is the choice.
-    func configure(calendar: Bool, reminders: Bool, mayAsk: Bool = true) {
+    func configure(
+        calendar: Bool, reminders: Bool, mayAsk: Bool = true, showsTimeLeft: Bool = false,
+        hiddenCalendars: Set<String> = []
+    ) {
         wantsCalendar = calendar
         wantsReminders = reminders
         self.mayAsk = mayAsk
+        self.showsTimeLeft = showsTimeLeft
+        self.hiddenCalendars = hiddenCalendars
         // With both sources off there is nothing to look at: no timer, no listener.
         if calendar || reminders { start() } else { stop() }
         refresh()
@@ -351,7 +458,7 @@ final class AgendaMonitor {
         isDenied = denied
 
         let now = Date()
-        next = AgendaRules.next(in: items)
+        next = AgendaRules.next(in: items, now: now, prefersInProgress: showsTimeLeft)
         upcoming = AgendaRules.upcoming(in: items)
 
         let due = items.filter { AgendaRules.shouldAnnounce($0, now: now) && !announced.contains($0.id) }
@@ -380,21 +487,60 @@ final class AgendaMonitor {
         }
     }
 
+    /// The calendars that count: nil is all of them, which is what no calendar being left out means.
+    private func allowedCalendars() -> [EKCalendar]? {
+        guard !hiddenCalendars.isEmpty else { return nil }
+        return store.calendars(for: .event).filter { !hiddenCalendars.contains($0.calendarIdentifier) }
+    }
+
+    private func item(for event: EKEvent) -> AgendaItem {
+        AgendaItem(
+            id: "\(event.eventIdentifier ?? event.title ?? "event")@\(event.startDate.timeIntervalSince1970)",
+            kind: .event,
+            title: event.title ?? "Event",
+            date: event.startDate,
+            joinURL: MeetingLink.find(in: [event.location, event.notes, event.url?.absoluteString]),
+            end: event.endDate,
+            calendarID: event.calendar?.calendarIdentifier,
+            isAllDay: event.isAllDay
+        )
+    }
+
     private func events() -> [AgendaItem] {
         let now = Date()
         let predicate = store.predicateForEvents(
-            withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: nil)
+            withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: allowedCalendars())
+        let showsTimeLeft = showsTimeLeft
         return store.events(matching: predicate)
-            .filter { !$0.isAllDay && $0.status != .canceled && $0.startDate >= now.addingTimeInterval(-600) }
-            .map { event in
-                AgendaItem(
-                    id: "\(event.eventIdentifier ?? event.title ?? "event")@\(event.startDate.timeIntervalSince1970)",
-                    kind: .event,
-                    title: event.title ?? "Event",
-                    date: event.startDate,
-                    joinURL: MeetingLink.find(in: [event.location, event.notes, event.url?.absoluteString])
-                )
+            .filter {
+                !$0.isAllDay && $0.status != .canceled
+                    && AgendaRules.keepsEvent(start: $0.startDate, end: $0.endDate, now: now, showsTimeLeft: showsTimeLeft)
             }
+            .map(item(for:))
+    }
+
+    /// The accounts and their calendars, for choosing which count. Empty until Calendars is allowed.
+    func calendarGroups() -> [CalendarGroup] {
+        if let sampleGroups { return sampleGroups }
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        return CalendarGroup.groups(
+            from: store.calendars(for: .event).map {
+                (
+                    source: $0.source?.sourceIdentifier ?? "local", sourceTitle: $0.source?.title ?? "On My Mac",
+                    id: $0.calendarIdentifier, title: $0.title
+                )
+            })
+    }
+
+    /// The events in a stretch of time (a month), by day of the month, for the dots in the month view. Read when the month appears and
+    /// when it changes, never on a timer.
+    func eventDays(in interval: DateInterval) async -> [Int: [AgendaItem]] {
+        if let sampleDays { return sampleDays }
+        guard wantsCalendar, await hasAccess(.event, asking: false) else { return [:] }
+        let predicate = store.predicateForEvents(
+            withStart: interval.start, end: interval.end, calendars: allowedCalendars())
+        let items = store.events(matching: predicate).filter { $0.status != .canceled }.map(item(for:))
+        return AgendaRules.eventDays(items, inMonthOf: interval.start)
     }
 
     private func reminders() async -> [AgendaItem] {

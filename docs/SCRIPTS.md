@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 812 tests, about a second.
+lines; 823 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -365,7 +365,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 50 files, about 10,900 lines, **812 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 51 files, about 10,900 lines, **823 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -394,6 +394,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `FeatureCatalogTests.swift` | The Features catalog: the words, defaults, presets, the two bridged settings, the clipboard migration, the shown tabs, the menu bar, the archive |
 | `OptionalAccessTests.swift` | Optional permissions: never part of the gate, never asked by turning a feature on or by a preset, asked once by Allow, and the evidence record |
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
+| `CalendarTests.swift` | Time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

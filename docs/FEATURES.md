@@ -149,6 +149,7 @@ Home & Widgets in Settings arranges it (see below).
 
 - **Top left**: today on one line (tap it for a **month calendar**, six weeks with arrows; today is a filled circle), over
   **Up Next**: the next meeting or due reminder (tap to join a call, or open Reminders). Reads Calendar and Reminders only
+  With **Time Left in the Current Event** on (Settings → Home → Up Next; off by default) a meeting that is on stays in Up Next until it ends and reads "Ends in 25 min" (or "Ends 3:30 PM" with over an hour left) instead of leaving ten minutes after it starts. **Calendars** (same section) lists your accounts and their calendars, each a switch; one you switch off is left out of Up Next, the banner, and the month, and one added later counts until you do (the list is per Mac and not in the settings file). In the month Home's date opens, a small dot under a day marks an event; click the day and the header names its first event and how many more ("Tue 14 · Design review, 10:00 · 2 more"), click it again or press Esc to get the month back. The month is read when it opens or you change month, never on a timer.
   if you turn them on in Settings.
 - **Top right**: what is playing, with play and pause (tap for the Media tab).
 - **Bottom left**: your first four pinned tools as a 2 by 2 of round buttons. White fill means on.

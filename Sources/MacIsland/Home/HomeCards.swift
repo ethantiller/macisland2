@@ -30,6 +30,8 @@ struct DateInline: View {
 struct UpNextLabel: View {
     let item: AgendaItem?
     let emptyTitle: String
+    /// An event on now reads "Ends in 25 min" instead of "Started".
+    var showsTimeLeft = false
 
     var body: some View {
         if let item {
@@ -46,7 +48,7 @@ struct UpNextLabel: View {
                             .font(Theme.Typography.bodyEmphasized)
                             .foregroundStyle(Theme.Palette.primary)
                         Text(
-                            AgendaRules.timeText(for: item, now: context.date) + (item.joinURL == nil ? "" : " · Join")
+                            AgendaRules.timeText(for: item, now: context.date, showsTimeLeft: showsTimeLeft) + (item.joinURL == nil ? "" : " · Join")
                         )
                         .font(Theme.Typography.numeral)
                         .foregroundStyle(Theme.Palette.secondary)
