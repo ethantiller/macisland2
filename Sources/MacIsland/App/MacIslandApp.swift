@@ -66,7 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             agents: AgentActivity(),
             mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper()),
             downloads: DownloadsFolder(),
-            notifications: NotificationMirror(reader: NotificationReader(environment: .live()))
+            notifications: NotificationMirror(
+                reader: NotificationReader(environment: .live()), placement: { settings.notificationPlacement })
         )
     }
 
@@ -297,6 +298,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fullScreenWatcher.onChange = { [weak viewModel] on in viewModel?.setFullScreen(on) }
         settings.onFullScreenSettingChange = { [weak self] in self?.applyFullScreen() }
         applyFullScreen()
+        // Notifications: a read notification reaches the island through the view model.
+        features.notifications.connect(to: viewModel)
         // After everything else is connected: starts what is on (the music adapter), and nothing that would ask.
         runner.startAtLaunch()
     }

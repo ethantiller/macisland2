@@ -8,6 +8,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
     case meeting, reminderDue, rainSoon
     case download, lowDisk
     case agentDone, agentLimit
+    case notification
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .lowDisk: "Low Disk Space"
         case .agentDone: "Task Finished"
         case .agentLimit: "Plan Limit"
+        case .notification: "Notifications"
         }
     }
 
@@ -36,6 +38,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case day = "Your Day"
         case storage = "Storage"
         case agents = "AI Agents"
+        case mirrored = "Mirrored"
 
         var id: String { rawValue }
     }
@@ -47,6 +50,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .meeting, .reminderDue, .rainSoon: .day
         case .download, .lowDisk: .storage
         case .agentDone, .agentLimit: .agents
+        case .notification: .mirrored
         }
     }
 }
@@ -73,6 +77,24 @@ enum Announcements {
         return IslandBanner(
             systemImage: "gauge.with.needle.fill", tint: Theme.Tint.attention, title: "\(name) at \(percent)%",
             detail: resetsAt.map { "Resets at " + $0.formatted(date: .omitted, time: .shortened) })
+    }
+
+    /// A notification macOS showed, on the island: "Messages: Maya" over the first line of what it says, with Open and Dismiss. The bell
+    /// stands for any app: the island shows no app icons.
+    static func mirrored(
+        _ notification: MirroredNotification, open: @escaping @MainActor () -> Void,
+        dismiss: @escaping @MainActor () -> Void
+    ) -> IslandBanner {
+        IslandBanner(
+            systemImage: "bell.fill", tint: Theme.Tint.neutral, title: notification.headline, detail: notification.detail,
+            actions: [.init(title: "Open", perform: open), .init(title: "Dismiss", perform: dismiss)])
+    }
+
+    /// Said once, when the system\u{2019}s banner couldn\u{2019}t be closed and a notification stayed in the corner instead.
+    static var couldntCloseNotification: IslandBanner {
+        IslandBanner(
+            systemImage: "bell.slash.fill", tint: Theme.Tint.neutral, title: "Notifications Stay in the Corner",
+            detail: "MacIsland couldn\u{2019}t close macOS\u{2019}s banner.")
     }
 
     static func charging(percent: Int) -> IslandAlert {
@@ -193,6 +215,12 @@ enum Announcements {
         case .agentDone: .alert(agentDone(duration: 252))
         case .agentLimit:
             .banner(agentLimit(agent: .claudeCode, percent: 80, resetsAt: Date().addingTimeInterval(2 * 3600)))
+        case .notification:
+            .banner(
+                mirrored(
+                    MirroredNotification(
+                        id: "preview", app: "Messages", title: "Maya", subtitle: "", body: "Are we still on for lunch?",
+                        isPersistent: false, date: Date()), open: {}, dismiss: {}))
         }
     }
 }

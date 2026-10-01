@@ -1442,6 +1442,14 @@ final class IslandViewModel {
         flash(Announcements.volume(level), for: Theme.Timing.volumeHUD, respectingFocus: false)
     }
 
+    /// Whether a banner for `event` would show right now: it isn't muted, no full-screen app has the display, and no Focus is holding
+    /// banners. For a caller that has something to do first that it must not do for a banner that won't show.
+    func canShowBanner(for event: AmbientEvent? = nil, respectingFocus: Bool = true) -> Bool {
+        if let event, features.settings.isMuted(event) { return false }
+        if hidesForFullScreen { return false }
+        return !(respectingFocus && isQuiet)
+    }
+
     /// Shows a banner, then optionally leaves `followUp` as a compact alert.
     func showBanner(
         _ banner: IslandBanner,

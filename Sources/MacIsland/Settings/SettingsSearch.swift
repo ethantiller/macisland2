@@ -44,6 +44,7 @@ enum SettingsAnchor {
     static let yourDay = "notifications.day"
     static let storage = "notifications.storage"
     static let agentNotices = "notifications.agents"
+    static let mirrored = "notifications.mirrored"
     static let leavesThisMac = "privacy.leaves"
     static let runs = "privacy.runs"
     static let access = "privacy.access"
@@ -293,7 +294,7 @@ enum SettingsSearch {
                     "permissions", "calendar", "reminders", "camera", "microphone", "accessibility", "screen recording",
                     "bluetooth", "system settings",
                 ], anchor: SettingsAnchor.access),
-        ] + featureEntries + optionalAccessEntries + agentEntries
+        ] + featureEntries + optionalAccessEntries + agentEntries + notificationEntries
 
     /// A row in the Features pane for each feature this build has.
     static var featureEntries: [SettingsSearchEntry] {
@@ -302,6 +303,21 @@ enum SettingsSearch {
                 pane: .features, title: $0.title, keywords: $0.keywords + ["feature", "turn off", "turn on", "switch"],
                 anchor: SettingsAnchor.feature($0))
         }
+    }
+
+    /// The mirrored notifications, in Notifications.
+    static var notificationEntries: [SettingsSearchEntry] {
+        guard Feature.notifications.isBuilt else { return [] }
+        return [
+            SettingsSearchEntry(
+                pane: .notifications, title: "Where Notifications Show",
+                keywords: ["mirror", "mirrored", "inbox", "island", "corner", "banner", "system", "messages"],
+                anchor: SettingsAnchor.mirrored),
+            SettingsSearchEntry(
+                pane: .notifications, title: "Mirrored Notifications",
+                keywords: ["notification center", "preview", "open", "dismiss", "mirror", "inbox"],
+                anchor: SettingsAnchor.mirrored),
+        ]
     }
 
     /// The options of the AI Agents module, in Content.

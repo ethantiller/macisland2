@@ -27,6 +27,9 @@ struct WidgetSizeSnapshots {
         viewModel.nowPlaying.apply(PreviewSamples.track())
         viewModel.agenda.showSample(
             PreviewSamples.nextEvent(), upcoming: PreviewSamples.upcoming(), reminders: PreviewSamples.reminders())
+        for notification in PreviewSamples.notifications().inbox.items.reversed() {
+            viewModel.notifications.inbox.add(notification)
+        }
         let note = viewModel.notes.addNote()
         viewModel.notes.setBody(
             "Talking points\nOpen with the demo, then the numbers.\nSlow down on pricing.\nAsk about the rollout.\n"

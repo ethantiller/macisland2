@@ -20,6 +20,7 @@ struct SettingsArchive: Codable, Equatable {
     var openOn: String?
     var mediaSource: String?
     var showsKeepAwakeCompact: Bool?
+    var notificationPlacement: String?
     var islandDisplay: String?
     var leftTabs: [String]?
     var rightTabs: [String]?
@@ -87,6 +88,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.openOn = settings.openOn.rawValue
         archive.mediaSource = settings.mediaSource.rawValue
         archive.showsKeepAwakeCompact = settings.showsKeepAwakeCompact
+        archive.notificationPlacement = settings.notificationPlacement.rawValue
         archive.islandDisplay = settings.islandDisplay.rawValue
         archive.leftTabs = settings.leftTabs.map(\.rawValue)
         archive.rightTabs = settings.rightTabs.map(\.rawValue)
@@ -166,6 +168,7 @@ extension AppSettings {
         if let value = archive.openOn.flatMap(OpenOn.init) { openOn = value }
         if let value = archive.mediaSource.flatMap(MediaSource.init) { mediaSource = value }
         if let value = archive.showsKeepAwakeCompact { showsKeepAwakeCompact = value }
+        if let value = archive.notificationPlacement.flatMap(NotificationPlacement.init) { notificationPlacement = value }
         if let value = archive.swipesEnabled { swipesEnabled = value }
         if let value = archive.islandDisplay.flatMap(IslandDisplay.init) { islandDisplay = value }
 

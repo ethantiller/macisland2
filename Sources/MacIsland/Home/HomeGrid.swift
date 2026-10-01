@@ -48,6 +48,9 @@ struct HomeGrid: View {
         } else {
             HomeWidgetView(placement: placement, size: size, viewModel: viewModel)
                 .contextMenu {
+                    if placement.widget == .builtIn(.notifications) {
+                        Button("Clear Notifications") { viewModel.notifications.inbox.clear() }
+                    }
                     Button("Edit Home\u{2026}") { viewModel.editHome(selecting: placement.id) }
                 }
         }
@@ -123,6 +126,7 @@ struct HomeWidgetView: View {
         case .builtIn(.system): SystemWidget(model: viewModel.system, size: size)
         case .builtIn(.agents):
             AgentsWidget(usage: viewModel.agents.usage, settings: viewModel.settings, size: size)
+        case .builtIn(.notifications): NotificationsWidget(mirror: viewModel.notifications, size: size)
         case .builtIn(.reminders): RemindersWidget(viewModel: viewModel, size: size)
         case .builtIn(.note): NoteWidget(viewModel: viewModel, options: placement.options, size: size)
         case .custom(let id):

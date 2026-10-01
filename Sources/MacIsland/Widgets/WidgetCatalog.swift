@@ -11,6 +11,8 @@ enum BuiltInWidget: String, CaseIterable, Codable {
     case system
     // Off until AI Agents is switched on.
     case agents
+    // Off until Notifications is switched on.
+    case notifications
 }
 
 /// One widget in a layout: one of the built-ins, or one the person made.
@@ -57,7 +59,7 @@ enum WidgetID: Hashable, Codable {
 
 /// What a widget reads. The Privacy pane and the idle budget are written from this.
 enum WidgetSource: Equatable {
-    case agenda, nowPlaying, pinnedTools, clock, weather, battery, reminders, notes, system, agents
+    case agenda, nowPlaying, pinnedTools, clock, weather, battery, reminders, notes, system, agents, notifications
     case shortcut, web, folder, command
 }
 
@@ -154,6 +156,10 @@ enum WidgetCatalog {
             return make(
                 "AI Agents", "sparkles", sizes: [GridSize(2, 1), GridSize(3, 1)], default: GridSize(3, 1),
                 source: .agents, tint: .attention, tap: .openModule(.agents))
+        case .notifications:
+            return make(
+                "Notifications", "bell", sizes: [GridSize(3, 1), GridSize(3, 2), GridSize(6, 2)],
+                default: GridSize(3, 1), source: .notifications, tap: .custom)
         }
     }
 

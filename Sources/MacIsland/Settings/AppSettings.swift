@@ -141,6 +141,15 @@ final class AppSettings {
         }
     }
 
+    /// Where a mirrored notification shows: macOS's banner stays and the island keeps an inbox, or the island shows it and the banner is
+    /// closed.
+    var notificationPlacement: NotificationPlacement {
+        didSet {
+            guard notificationPlacement != oldValue else { return }
+            defaults.set(notificationPlacement.rawValue, forKey: Key.notificationPlacement)
+        }
+    }
+
     /// A two-finger swipe over the island opens it, closes it, and changes tabs. The timer dial's own scrubbing works
     /// either way.
     var swipesEnabled: Bool {
@@ -559,6 +568,7 @@ final class AppSettings {
         static let openOn = "openOn"
         static let mediaSource = "media.source"
         static let keepAwakeCompact = "keepAwake.compact"
+        static let notificationPlacement = "notifications.placement"
         static let mixerOutputs = "mixer.outputs"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
@@ -576,6 +586,8 @@ final class AppSettings {
         openOn = defaults.string(forKey: Key.openOn).flatMap(OpenOn.init) ?? .lastTab
         mediaSource = defaults.string(forKey: Key.mediaSource).flatMap(MediaSource.init) ?? .any
         showsKeepAwakeCompact = defaults.bool(forKey: Key.keepAwakeCompact)
+        notificationPlacement =
+            defaults.string(forKey: Key.notificationPlacement).flatMap(NotificationPlacement.init) ?? .corner
         islandDisplay = defaults.string(forKey: Key.islandDisplay).flatMap(IslandDisplay.init) ?? .builtIn
         dragTarget = defaults.string(forKey: Key.dragTarget).flatMap(DragTarget.init) ?? .shelfAndAirDrop
         addsScreenshots = defaults.object(forKey: Key.addsScreenshots) as? Bool ?? true

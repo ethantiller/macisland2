@@ -217,6 +217,13 @@ struct IslandSnapshots {
             ))
         render(viewModel, "12b-banner-two-actions")
 
+        viewModel.showBanner(
+            Announcements.mirrored(
+                MirroredNotification(
+                    id: "snapshot", app: "Messages", title: "Maya", subtitle: "", body: "Are we still on for lunch?",
+                    isPersistent: false, date: Date()), open: {}, dismiss: {}))
+        render(viewModel, "12c-banner-mirrored")
+
         // The banner outranks an alert, so let it go first.
         viewModel.performBannerAction()
         viewModel.flash(
