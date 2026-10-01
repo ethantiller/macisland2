@@ -25,7 +25,9 @@ struct SettingsSearchTests {
         #expect(titles("lyr").first == "Synced Lyrics")
         #expect(titles("screenshots").first == "Add New Screenshots to the Shelf")
         #expect(titles("long break").first == "Long Break")
-        #expect(Set(titles("pomodoro")) == ["Focus Length", "Short Break", "Long Break", "Sessions Before Long Break"])
+        #expect(
+            Set(titles("pomodoro"))
+                == ["Focus Length", "Short Break", "Long Break", "Sessions Before Long Break", "Clock"])
     }
 
     @Test func anotherNameForASettingFindsIt() {
@@ -48,8 +50,8 @@ struct SettingsSearchTests {
     }
 
     @Test func aTitleBeatsAKeywordAndTiesKeepThePanesOrder() {
-        // "calendar" is in Calendar Events' title and only a keyword for other entries.
-        #expect(titles("calendar").first == "Calendar Events")
+        // "calendar" is the Calendar feature's title and only a keyword for other entries.
+        #expect(titles("calendar").first == "Calendar")
         let results = SettingsSearch.results(for: "reminders")
         let names = results.map { "\($0.pane.rawValue)/\($0.title)" }
         #expect(names.firstIndex(of: "home/Due Reminders")! < names.firstIndex(of: "notifications/Due Reminders")!)

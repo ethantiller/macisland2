@@ -18,6 +18,7 @@ enum SettingsAnchor {
     static let input = "general.input"
     static let yourSettings = "general.settings"
     static let guide = "general.guide"
+    static let featurePresets = "features.presets"
     static let menuBar = "tabs.menubar"
     static let widgets = "home.widgets"
     static let layout = "home.layout"
@@ -32,7 +33,6 @@ enum SettingsAnchor {
     static let rowOrder = "tools.roworder"
     static let shortcutTools = "tools.shortcuts"
     static let interruptions = "notifications.interruptions"
-    static let volumeHUD = "notifications.volume"
     static let power = "notifications.power"
     static let devices = "notifications.devices"
     static let yourDay = "notifications.day"
@@ -40,6 +40,11 @@ enum SettingsAnchor {
     static let leavesThisMac = "privacy.leaves"
     static let runs = "privacy.runs"
     static let access = "privacy.access"
+}
+
+extension SettingsAnchor {
+    /// A feature's row in the Features pane.
+    static func feature(_ feature: Feature) -> String { "features." + feature.rawValue }
 }
 
 /// Finding a setting by what it is called. Pure, so it is tested.
@@ -84,6 +89,11 @@ enum SettingsSearch {
             .init(
                 pane: .general, title: "Reset All Settings", keywords: ["defaults", "factory", "erase", "clear"],
                 anchor: SettingsAnchor.yourSettings),
+            // Features
+            .init(
+                pane: .features, title: "Presets",
+                keywords: ["minimal", "everyday", "everything", "start from", "reset", "features"],
+                anchor: SettingsAnchor.featurePresets),
             // Tabs
             .init(
                 pane: .tabs, title: "Left of the Notch",
@@ -119,10 +129,6 @@ enum SettingsSearch {
             .init(
                 pane: .home, title: "Reset Home to Everyday", keywords: ["default", "layout"],
                 anchor: SettingsAnchor.layout),
-            .init(
-                pane: .home, title: "Calendar Events",
-                keywords: ["up next", "meetings", "calendar", "outlook", "google", "exchange"],
-                anchor: SettingsAnchor.upNext),
             .init(
                 pane: .home, title: "Due Reminders", keywords: ["up next", "reminders", "tasks"],
                 anchor: SettingsAnchor.upNext),
@@ -182,10 +188,6 @@ enum SettingsSearch {
                 pane: .tools, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
                 anchor: SettingsAnchor.rowOrder),
             // Notifications
-            .init(
-                pane: .notifications, title: "Replace the Volume HUD",
-                keywords: ["volume", "sound", "keys", "hud", "speaker", "mute", "accessibility"],
-                anchor: SettingsAnchor.volumeHUD),
             .init(
                 pane: .notifications, title: "Quiet in Focus", keywords: ["do not disturb", "dnd", "silence", "mute"],
                 anchor: SettingsAnchor.interruptions),
@@ -247,7 +249,16 @@ enum SettingsSearch {
                     "permissions", "calendar", "reminders", "camera", "microphone", "accessibility", "screen recording",
                     "bluetooth", "system settings",
                 ], anchor: SettingsAnchor.access),
-        ]
+        ] + featureEntries
+
+    /// A row in the Features pane for each feature this build has.
+    static var featureEntries: [SettingsSearchEntry] {
+        Feature.allCases.filter(\.isBuilt).map {
+            SettingsSearchEntry(
+                pane: .features, title: $0.title, keywords: $0.keywords + ["feature", "turn off", "turn on", "switch"],
+                anchor: SettingsAnchor.feature($0))
+        }
+    }
 
     /// Lowercase and without accents, so "cafe" finds "Café".
     static func normalized(_ text: String) -> String {

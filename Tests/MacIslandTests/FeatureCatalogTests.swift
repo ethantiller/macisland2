@@ -576,4 +576,92 @@ struct FeatureCatalogTests {
         #expect(why(.rainSoon) == nil)
         #expect(why(.charging) == nil)
     }
+
+    // MARK: The Features pane (F3)
+
+    @Test func everyBuiltFeatureHasASearchEntry() {
+        for feature in Feature.allCases where feature.isBuilt {
+            let found = SettingsSearch.results(for: feature.title)
+            #expect(
+                found.contains { $0.pane == .features && $0.anchor == SettingsAnchor.feature(feature) },
+                "\(feature)")
+        }
+        // A feature that isn\u{2019}t built has no row, so nothing to find.
+        #expect(!SettingsSearch.entries.contains { $0.pane == .features && $0.title == Feature.mixer.title })
+        // The two switches that moved are found where they now are.
+        #expect(SettingsSearch.results(for: "replace the volume hud").first?.pane == .features)
+        #expect(SettingsSearch.results(for: "outlook").contains { $0.pane == .features && $0.title == "Calendar" })
+        #expect(
+            !SettingsSearch.entries.contains { $0.pane == .home && $0.title == "Calendar Events" }
+                && !SettingsSearch.entries.contains { $0.pane == .notifications && $0.title == "Replace the Volume HUD" })
+    }
+
+    @Test func theFeaturesStopIsGroupedWithItsPane() {
+        let ids = TourStop.all.map(\.id)
+        #expect(ids.firstIndex(of: "features")! > ids.firstIndex(of: "input")!)
+        #expect(ids.firstIndex(of: "features")! < ids.firstIndex(of: "tabs")!)
+        let stop = TourStop.all.first { $0.id == "features" }
+        #expect(stop?.pane == .features && stop?.scrollAnchor == SettingsAnchor.featurePresets)
+        #expect(stop?.preview == nil)
+    }
+
+    @Test func aPresetSaysWhatItTurnsOn() {
+        let minimal = FeaturePreset.minimal.confirmation
+        for name in ["Music", "Clock", "Shelf", "Calendar"] { #expect(minimal.contains(name), "\(name)") }
+        #expect(!minimal.contains("Tools") && minimal.contains("turns the rest off"))
+        #expect(minimal.hasSuffix("Nothing is deleted: turning a feature back on brings its settings back."))
+        #expect(FeaturePreset.everything.confirmation.hasPrefix("It turns every feature on."))
+        #expect(FeaturePreset.everyday.confirmation.contains("Weather"))
+    }
+
+    @Test func turningOffSomethingLiveSaysWhatStops() {
+        let viewModel = TestSupport.makeViewModel()
+        let features = viewModel.features
+        #expect(FeatureNotice.whatStops(.clock, features: features) == nil)
+        features.timer.start(minutes: 5)
+        #expect(FeatureNotice.whatStops(.clock, features: features) == "The running timer was stopped.")
+        features.stopwatch.toggle()
+        let both = FeatureNotice.whatStops(.clock, features: features) ?? ""
+        #expect(both.contains("timer") && both.contains("stopwatch") && both.hasSuffix("were stopped."))
+        features.timer.reset()
+        features.stopwatch.reset()
+
+        #expect(FeatureNotice.whatStops(.tools, features: features) == nil)
+
+        features.clipboard.record(.text("copied"))
+        #expect(FeatureNotice.whatStops(.clipboard, features: features) == "The clipboard history was cleared.")
+        #expect(FeatureNotice.whatStops(.weather, features: features) == nil)
+    }
+
+    @Test func theFeatureCountIsOfTheFeaturesThisBuildHas() {
+        let settings = makeSettings()
+        let built = Feature.allCases.filter(\.isBuilt).count
+        #expect(settings.featureCount.of == built)
+        #expect(settings.featureCount.on == Feature.allCases.filter { $0.isBuilt && settings.isOn($0) }.count)
+        settings.apply(.minimal)
+        #expect(settings.featureCount.on == FeaturePreset.minimal.features.filter(\.isBuilt).count)
+    }
+
+    @Test func everyBuiltFeatureShowsWhereItLandsAndAnUnbuiltOneHasNoRow() {
+        for feature in Feature.allCases where feature.isBuilt {
+            #expect(feature.previewContext != nil, "\(feature)")
+        }
+        #expect(Feature.volumeHUD.previewContext?.showsVolume == true)
+        #expect(Feature.calendar.previewContext?.event == .meeting)
+        #expect(Feature.weather.previewContext?.presentation == .peek)
+        #expect(Feature.shelf.previewContext?.fileDrag == true)
+        #expect(!Feature.agents.isBuilt && !Feature.mixer.isBuilt)
+    }
+
+    @Test func anOffFeatureIsKeptApartFromItsSettings() {
+        // Turning a feature off keeps what it was set to.
+        let settings = makeSettings()
+        settings.weatherCity = "Oslo"
+        settings.clipboardLimit = 50
+        settings.setOn(.weather, false)
+        settings.setOn(.clipboard, false)
+        settings.setOn(.weather, true)
+        settings.setOn(.clipboard, true)
+        #expect(settings.weatherCity == "Oslo" && settings.clipboardLimit == 50)
+    }
 }

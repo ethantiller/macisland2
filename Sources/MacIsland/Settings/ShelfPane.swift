@@ -30,22 +30,17 @@ struct ShelfPane: View {
                 )
             }
             Section {
-                // Off is the Clipboard feature switched off. Until the Features pane has its switch, it is still chosen here.
+                FeatureOffNote(settings: settings, feature: .clipboard)
                 SettingsDropdown(
-                    title: "Clipboard History",
-                    selection: Binding(
-                        get: { settings.effectiveClipboardLimit },
-                        set: { limit in
-                            if limit != 0 { settings.clipboardLimit = limit }
-                            settings.setOn(.clipboard, limit != 0)
-                        }
-                    ),
-                    options: [DropdownOption(0, "Off")] + DropdownOption.all([10, 25, 50]) { "\($0) Items" })
+                    title: "Clipboard History", selection: Bindable(settings).clipboardLimit,
+                    options: DropdownOption.all([10, 25, 50]) { "\($0) Items" }
+                )
+                .disabled(!settings.isOn(.clipboard))
             } header: {
                 Text("Clipboard").id(SettingsAnchor.clipboard)
             } footer: {
                 Text(
-                    "Kept in memory only, and never written to disk. Copies that a password manager marks as private are skipped. Off, MacIsland stops watching the clipboard."
+                    "Kept in memory only, and never written to disk. Copies that a password manager marks as private are skipped. Turn the Clipboard feature off in Features and MacIsland stops watching it."
                 )
             }
         }

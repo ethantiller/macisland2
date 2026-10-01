@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (782 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (789 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -31,7 +31,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
 - **Live activities:** the minimal pair, full charge, drive eject, the screenshot shelf, Keep Awake durations, headphone batteries.
 - **Media:** shuffle, repeat, Favorite, app volume, and synced lyrics, in a Dynamic Island style player.
 - **Home and productivity:** the Home dashboard, weather, Reminders, Pomodoro, zip and convert, smart actions, notes, Clean Keys.
-- **Customization:** the timer dial (scrub, fade, fixed marker), a Settings window of nine panes with a live island preview, Home as
+- **Customization:** the timer dial (scrub, fade, fixed marker), a Settings window of ten panes (Features is second) with a live island preview, Home as
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
@@ -526,6 +526,13 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
+
+**Features pane (F3)** *(written, not run)*
+- [ ] Settings → Features is second in the sidebar; every row turns its feature off and on with the island following at once, and a row that stops something running says what stopped
+- [ ] Each preset asks, then switches; choosing the rows afterwards shows "Your Own"
+- [ ] Search finds "calendar", "volume hud", and "clock" in Features; Home → Weather with Weather off says so and **Open Features** lands on the Weather row; the same from Up Next, the Shelf pane's Clipboard section, and Media
+- [ ] Replace the Volume HUD works from its new row, and turning it on without Accessibility still asks and falls back to off
+- [ ] The tour has the new "Choose Your Features" stop after General's opening stops
 
 ---
 

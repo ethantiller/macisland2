@@ -11,7 +11,7 @@ import SwiftUI
 
 /// What a stop points at. Each is anchored at one view with `.tourAnchor(_:)`.
 enum TourTarget: Hashable {
-    case search, previewBand, shortcut, shelfShortcut, peekOnHover, notShownTray, menuBarRow, addWidgets, calendarEvents, dragTarget,
+    case search, previewBand, shortcut, shelfShortcut, peekOnHover, featureList, notShownTray, menuBarRow, addWidgets, calendarEvents, dragTarget,
         musicCompact, pomodoro, toolsRow, quietInFocus, accessList, guide
     /// The visible part of the pane's scrolling form: a target outside it has been scrolled out of view.
     case paneViewport
@@ -72,6 +72,12 @@ struct TourStop: Identifiable, Equatable {
                 "If the island opens when you reach for the menu bar, turn off Peek on Hover; a click still opens it. Swiping can be turned off here too."
         ),
         TourStop(
+            id: "features", since: 1, pane: .features, target: .featureList, placement: .below,
+            scrollAnchor: SettingsAnchor.featurePresets, preview: nil, title: "Choose Your Features",
+            copy:
+                "Turn off what you don\u{2019}t use: it leaves the island and stops running. New features wait here, off."
+        ),
+        TourStop(
             id: "tabs", since: 1, pane: .tabs, target: .notShownTray, placement: .below, scrollAnchor: nil,
             preview: nil, title: "Arrange Your Tabs",
             copy:
@@ -96,7 +102,7 @@ struct TourStop: Identifiable, Equatable {
             id: "upNext", since: 1, pane: .home, target: .calendarEvents, placement: .above,
             scrollAnchor: SettingsAnchor.upNext, preview: nil, title: "Up Next",
             copy:
-                "Turn these on to see your next meeting and due reminders on Home, with a banner before they start."),
+                "Turn on Due Reminders to see them on Home, with a banner before they start. Calendar is in Features."),
         TourStop(
             id: "dragTarget", since: 1, pane: .shelf, target: .dragTarget, placement: .below,
             scrollAnchor: SettingsAnchor.files, preview: nil, title: "When You Drag a File",

@@ -73,5 +73,7 @@ struct SettingsPreviewTests {
         #expect(SettingsPane.notifications.previewContext?.presentation == .banner)
         #expect(SettingsPane.tools.previewContext?.tab == .tools)
         #expect(SettingsPane.privacy.previewContext == nil)
+        #expect(SettingsPane.features.previewContext == PreviewContext(presentation: .expanded, tab: .home))
+        #expect(SettingsPane.allCases.prefix(2) == [.general, .features], "Features is second in the sidebar")
     }
 }

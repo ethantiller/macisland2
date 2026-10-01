@@ -2,13 +2,14 @@ import SwiftUI
 
 /// The Settings window's sidebar. There is no Appearance pane: what the island looks like is not a setting.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, tabs, home, shelf, media, clock, tools, notifications, privacy
+    case general, features, tabs, home, shelf, media, clock, tools, notifications, privacy
 
     var id: Self { self }
 
     var title: String {
         switch self {
         case .general: "General"
+        case .features: "Features"
         case .tabs: "Tabs"
         case .home: "Home"
         case .shelf: "Shelf"
@@ -23,6 +24,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: "gearshape"
+        case .features: "switch.2"
         case .tabs: "rectangle.split.3x1"
         case .home: "house"
         case .shelf: "tray.full"
@@ -39,6 +41,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var previewContext: PreviewContext? {
         switch self {
         case .general: PreviewContext(presentation: .compact)
+        case .features: PreviewContext(presentation: .expanded, tab: .home)
         case .tabs: PreviewContext(presentation: .expanded, tab: .home)
         case .home: PreviewContext(presentation: .expanded, tab: .home)
         case .shelf: PreviewContext(presentation: .compact, tab: .shelf, fileDrag: true)

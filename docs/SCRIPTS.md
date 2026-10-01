@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 782 tests, about a second.
+lines; 789 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -341,6 +341,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | --- | --- |
 | `AppSettings.swift` | Every setting, its storage, the tab sides, menu-bar modules, search engines, pinned tools |
 | `FeatureCatalog.swift` | `Feature` (what can be switched off, with its words and cost), `FeatureCost`, and the `FeaturePreset`s |
+| `FeaturesPane.swift`, `FeatureOffNote.swift`, `FeatureNotice.swift` | The Features pane; the "Turned off in Features" line with Open Features (and `\.openFeatures`); what a switch stops in words, the preset confirmation, the feature count, each feature's preview and search words |
 | `SettingsView.swift` | The Settings window: a sidebar of panes over a live preview and the pane's form |
 | `SettingsPane.swift` | The panes, and what the preview shows for each |
 | `IslandPreview.swift` | `IslandPreviewModel` (a second view model on sample data), `IslandPreview` (the picker, arrows, tray, and hints around the band), and `PreviewBand` (the real `IslandView` on a desk band, which the first-run guide uses alone as its stage) |
@@ -355,7 +356,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ShortcutRecorder.swift`, `KeyCombo.swift` | Recording a global shortcut, and the key combination it stores |
 | `ShelfPane.swift` | The Shelf pane (drag target, screenshots, retention, clipboard limit) |
 | `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
-| `GeneralPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `ShortcutToolSheet.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
+| `GeneralPane.swift`, `FeaturesPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `ShortcutToolSheet.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -363,7 +364,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 48 files, about 10,700 lines, **782 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 48 files, about 10,900 lines, **789 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |

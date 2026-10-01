@@ -156,6 +156,10 @@ struct SettingsView: View {
         .frame(maxWidth: Self.maxContentWidth)
         .frame(maxWidth: .infinity)
         .coordinateSpace(.named(HomeEditor.space))
+        .environment(\.openFeatures) { feature in
+            storedPane = SettingsPane.features.rawValue
+            scrollTarget = SettingsAnchor.feature(feature)
+        }
         .overlay { if pane == .home { HomeDragLayer(editor: editor) } }
         .overlay(alignment: .topLeading) { if sidebarHidden { showSidebarButton } }
     }
@@ -179,6 +183,7 @@ struct SettingsView: View {
                     OnboardingWindowController.shared.show(replay: true)
                 },
                 onReplayTour: { beginTour() })
+        case .features: FeaturesPane(settings: settings, features: features, preview: preview)
         case .tabs: TabsPane(settings: settings, preview: preview)
         case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
         case .shelf: ShelfPane(settings: settings, preview: preview)

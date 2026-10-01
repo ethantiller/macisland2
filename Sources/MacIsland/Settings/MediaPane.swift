@@ -6,6 +6,7 @@ struct MediaPane: View {
     var body: some View {
         Form {
             Section {
+                FeatureOffNote(settings: settings, feature: .music)
                 Toggle("Show Music Beside the Notch", isOn: Bindable(settings).showsMusicCompact)
                     .tourAnchor(.musicCompact)
             } header: {
