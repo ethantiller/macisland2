@@ -143,6 +143,10 @@ enum SettingsSearch {
                 keywords: ["meeting", "ends", "remaining", "calendar", "up next", "in progress"],
                 anchor: SettingsAnchor.upNext),
             .init(
+                pane: .home, title: "Count Down to Every Event",
+                keywords: ["countdown", "meeting", "before", "hour", "calendar", "notch", "timer"],
+                anchor: SettingsAnchor.upNext),
+            .init(
                 pane: .home, title: "Calendars",
                 keywords: ["accounts", "icloud", "google", "outlook", "hide", "show", "which", "up next", "month"],
                 anchor: SettingsAnchor.calendars),

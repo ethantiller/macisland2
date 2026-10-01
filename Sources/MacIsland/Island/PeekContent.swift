@@ -13,6 +13,8 @@ struct PeekContent: View {
                     isPeek: true)
             case .timer, .pomodoro, .stopwatch:
                 ClockPeekView(viewModel: viewModel)
+            case .countdown(let event):
+                CountdownPeekView(event: event, agenda: viewModel.agenda)
             case .recording(.voice):
                 VoicePeekView(viewModel: viewModel)
             default:
@@ -39,7 +41,7 @@ struct IdlePeekView: View {
                 }
                 Spacer(minLength: 0)
                 if let next = viewModel.agenda.next {
-                    UpNextLabel(item: next, emptyTitle: "", showsTimeLeft: viewModel.settings.showsTimeLeft)
+                    UpNextLabel(item: next, emptyTitle: "", settings: viewModel.settings)
                 } else {
                     MacBatteryGlance()
                 }
@@ -53,6 +55,33 @@ struct IdlePeekView: View {
             }
             .frame(height: Theme.Metrics.homeQuickHeight)
         }
+    }
+}
+
+/// Hover while an event is about to start: its title, when it starts, the time left, and Join when it has a call link.
+struct CountdownPeekView: View {
+    let event: AgendaItem
+    let agenda: AgendaMonitor
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Glyph(systemName: "calendar", tint: Theme.Tint.clock)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(Theme.Palette.primary)
+                    .lineLimit(1)
+                Text(event.date.formatted(date: .omitted, time: .shortened))
+                    .font(Theme.Typography.numeral)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+            Spacer(minLength: 8)
+            CompactCountdownText(item: event, agenda: agenda)
+            if let url = event.joinURL {
+                ChipButton(title: "Join", systemImage: "video.fill", isProminent: true) { MeetingLink.join(url) }
+            }
+        }
+        .frame(maxHeight: .infinity)
     }
 }
 

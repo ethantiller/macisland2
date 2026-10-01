@@ -195,6 +195,8 @@ struct IslandView: View {
             CompactPomodoroRing(pomodoro: viewModel.pomodoro)
         case .stopwatch:
             Glyph(systemName: "stopwatch", tint: Theme.Tint.clock)
+        case .countdown:
+            Glyph(systemName: "calendar", tint: Theme.Tint.clock)
         case .working:
             WorkingGlyph()
         case .transfer:
@@ -226,6 +228,8 @@ struct IslandView: View {
             CompactPomodoroRing(pomodoro: viewModel.pomodoro)
         case .stopwatch:
             Glyph(systemName: "stopwatch", tint: Theme.Tint.clock)
+        case .countdown:
+            Glyph(systemName: "calendar", tint: Theme.Tint.clock)
         case .working:
             WorkingGlyph()
         case .transfer:
@@ -278,6 +282,8 @@ struct IslandView: View {
             CompactPomodoroText(pomodoro: viewModel.pomodoro)
         case .stopwatch:
             CompactStopwatchText(stopwatch: viewModel.stopwatch)
+        case .countdown(let event):
+            CompactCountdownText(item: event, agenda: viewModel.agenda)
         case .working(let title):
             Text(title)
                 .font(Theme.Typography.compactNumeral)

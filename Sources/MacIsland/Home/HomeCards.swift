@@ -30,8 +30,9 @@ struct DateInline: View {
 struct UpNextLabel: View {
     let item: AgendaItem?
     let emptyTitle: String
-    /// An event on now reads "Ends in 25 min" instead of "Started".
-    var showsTimeLeft = false
+    /// Reads the time-left and countdown choices, and offers Add Countdown on an event that hasn't started. Nil in a sample.
+    var settings: AppSettings?
+    private var showsTimeLeft: Bool { settings?.showsTimeLeft ?? false }
 
     var body: some View {
         if let item {
@@ -56,12 +57,29 @@ struct UpNextLabel: View {
                     .lineLimit(1)
                 }
                 .accessibilityElement(children: .combine)
+                .contextMenu { countdownMenu(for: item, now: context.date) }
             }
         } else {
             Label(emptyTitle, systemImage: "checkmark.circle")
                 .font(Theme.Typography.bodyEmphasized)
                 .foregroundStyle(Theme.Palette.secondary)
                 .lineLimit(1)
+        }
+    }
+}
+
+extension UpNextLabel {
+    /// Add Countdown or Remove Countdown, for an event with a start time that hasn't started, while Count Down to Every Event is off.
+    @ViewBuilder
+    fileprivate func countdownMenu(for item: AgendaItem, now: Date) -> some View {
+        if let settings, !settings.countsDownToEveryEvent, settings.isOn(.calendar),
+            AgendaRules.canCountDown(item, now: now)
+        {
+            if settings.hasCountdown(item.id) {
+                Button("Remove Countdown") { settings.setCountdown(for: item, false) }
+            } else {
+                Button("Add Countdown") { settings.setCountdown(for: item, true) }
+            }
         }
     }
 }

@@ -23,6 +23,7 @@ struct SettingsArchive: Codable, Equatable {
     var showsCalendar: Bool?
     var showsReminders: Bool?
     var showsTimeLeft: Bool?
+    var countsDownToEveryEvent: Bool?
     var weatherCity: String?
     var dragTarget: String?
     var addsScreenshots: Bool?
@@ -74,6 +75,7 @@ struct SettingsArchive: Codable, Equatable {
         archive.showsCalendar = settings.showsCalendar
         archive.showsReminders = settings.showsReminders
         archive.showsTimeLeft = settings.showsTimeLeft
+        archive.countsDownToEveryEvent = settings.countsDownToEveryEvent
         archive.weatherCity = settings.weatherCity
         archive.dragTarget = settings.dragTarget.rawValue
         archive.addsScreenshots = settings.addsScreenshots
@@ -147,6 +149,7 @@ extension AppSettings {
         if let value = archive.showsCalendar { showsCalendar = value }
         if let value = archive.showsReminders { showsReminders = value }
         if let value = archive.showsTimeLeft, value != showsTimeLeft { showsTimeLeft = value }
+        if let value = archive.countsDownToEveryEvent { countsDownToEveryEvent = value }
         if let value = archive.weatherCity { weatherCity = value }
         if let value = archive.dragTarget.flatMap(DragTarget.init) { dragTarget = value }
         if let value = archive.addsScreenshots { addsScreenshots = value }

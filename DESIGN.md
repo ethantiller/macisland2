@@ -59,7 +59,7 @@ Rules:
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, working, transfer, music. At most 2 activities show at once.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, transfer, music. At most 2 activities show at once.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.

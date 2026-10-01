@@ -197,6 +197,28 @@ enum AgendaRules {
 }
 
 extension AgendaRules {
+    /// A countdown shows in the hour before an event starts.
+    static let countdownWindow: TimeInterval = 3600
+
+    /// An event with a start time that hasn't started: the only kind a countdown can be for.
+    static func canCountDown(_ item: AgendaItem, now: Date) -> Bool {
+        item.kind == .event && !item.isAllDay && item.date > now
+    }
+
+    /// The event to count down to now: one that starts within the hour, and that the person chose (or any, with `all`). The soonest.
+    static func countdown(
+        in items: [AgendaItem], now: Date, all: Bool, chosen: Set<String>
+    ) -> AgendaItem? {
+        items
+            .filter {
+                canCountDown($0, now: now) && $0.date.timeIntervalSince(now) <= countdownWindow
+                    && (all || chosen.contains($0.id))
+            }
+            .min { $0.date < $1.date }
+    }
+}
+
+extension AgendaRules {
     /// The days of the month `month` falls in that have an event, as the day of the month to the events on it, soonest first. An event
     /// that spans days is on each of them.
     static func eventDays(

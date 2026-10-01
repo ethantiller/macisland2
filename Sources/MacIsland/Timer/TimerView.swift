@@ -498,6 +498,31 @@ struct CompactTimerText: View {
     }
 }
 
+/// The time left until an event starts, beside the notch in the hour before it does. Ticks once a second only while it shows, and
+/// asks the agenda to look again when the event starts, so the activity ends then.
+struct CompactCountdownText: View {
+    let item: AgendaItem
+    let agenda: AgendaMonitor
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = max(item.date.timeIntervalSince(context.date), 0).rounded(.up)
+            Text(formatTime(remaining))
+                .font(Theme.Typography.compactNumeral)
+                .foregroundStyle(Theme.Tint.clock)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.default, value: remaining)
+        }
+        .task(id: item.id) {
+            let wait = item.date.timeIntervalSinceNow
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+            guard !Task.isCancelled else { return }
+            agenda.refresh()
+        }
+        .accessibilityLabel("Countdown to \(item.title)")
+    }
+}
+
 /// Small ring beside the notch while a timer runs.
 struct CompactTimerRing: View {
     let timer: TimerModel

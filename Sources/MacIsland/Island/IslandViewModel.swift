@@ -140,6 +140,8 @@ enum CompactActivity: Equatable {
     case timer
     case pomodoro
     case stopwatch
+    /// An event about to start, in the hour before it does.
+    case countdown(AgendaItem)
     case working(String)
     case transfer
     case media
@@ -290,12 +292,24 @@ final class IslandViewModel {
         if clockIsOn, features.timer.isActive { list.append(.timer) }
         if clockIsOn, features.pomodoro.isActive { list.append(.pomodoro) }
         if clockIsOn, features.stopwatch.isActive { list.append(.stopwatch) }
+        if let event = activeCountdown { list.append(.countdown(event)) }
         if let job = features.work.current { list.append(.working(job.title)) }
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
         if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
             list.append(.media)
         }
         return list
+    }
+
+    /// The event the closed island counts down to: within the hour before it starts, and chosen (or every event, if that is on). Needs
+    /// Calendar to be on.
+    var activeCountdown: AgendaItem? {
+        guard features.settings.isOn(.calendar) else { return nil }
+        let settings = features.settings
+        var items = features.agenda.upcoming
+        if let next = features.agenda.next, !items.contains(where: { $0.id == next.id }) { items.append(next) }
+        return AgendaRules.countdown(
+            in: items, now: Date(), all: settings.countsDownToEveryEvent, chosen: Set(settings.countdowns.keys))
     }
 
     /// The top activity.
@@ -361,7 +375,7 @@ final class IslandViewModel {
         case .banner, .none: return 0
         case .alert: return 64
         case .microphone: return 60
-        case .timer, .pomodoro, .stopwatch, .transfer: return 52
+        case .timer, .pomodoro, .stopwatch, .countdown, .transfer: return 52
         case .working, .recording: return 64
         case .media: return geometry.notchSize.height + 8
         }
@@ -384,7 +398,7 @@ final class IslandViewModel {
     /// Clock for a running timer or stopwatch, Now Playing for music, and the day at a glance when idle.
     var peekContentHeight: CGFloat {
         switch compactActivity {
-        case .timer, .pomodoro, .stopwatch: Theme.Metrics.glanceHeight
+        case .timer, .pomodoro, .stopwatch, .countdown: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)
         case .recording: Theme.Metrics.glanceHeight
         default: Theme.Metrics.idlePeekHeight

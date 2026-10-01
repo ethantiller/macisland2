@@ -26,13 +26,15 @@ struct HomePane: View {
                 FeatureOffNote(settings: settings, feature: .calendar)
                 Toggle("Time Left in the Current Event", isOn: Bindable(settings).showsTimeLeft)
                     .disabled(!settings.isOn(.calendar))
+                Toggle("Count Down to Every Event", isOn: Bindable(settings).countsDownToEveryEvent)
+                    .disabled(!settings.isOn(.calendar))
                 Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
                     .tourAnchor(.calendarEvents)
             } header: {
                 Text("Up Next").id(SettingsAnchor.upNext)
             } footer: {
                 Text(
-                    "Meetings (Calendar, in Features) and due reminders (Content, Reminders) show in Up Next on Home, and announce themselves as banners. Time left keeps a meeting that is on until it ends. Outlook, Google, and Exchange calendars come from Internet Accounts."
+                    "Meetings (Calendar, in Features) and due reminders (Content, Reminders) show in Up Next on Home, and announce themselves as banners. Time left keeps a meeting that is on until it ends. A countdown shows beside the notch in the hour before a meeting: for every one, or for those you right-click and Add Countdown. Outlook, Google, and Exchange calendars come from Internet Accounts."
                 )
             }
             if settings.isOn(.calendar), !calendarGroups.isEmpty {

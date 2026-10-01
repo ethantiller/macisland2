@@ -295,7 +295,7 @@ large one (32, continuous). Peek and banner share a width (380), so one becomes 
 
 ## Activities: what is live
 
-`compactActivities` builds a ranked list from the features (banner, alert, microphone, timer, Pomodoro, stopwatch, working,
+`compactActivities` builds a ranked list from the features (banner, alert, microphone, timer, Pomodoro, stopwatch, countdown, working,
 download, music). The island shows the **top two**. A pair shows each activity's glyph, ring, or artwork at `notch height + 8`;
 an alert always stands alone, because its text is the message. `compactActivity` (singular) is the top of the list, and it
 decides what the peek shows. The table is in [FEATURES.md](FEATURES.md#live-activities).
@@ -416,6 +416,8 @@ app delegate owns (the Now Playing adapter, the screenshot search) are closures,
 | notes | no Notes tab, New Note pencil, or Note widget | a voice note being recorded is stopped and saved |
 | calendar | no meetings in Up Next or Today, no meeting banners | `configureAgenda` passes `calendar: false`; with reminders also off `AgendaMonitor.stop()` ends its 30 s timer and its store listener |
 | weather | no weather in the strip, the idle peek, or the Weather widget | `weather.configure(city: "")`; the city is kept |
+
+**Countdowns.** `CompactActivity.countdown(AgendaItem)` is the event the closed island counts down to (`IslandViewModel.activeCountdown`, from `AgendaRules.countdown`): an event with a start time that starts within the hour, that was chosen (`agenda.countdowns`: id to end, pruned after it ends) or any event with `agenda.countdownAll` on, and only while Calendar is on. It ranks right after the stopwatch; leading is a calendar glyph in `Tint.clock`, trailing `CompactCountdownText` (ticking once a second only while shown, and asking the agenda to look again when the event starts so the activity ends then). The peek is `CountdownPeekView` with Join. The id is the event's identifier and start, so an event moved in Calendar loses its countdown.
 
 **The agenda's queries.** `AgendaMonitor.configure` also takes `showsTimeLeft` and the calendars left out; event queries pass the allowed `EKCalendar`s (nil when none are left out). `AgendaRules.keepsEvent` keeps an event until ten minutes after it starts, or until it ends with time left on; `next(in:prefersInProgress:)` puts an event that is on now before a later one then. `eventDays(in:)` (the dots) is read when the month view appears and when its month changes, with `AgendaRules.eventDays` placing a multi-day event on each day it touches; `calendarGroups()` groups by the account's source identifier because two accounts can both be called iCloud.
 
@@ -685,7 +687,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **823 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **829 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

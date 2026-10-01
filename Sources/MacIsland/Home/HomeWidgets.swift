@@ -78,7 +78,7 @@ struct TimeWidget: View {
             open(viewModel.agenda.next)
         } label: {
             UpNextLabel(
-                item: viewModel.agenda.next, emptyTitle: "All Clear", showsTimeLeft: viewModel.settings.showsTimeLeft)
+                item: viewModel.agenda.next, emptyTitle: "All Clear", settings: viewModel.settings)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -97,7 +97,7 @@ struct TimeWidget: View {
                         open(item)
                     } label: {
                         UpNextLabel(
-                            item: item, emptyTitle: "All Clear", showsTimeLeft: viewModel.settings.showsTimeLeft)
+                            item: item, emptyTitle: "All Clear", settings: viewModel.settings)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }

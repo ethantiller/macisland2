@@ -169,6 +169,119 @@ struct CalendarTests {
         #expect(viewModel.settings.showsTimeLeft && viewModel.settings.isCalendarHidden("x"))
     }
 
+    // MARK: Countdowns (K2)
+
+    @Test func aCountdownShowsOnlyInTheHourBefore() {
+        let now = date(1, 10)
+        let soon = event("soon", start: now.addingTimeInterval(50 * 60))
+        let far = event("far", start: now.addingTimeInterval(2 * 3600))
+        let started = event("started", start: now.addingTimeInterval(-60))
+        let allDay = event("allday", start: now.addingTimeInterval(600), allDay: true)
+        let everything = [far, soon, started, allDay]
+        #expect(AgendaRules.countdown(in: everything, now: now, all: true, chosen: [])?.id == "soon")
+        #expect(AgendaRules.countdown(in: [far], now: now, all: true, chosen: []) == nil, "more than an hour away")
+        #expect(AgendaRules.countdown(in: [started], now: now, all: true, chosen: []) == nil, "it ends when the event starts")
+        #expect(AgendaRules.countdown(in: [allDay], now: now, all: true, chosen: []) == nil, "an all-day event has no start time")
+        // Chosen, and not all: only the chosen one.
+        #expect(AgendaRules.countdown(in: [soon], now: now, all: false, chosen: []) == nil)
+        #expect(AgendaRules.countdown(in: [soon], now: now, all: false, chosen: ["soon"])?.id == "soon")
+        let reminder = AgendaItem(id: "r", kind: .reminder, title: "r", date: now.addingTimeInterval(300))
+        #expect(AgendaRules.countdown(in: [reminder], now: now, all: true, chosen: []) == nil)
+    }
+
+    @Test func theMenuOffersCountdownOnlyForTimedEventsNotStarted() {
+        let now = date(1, 10)
+        #expect(AgendaRules.canCountDown(event("a", start: now.addingTimeInterval(600)), now: now))
+        #expect(!AgendaRules.canCountDown(event("a", start: now.addingTimeInterval(-600)), now: now))
+        #expect(!AgendaRules.canCountDown(event("a", start: now.addingTimeInterval(600), allDay: true), now: now))
+        let reminder = AgendaItem(id: "r", kind: .reminder, title: "r", date: now.addingTimeInterval(60))
+        #expect(!AgendaRules.canCountDown(reminder, now: now))
+    }
+
+    @Test func aChosenCountdownSurvivesARelaunchAndIsPrunedAfter() {
+        let defaults = freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        let now = Date()
+        let soon = AgendaItem(
+            id: "e1@1", kind: .event, title: "Soon", date: now.addingTimeInterval(1800), end: now.addingTimeInterval(5400))
+        let past = AgendaItem(
+            id: "e2@2", kind: .event, title: "Past", date: now.addingTimeInterval(-7200), end: now.addingTimeInterval(-3600))
+        settings.setCountdown(for: soon, true)
+        settings.setCountdown(for: past, true)
+        settings.setCountdown(for: soon, true)
+        #expect(settings.hasCountdown(soon.id) && settings.hasCountdown(past.id))
+
+        let relaunched = AppSettings(defaults: defaults)
+        #expect(relaunched.hasCountdown(soon.id), "it survives")
+        relaunched.pruneCountdowns(now: now)
+        #expect(relaunched.hasCountdown(soon.id) && !relaunched.hasCountdown(past.id), "a finished event's is forgotten")
+        #expect(!AppSettings(defaults: defaults).hasCountdown(past.id), "and stays forgotten")
+        relaunched.setCountdown(for: soon, false)
+        #expect(!relaunched.hasCountdown(soon.id))
+    }
+
+    private func standup() -> AgendaItem {
+        let now = Date()
+        return AgendaItem(
+            id: "e@1", kind: .event, title: "Standup", date: now.addingTimeInterval(20 * 60),
+            end: now.addingTimeInterval(50 * 60))
+    }
+
+    @Test func everyEventCountsDownWhenOnAndTheSwitchTravels() throws {
+        let viewModel = TestSupport.makeViewModel()
+        let settings = viewModel.settings
+        settings.setOn(.calendar, true)
+        let event = standup()
+        viewModel.agenda.showSample(event, upcoming: [event])
+        #expect(viewModel.activeCountdown == nil, "off: nothing is counted down")
+        settings.countsDownToEveryEvent = true
+        #expect(viewModel.activeCountdown?.id == event.id)
+        #expect(viewModel.compactActivities == [.countdown(event)])
+
+        let target = AppSettings(defaults: freshDefaults())
+        target.restore(try SettingsArchive.read(SettingsArchive.make(from: settings).data()))
+        #expect(target.countsDownToEveryEvent)
+        settings.setOn(.calendar, false)
+        #expect(viewModel.activeCountdown == nil, "Calendar off: no countdown")
+    }
+
+    @Test func aChosenCountdownCountsDownWithoutTheEverySwitch() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.settings.setOn(.calendar, true)
+        let event = standup()
+        viewModel.agenda.showSample(event, upcoming: [event])
+        #expect(viewModel.activeCountdown == nil)
+        viewModel.settings.setCountdown(for: event, true)
+        #expect(viewModel.activeCountdown?.id == event.id)
+    }
+
+    @Test func aCountdownRanksAfterTheStopwatch() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.settings.setOn(.calendar, true)
+        viewModel.settings.countsDownToEveryEvent = true
+        let event = standup()
+        viewModel.agenda.showSample(event, upcoming: [event])
+        viewModel.timer.start(minutes: 5)
+        viewModel.stopwatch.toggle()
+        defer {
+            viewModel.timer.reset()
+            viewModel.stopwatch.reset()
+        }
+        #expect(viewModel.compactActivities == [.timer, .stopwatch, .countdown(event)])
+        #expect(viewModel.compactPair?.leading == .timer && viewModel.compactPair?.trailing == .stopwatch)
+        viewModel.timer.reset()
+        viewModel.stopwatch.reset()
+        #expect(viewModel.compactActivity == .countdown(event))
+        var song = NowPlayingState()
+        song.title = "Song"
+        song.isPlaying = true
+        song.playbackRate = 1
+        song.duration = 200
+        song.timestamp = Date()
+        viewModel.nowPlaying.apply(song)
+        #expect(viewModel.compactActivities == [.countdown(event), .media], "it pairs with music")
+    }
+
     private func freshDefaults() -> UserDefaults {
         let name = "MacIslandCalendar.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

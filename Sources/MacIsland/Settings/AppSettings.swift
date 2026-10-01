@@ -179,6 +179,36 @@ final class AppSettings {
         didSet { defaults.set(hiddenCalendars.sorted(), forKey: Key.hiddenCalendars) }
     }
 
+    /// A countdown beside the notch for every event with a start time, in the hour before it starts.
+    var countsDownToEveryEvent: Bool {
+        didSet { defaults.set(countsDownToEveryEvent, forKey: Key.countdownAll) }
+    }
+
+    /// The events the person chose to count down to: an event's id (its identifier and start) to when it ends. Pruned after it ends.
+    /// Moving an event in Calendar changes its start, so its countdown is lost. Identifiers belong to this Mac, so not in the file.
+    private(set) var countdowns: [String: Date] {
+        didSet { defaults.set(countdowns.mapValues(\.timeIntervalSince1970), forKey: Key.countdowns) }
+    }
+
+    func hasCountdown(_ id: String) -> Bool { countdowns[id] != nil }
+
+    /// Adds or removes a countdown. Does nothing unless it changes something.
+    func setCountdown(for item: AgendaItem, _ on: Bool) {
+        if on {
+            guard countdowns[item.id] == nil else { return }
+            countdowns[item.id] = item.end ?? item.date
+        } else {
+            guard countdowns[item.id] != nil else { return }
+            countdowns[item.id] = nil
+        }
+    }
+
+    /// Forgets the countdowns of events that have ended.
+    func pruneCountdowns(now: Date = Date()) {
+        let kept = countdowns.filter { $0.value > now }
+        if kept.count != countdowns.count { countdowns = kept }
+    }
+
     func isCalendarHidden(_ id: String) -> Bool { hiddenCalendars.contains(id) }
 
     /// Does nothing unless it changes something.
@@ -382,6 +412,8 @@ final class AppSettings {
         static let features = "features.available"
         static let timeLeft = "agenda.timeLeft"
         static let hiddenCalendars = "agenda.hiddenCalendars"
+        static let countdownAll = "agenda.countdownAll"
+        static let countdowns = "agenda.countdowns"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
 
@@ -415,6 +447,9 @@ final class AppSettings {
         showsReminders = defaults.bool(forKey: Key.reminders)
         showsTimeLeft = defaults.bool(forKey: Key.timeLeft)
         hiddenCalendars = Set(defaults.stringArray(forKey: Key.hiddenCalendars) ?? [])
+        countsDownToEveryEvent = defaults.bool(forKey: Key.countdownAll)
+        countdowns = (defaults.dictionary(forKey: Key.countdowns) as? [String: Double] ?? [:])
+            .mapValues { Date(timeIntervalSince1970: $0) }
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
         showsLyrics = defaults.object(forKey: Key.lyrics) as? Bool ?? true
         replacesVolumeHUD = defaults.bool(forKey: Key.volumeHUD)
