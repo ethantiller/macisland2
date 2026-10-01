@@ -37,3 +37,8 @@ with changes, and run `./scripts/docs-images.sh` after a UI change.
 ## Working style
 
 When the user asks for ideas, options, or a plan, give them that and stop. Don't start building or changing anything until they say to go ahead.
+
+Use RTK commands first before others 
+Command:   rtk hook claude
+RTK.md:    /Users/ethantiller/.claude/RTK.md (awareness: default)
+CLAUDE.md: @RTK.md reference added

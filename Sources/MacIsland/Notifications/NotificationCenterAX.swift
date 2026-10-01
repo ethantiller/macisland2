@@ -50,7 +50,7 @@ struct AXElementNode: AXNodeReading, @unchecked Sendable {
 /// follows the process if it restarts.
 @MainActor
 final class NotificationCenterObserver {
-    static let bundleIdentifier = "com.apple.notificationcenterui"
+    nonisolated static let bundleIdentifier = "com.apple.notificationcenterui"
 
     private var observer: AXObserver?
     private var application: AXUIElement?
@@ -125,8 +125,9 @@ final class NotificationCenterObserver {
 extension NotificationReader.Environment {
     /// The Mac's own Notification Center.
     @MainActor
-    static func live(observer: NotificationCenterObserver = NotificationCenterObserver()) -> Self {
-        Self(
+    static func live(observer: NotificationCenterObserver? = nil) -> Self {
+        let observer = observer ?? NotificationCenterObserver()
+        return Self(
             hasAccess: { AXIsProcessTrusted() },
             root: { observer.root },
             observe: { observer.start(onChange: $0) },

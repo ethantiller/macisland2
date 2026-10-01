@@ -314,7 +314,7 @@ private struct ClipboardCard: View {
     private func cardText(_ text: String) -> Text {
         guard !ClipboardSearch.words(query).isEmpty else { return Text(text).foregroundStyle(Theme.Palette.primary) }
         return ClipboardSearch.segments(of: query, in: text).reduce(Text("")) { result, part in
-            result + Text(part.text).foregroundStyle(part.isMatch ? Theme.Palette.primary : Theme.Palette.secondary)
+            Text("\(result)\(Text(part.text).foregroundStyle(part.isMatch ? Theme.Palette.primary : Theme.Palette.secondary))")
         }
     }
 

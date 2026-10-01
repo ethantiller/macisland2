@@ -32,11 +32,11 @@ final class NotificationMirror {
     @ObservationIgnored var show: (IslandBanner) -> Void = { _ in }
 
     init(
-        reader: NotificationReader, inbox: NotificationInbox = NotificationInbox(),
+        reader: NotificationReader, inbox: NotificationInbox? = nil,
         placement: @escaping () -> NotificationPlacement = { .corner }
     ) {
         self.reader = reader
-        self.inbox = inbox
+        self.inbox = inbox ?? NotificationInbox()
         self.placement = placement
         reader.onArrival = { [weak self] in self?.arrived($0) }
     }
