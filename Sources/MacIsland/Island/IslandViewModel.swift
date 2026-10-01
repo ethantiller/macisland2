@@ -183,6 +183,7 @@ struct IslandFeatures {
     let agents: AgentActivity
     let mixer: AppMixer
     let downloads: DownloadsFolder
+    let notifications: NotificationMirror
 }
 
 @MainActor

@@ -65,7 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             system: SystemModel(sampler: LiveSystemSampler()),
             agents: AgentActivity(),
             mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper()),
-            downloads: DownloadsFolder()
+            downloads: DownloadsFolder(),
+            notifications: NotificationMirror(reader: NotificationReader(environment: .live()))
         )
     }
 
@@ -77,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         music: { [weak self] on in on ? self?.features.nowPlaying.start() : self?.features.nowPlaying.stop() },
         screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() },
         agents: { [weak self] on in self?.applyAgents(on) },
-        mixer: { [weak self] on in self?.applyMixer(on) }))
+        mixer: { [weak self] on in self?.applyMixer(on) })
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
