@@ -71,9 +71,10 @@ struct SettingsPreviewTests {
 
     @Test func eachPaneSaysWhatThePreviewShows() {
         #expect(SettingsPane.notifications.previewContext?.presentation == .banner)
-        #expect(SettingsPane.tools.previewContext?.tab == .tools)
+        #expect(TabsPane.previewContext(for: .tools).tab == .tools, "Tools' options show Expanded Tools")
+        #expect(TabsPane.previewContext(for: .clock).clockMode == .pomodoro)
+        #expect(SettingsPane.allCases == [.general, .features, .tabs, .home, .notifications, .privacy])
         #expect(SettingsPane.privacy.previewContext == nil)
         #expect(SettingsPane.features.previewContext == PreviewContext(presentation: .expanded, tab: .home))
-        #expect(SettingsPane.allCases.prefix(2) == [.general, .features], "Features is second in the sidebar")
     }
 }

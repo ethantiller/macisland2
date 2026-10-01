@@ -1,11 +1,15 @@
 import SwiftUI
 
-struct ShelfPane: View {
+/// The Shelf module's options: what a dragged file does, screenshots, how long files stay, and the clipboard's size.
+struct ShelfOptions: View {
     let settings: AppSettings
     let preview: IslandPreviewModel?
 
+    /// What choosing what a dragged file does shows: the closed island with the drop target the choice gives.
+    static let dragPreview = PreviewContext(presentation: .compact, tab: .shelf, fileDrag: true)
+
     var body: some View {
-        Form {
+        Group {
             Section {
                 SettingsDropdown(
                     title: "When You Drag a File",
@@ -13,7 +17,7 @@ struct ShelfPane: View {
                         get: { settings.dragTarget },
                         set: {
                             settings.dragTarget = $0
-                            preview?.show(SettingsPane.shelf.previewContext ?? PreviewContext())
+                            preview?.show(Self.dragPreview)
                         }),
                     options: DropdownOption.all(DragTarget.allCases, title: \.title)
                 )
@@ -44,6 +48,5 @@ struct ShelfPane: View {
                 )
             }
         }
-        .formStyle(.grouped)
     }
 }

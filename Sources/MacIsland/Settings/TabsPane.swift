@@ -1,10 +1,26 @@
 import SwiftUI
 
-/// Where each tab goes, or (in the preview's Menu Bar view) which modules have an icon in the menu bar. Selecting a row shows that
-/// tab in the preview.
+/// Content: where each tab goes, which modules are on, and the selected module's own options beside them. In the preview's Menu Bar
+/// view it is which modules have an icon in the menu bar. Selecting a row, a tab in the preview, or a tray tab shows that tab in the
+/// preview and its options here.
 struct TabsPane: View {
     let settings: AppSettings
     let preview: IslandPreviewModel?
+
+    /// The Shortcut tool whose sheet is showing. It lives here because the Tools tab's right-click menu can ask for it from outside.
+    @State private var editingTool: ShortcutTool?
+    @Environment(\.openPane) private var openPane
+
+    /// What the preview shows for a module's options: its tab, and for Clock the Pomodoro its options are about.
+    static func previewContext(for module: IslandModule) -> PreviewContext {
+        .options(for: module)
+    }
+
+    /// The module whose options show: the tab the preview is on, or Home when that module has been turned off.
+    var selected: IslandModule {
+        let tab = preview?.context.tab ?? .home
+        return settings.isShown(tab) ? tab : .home
+    }
 
     var body: some View {
         Form {
@@ -14,9 +30,94 @@ struct TabsPane: View {
             } else {
                 TabSection(settings: settings, side: .left, preview: preview)
                 TabSection(settings: settings, side: .right, preview: preview)
+                OffInFeaturesSection(settings: settings)
+                moduleOptions(for: selected)
             }
         }
         .formStyle(.grouped)
+        .sheet(item: $editingTool) { tool in
+            ShortcutToolSheet(tool: tool) { settings.saveShortcutTool($0) }
+        }
+        // The Tools tab's right-click menu asks for a tool's sheet: show Tools, and the sheet.
+        .task(id: settings.requestedShortcutToolEdit) {
+            guard let id = settings.requestedShortcutToolEdit else { return }
+            settings.requestedShortcutToolEdit = nil
+            preview?.show(Self.previewContext(for: .tools))
+            editingTool = settings.shortcutTool(id: id)
+        }
+    }
+
+    @ViewBuilder private func moduleOptions(for module: IslandModule) -> some View {
+        switch module {
+        case .home:
+            Section {
+                Text("Home is arranged in the Home pane, where its widgets are added, moved, and resized.")
+                    .foregroundStyle(.secondary)
+                Button("Open Home") { openPane(.home) }
+            } header: {
+                Text("Home").id(SettingsAnchor.options)
+            }
+        case .media: MediaOptions(settings: settings)
+        case .clock: ClockOptions(settings: settings, preview: preview)
+        case .shelf: ShelfOptions(settings: settings, preview: preview)
+        case .tools: ToolsOptions(settings: settings, preview: preview, editing: $editingTool)
+        case .reminders:
+            Section {
+                FeatureOffNote(settings: settings, feature: .reminders)
+                Toggle("Due Reminders in Up Next", isOn: Bindable(settings).showsReminders)
+                    .disabled(!settings.isOn(.reminders))
+            } header: {
+                Text("Reminders").id(SettingsAnchor.dueReminders)
+            } footer: {
+                Text(
+                    "Due reminders show in Up Next on Home, and announce themselves as banners. The Reminders tab works either way."
+                )
+            }
+        case .notes:
+            Section {
+                Text("Notes has no options.").foregroundStyle(.secondary)
+            } header: {
+                Text("Notes").id(SettingsAnchor.options)
+            }
+        case .agents:
+            EmptyView()
+        }
+    }
+}
+
+/// Modules whose feature is off: not draggable, and a way to the switch.
+private struct OffInFeaturesSection: View {
+    let settings: AppSettings
+    @Environment(\.openFeatures) private var openFeatures
+
+    private var off: [IslandModule] {
+        IslandModule.allCases.filter { $0.isAvailable && !settings.isShown($0) }
+    }
+
+    var body: some View {
+        if !off.isEmpty {
+            Section {
+                ForEach(off) { module in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(module.title, systemImage: module.systemImage)
+                            Text("Turned off in Features.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        if let feature = Feature.module(for: module) {
+                            Button("Open Features") { openFeatures(feature) }
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            } header: {
+                Text("Off in Features")
+            } footer: {
+                Text("A module that is off has no tab, no menu bar icon, and runs nothing. Its place in the strip is kept.")
+            }
+        }
     }
 }
 

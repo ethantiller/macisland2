@@ -151,7 +151,7 @@ ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All co
 
 ## Status
 
-The island, its seven modules, Home widgets, a Settings window with a live preview and a Features catalog (switch off what you don't use), menu-bar and torn-off windows, and a first-run guide and Settings tour are built. The
+The island, its seven modules, Home widgets, a Settings window of six panes with a live preview and a Features catalog (switch off what you don't use), menu-bar and torn-off windows, and a first-run guide and Settings tour are built. The
 everyday features (file tools and converters, clipboard, Outlook and Teams, ambient banners, capture) are built too: see
 [docs/ROADMAP.md](docs/ROADMAP.md#next). What is done, the decisions along the way, what still needs a hand test, and what was
 ruled out are in [docs/ROADMAP.md](docs/ROADMAP.md).

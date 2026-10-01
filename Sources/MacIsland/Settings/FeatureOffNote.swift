@@ -12,6 +12,18 @@ extension EnvironmentValues {
     }
 }
 
+private struct OpenPaneKey: EnvironmentKey {
+    static let defaultValue: (SettingsPane) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    /// Goes to a pane. Set by the Settings window.
+    var openPane: (SettingsPane) -> Void {
+        get { self[OpenPaneKey.self] }
+        set { self[OpenPaneKey.self] = newValue }
+    }
+}
+
 /// A line for a pane whose feature is off: it says so, and goes to the switch. Nothing while the feature is on.
 struct FeatureOffNote: View {
     let settings: AppSettings

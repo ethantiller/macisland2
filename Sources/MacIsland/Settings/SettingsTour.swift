@@ -89,6 +89,27 @@ struct TourStop: Identifiable, Equatable {
             title: "Put a Module in the Menu Bar",
             copy: "Switch a module on to give it its own icon. Drag its window\u{2019}s header away to pop it out."),
         TourStop(
+            id: "dragTarget", since: 1, pane: .tabs, target: .dragTarget, placement: .below,
+            scrollAnchor: SettingsAnchor.files, preview: PreviewContext.options(for: .shelf), title: "When You Drag a File",
+            copy:
+                "Choose what the island becomes as a file comes near: the Shelf, AirDrop, both, or nothing."),
+        TourStop(
+            id: "music", since: 1, pane: .tabs, target: .musicCompact, placement: .below,
+            scrollAnchor: SettingsAnchor.music, preview: PreviewContext.options(for: .media), title: "Music Beside the Notch",
+            copy: "Turn this off to keep music in Home and the Media tab only."),
+        TourStop(
+            id: "pomodoro", since: 2, pane: .tabs, target: .pomodoro, placement: .below,
+            scrollAnchor: SettingsAnchor.pomodoro, preview: PreviewContext.options(for: .clock), title: "Set Your Pomodoro",
+            copy:
+                "Choose how long a focus session and each break last, and how many sessions come before the long break."
+        ),
+        TourStop(
+            id: "toolsRow", since: 1, pane: .tabs, target: .toolsRow, placement: .below,
+            scrollAnchor: SettingsAnchor.toolsRow, preview: PreviewContext.options(for: .tools), title: "Your Tools Row",
+            copy:
+                "Choose how many tools the row shows, then drag them into order below. Home\u{2019}s quick tools are the first four."
+        ),
+        TourStop(
             id: "homeCanvas", since: 1, pane: .home, target: .previewBand, placement: .below, scrollAnchor: nil,
             preview: nil, title: "Arrange Home",
             copy:
@@ -102,28 +123,7 @@ struct TourStop: Identifiable, Equatable {
             id: "upNext", since: 1, pane: .home, target: .calendarEvents, placement: .above,
             scrollAnchor: SettingsAnchor.upNext, preview: nil, title: "Up Next",
             copy:
-                "Turn on Due Reminders to see them on Home, with a banner before they start. Calendar is in Features."),
-        TourStop(
-            id: "dragTarget", since: 1, pane: .shelf, target: .dragTarget, placement: .below,
-            scrollAnchor: SettingsAnchor.files, preview: nil, title: "When You Drag a File",
-            copy:
-                "Choose what the island becomes as a file comes near: the Shelf, AirDrop, both, or nothing."),
-        TourStop(
-            id: "music", since: 1, pane: .media, target: .musicCompact, placement: .below,
-            scrollAnchor: SettingsAnchor.music, preview: nil, title: "Music Beside the Notch",
-            copy: "Turn this off to keep music in Home and the Media tab only."),
-        TourStop(
-            id: "pomodoro", since: 2, pane: .clock, target: .pomodoro, placement: .below,
-            scrollAnchor: SettingsAnchor.pomodoro, preview: nil, title: "Set Your Pomodoro",
-            copy:
-                "Choose how long a focus session and each break last, and how many sessions come before the long break."
-        ),
-        TourStop(
-            id: "toolsRow", since: 1, pane: .tools, target: .toolsRow, placement: .below,
-            scrollAnchor: SettingsAnchor.toolsRow, preview: nil, title: "Your Tools Row",
-            copy:
-                "Choose how many tools the row shows, then drag them into order below. Home\u{2019}s quick tools are the first four."
-        ),
+                "Meetings come from Calendar in Features, and due reminders from Content. Outlook, Google, and Exchange come from Internet Accounts here."),
         TourStop(
             id: "interruptions", since: 1, pane: .notifications, target: .quietInFocus, placement: .below,
             scrollAnchor: SettingsAnchor.interruptions, preview: nil, title: "Choose What Interrupts You",

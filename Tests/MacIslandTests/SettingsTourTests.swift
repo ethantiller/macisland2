@@ -49,8 +49,14 @@ struct SettingsTourTests {
         }
     }
 
-    @Test func onlyTheMenuBarStopChangesThePreview() {
-        #expect(TourStop.all.filter { $0.preview != nil }.map(\.id) == ["menuBar"])
+    @Test func onlyTheContentStopsChangeThePreview() {
+        #expect(
+            TourStop.all.filter { $0.preview != nil }.map(\.id)
+                == ["menuBar", "dragTarget", "music", "pomodoro", "toolsRow"],
+            "the Content stops show their module")
+        for id in ["dragTarget", "music", "pomodoro", "toolsRow"] {
+            #expect(TourStop.all.first { $0.id == id }?.pane == .tabs, "\(id)")
+        }
     }
 
     @Test func everyStopHasWordsAndAUniqueId() {

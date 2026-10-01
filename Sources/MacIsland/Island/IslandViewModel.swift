@@ -669,10 +669,10 @@ final class IslandViewModel {
         }
     }
 
-    /// Opens Settings on the Tools pane with this tool's sheet showing.
+    /// Opens Settings on Content, on Tools, with this tool's sheet showing.
     func editShortcutTool(_ id: UUID) {
         features.settings.requestedShortcutToolEdit = id
-        onOpenSettings?(.tools, nil)
+        onOpenSettings?(.tabs, nil)
     }
 
     /// Runs one of the person's Shortcuts. It shows as work in progress while it runs.

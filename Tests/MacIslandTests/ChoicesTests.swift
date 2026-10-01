@@ -182,10 +182,10 @@ struct DragAndMusicChoicesTests {
         let live = TestSupport.makeViewModel()
         let preview = IslandPreviewModel(live: live.features)
         defer { preview.stop() }
-        preview.show(SettingsPane.shelf.previewContext ?? PreviewContext())
+        preview.show(ShelfOptions.dragPreview)
         #expect(preview.viewModel.showsDragTarget)
         live.settings.dragTarget = .nothing
-        preview.show(SettingsPane.shelf.previewContext ?? PreviewContext())
+        preview.show(ShelfOptions.dragPreview)
         #expect(!preview.viewModel.showsDragTarget)
     }
 }

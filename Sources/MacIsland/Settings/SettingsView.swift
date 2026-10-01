@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var searchText = ""
     /// A section a search result pointed at, until the pane has scrolled to it.
     @State private var scrollTarget: String?
+    /// A module a search result pointed at: the Content pane selects it once the pane is on screen.
+    @State private var pendingModule: IslandModule?
     @State private var preview: IslandPreviewModel?
     @State private var editor: HomeEditor
     @State private var tabEditor: TabEditor
@@ -160,6 +162,7 @@ struct SettingsView: View {
             storedPane = SettingsPane.features.rawValue
             scrollTarget = SettingsAnchor.feature(feature)
         }
+        .environment(\.openPane) { storedPane = $0.rawValue }
         .overlay { if pane == .home { HomeDragLayer(editor: editor) } }
         .overlay(alignment: .topLeading) { if sidebarHidden { showSidebarButton } }
     }
@@ -186,10 +189,6 @@ struct SettingsView: View {
         case .features: FeaturesPane(settings: settings, features: features, preview: preview)
         case .tabs: TabsPane(settings: settings, preview: preview)
         case .home: HomePane(settings: settings, features: features, preview: preview, editor: editor)
-        case .shelf: ShelfPane(settings: settings, preview: preview)
-        case .media: MediaPane(settings: settings)
-        case .clock: ClockPane(settings: settings)
-        case .tools: ToolsPane(settings: settings, preview: preview)
         case .notifications: NotificationsPane(settings: settings, preview: preview)
         case .privacy: PrivacyPane(settings: settings)
         }
@@ -203,6 +202,7 @@ struct SettingsView: View {
     private func open(_ entry: SettingsSearchEntry) {
         storedPane = entry.pane.rawValue
         searchText = ""
+        pendingModule = entry.module
         scrollTarget = entry.anchor
     }
 
@@ -225,6 +225,10 @@ struct SettingsView: View {
         // Menu Bar is a view of the preview only where its icons are chosen.
         preview?.allowsMenuBar = pane == .tabs
         if let context = pane.previewContext { preview?.show(context) }
+        if let module = pendingModule, pane == .tabs {
+            preview?.show(TabsPane.previewContext(for: module))
+            pendingModule = nil
+        }
         // A stop that shows its own view keeps it while the tour is on that stop's pane.
         if let stop = tour.current, stop.pane == pane, let context = stop.preview { preview?.show(context) }
     }

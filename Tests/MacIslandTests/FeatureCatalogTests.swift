@@ -589,7 +589,7 @@ struct FeatureCatalogTests {
         // A feature that isn\u{2019}t built has no row, so nothing to find.
         #expect(!SettingsSearch.entries.contains { $0.pane == .features && $0.title == Feature.mixer.title })
         // The two switches that moved are found where they now are.
-        #expect(SettingsSearch.results(for: "replace the volume hud").first?.pane == .features)
+        #expect(SettingsSearch.results(for: "replace volume").first?.pane == .features)
         #expect(SettingsSearch.results(for: "outlook").contains { $0.pane == .features && $0.title == "Calendar" })
         #expect(
             !SettingsSearch.entries.contains { $0.pane == .home && $0.title == "Calendar Events" }
@@ -664,4 +664,71 @@ struct FeatureCatalogTests {
         settings.setOn(.clipboard, true)
         #expect(settings.weatherCity == "Oslo" && settings.clipboardLimit == 50)
     }
+
+    // MARK: The Content pane (F5)
+
+    @Test func selectingAModuleShowsItsOptionsAndItsTab() {
+        let live = TestSupport.makeViewModel()
+        let preview = IslandPreviewModel(live: live.features)
+        defer { preview.stop() }
+        let pane = TabsPane(settings: live.settings, preview: preview)
+        preview.show(SettingsPane.tabs.previewContext!, animated: false)
+        #expect(pane.selected == .home, "it starts on Home")
+
+        for module in [IslandModule.media, .clock, .shelf, .tools, .reminders, .notes] {
+            preview.show(PreviewContext(presentation: .expanded, tab: module), animated: false)
+            #expect(pane.selected == module, "\(module)")
+            #expect(preview.viewModel.selectedTab == module, "the preview follows")
+        }
+        // A module's options set the preview as its pane did.
+        preview.show(TabsPane.previewContext(for: .clock), animated: false)
+        #expect(preview.viewModel.clockMode == .pomodoro)
+        preview.show(ShelfOptions.dragPreview, animated: false)
+        #expect(preview.viewModel.showsDragTarget && pane.selected == .shelf, "still the Shelf\u{2019}s options")
+    }
+
+    @Test func aModuleThatIsOffIsListedAsOffWithAWayToFeatures() {
+        let live = TestSupport.makeViewModel()
+        let preview = IslandPreviewModel(live: live.features)
+        defer { preview.stop() }
+        let pane = TabsPane(settings: live.settings, preview: preview)
+        preview.show(PreviewContext(presentation: .expanded, tab: .media), animated: false)
+        #expect(pane.selected == .media)
+
+        live.settings.setOn(.music, false)
+        #expect(pane.selected == .home, "a module turned off elsewhere hands the selection to Home")
+        let off = IslandModule.allCases.filter { $0.isAvailable && !live.settings.isShown($0) }
+        #expect(off == [.media])
+        #expect(Feature.module(for: .media) == .music, "Open Features goes to the Music row")
+        #expect(SettingsAnchor.feature(.music) == "features.music")
+    }
+
+    @Test func theFourPanesAreFoldedIntoContent() {
+        #expect(SettingsPane.allCases.count == 6)
+        #expect(SettingsPane.tabs.title == "Content")
+        // Their settings are all found in Content, each selecting its module.
+        let moved: [(String, IslandModule)] = [
+            ("Focus Length", .clock), ("Tools in the Row", .tools), ("Synced Lyrics", .media),
+            ("When You Drag a File", .shelf), ("Clipboard History", .shelf), ("Due Reminders", .reminders),
+        ]
+        for (title, module) in moved {
+            let entry = SettingsSearch.entries.first { $0.pane == .tabs && $0.title == title }
+            #expect(entry?.module == module, title)
+            #expect(entry?.anchor?.hasPrefix("tabs.") == true, title)
+        }
+    }
+
+    @Test func searchSelectsTheModule() {
+        let found = SettingsSearch.results(for: "pomodoro").first { $0.title == "Focus Length" }
+        #expect(found?.pane == .tabs && found?.module == .clock && found?.anchor == SettingsAnchor.pomodoro)
+        #expect(SettingsSearch.results(for: "row order").first?.module == .tools)
+        // Entries that aren\u{2019}t a module\u{2019}s option select nothing.
+        #expect(SettingsSearch.results(for: "launch at login").first?.module == nil)
+        // Every anchor is still a place in its pane, and the moved ones are not left under the old panes.
+        for entry in SettingsSearch.entries {
+            #expect(entry.anchor.map { $0.hasPrefix(entry.pane.rawValue + ".") } ?? true, entry.title)
+        }
+        #expect(SettingsAnchor.music == "tabs.media" && SettingsAnchor.toolsRow == "tabs.row")
+    }
+
 }

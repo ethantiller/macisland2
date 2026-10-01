@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (796 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (800 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -31,7 +31,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
 - **Live activities:** the minimal pair, full charge, drive eject, the screenshot shelf, Keep Awake durations, headphone batteries.
 - **Media:** shuffle, repeat, Favorite, app volume, and synced lyrics, in a Dynamic Island style player.
 - **Home and productivity:** the Home dashboard, weather, Reminders, Pomodoro, zip and convert, smart actions, notes, Clean Keys.
-- **Customization:** the timer dial (scrub, fade, fixed marker), a Settings window of ten panes (Features is second) with a live island preview, Home as
+- **Customization:** the timer dial (scrub, fade, fixed marker), a Settings window of six panes (General, Features, Content, Home, Notifications, Privacy) with a live island preview, Home as
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
@@ -406,8 +406,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Banners: connect AirPods (and with one earbud low): a small centered alert with a green (or red) ring that draws once, the island narrower than the other banners, content centered; Low Battery (Notifications preview, or unplug at 20%) is a centered alert with no button and never asks for a password
 - [ ] Presets and dropdowns (Settings, Home): the Presets dropdown lists the five built-in presets with a check on the current one; Save opens a name field (Return saves, an empty or built-in name is refused, an existing name asks to replace it); the saved layout shows under Saved, comes back with its sizes and options, and its trash removes it (⌘Z brings it back); every other pop-up in Settings (Shelf, General, Notifications, a widget's options, the custom widget sheet) is the styled dropdown and its list scrolls when long; it works with the keyboard and VoiceOver
 - [ ] The Home editor (Settings, Home): drag a widget and it lifts and follows the pointer, the others slide aside calmly with no flicker, and a trackpad tick marks each new place; Escape calls a drag off and nothing changes; let go on the wallpaper beside the island and the widget snaps back where it was, while the dashed room under the island still places it; the ⊖ badge removes a widget (it is back in Add Widgets, and ⌘Z brings it back) and is dimmed on the last one; drag a corner and the box snaps to sizes with a tick, and a size that won't fit says so; drag the gallery's preview (click a chip first) into the room under the island and onto a gap, press its plus and a chip's plus, and see "No room" when it won't fit; a drag never gets stuck (drag a widget to the wallpaper, let go, and drag it or another again right away); the island grows and shrinks with the rows, and the dashed room and "Room for N more rows" follow; ⊖ removes (dimmed on the last widget), Delete, the arrows, Option-arrows, ⌘] and ⌘[ work with Home focused; VoiceOver offers Move, Make Larger, Make Smaller, and Remove on each widget, with "Weather, 1 by 1" and "row 2, column 1"; with Reduce Motion there is no lift or shadow; ⌘Z and ⇧⌘Z; presets, Export then Import, Reset; right-click a widget on the island, **Edit Home…** opens Settings with it selected; dragging from a tile scrolled partly under the preview still works
-- [ ] Tabs pane: click a row and a tab in the preview to see it; drag a preview tab onto another (swaps), a tray tab onto a tab (replaces it), a tab onto the tray (hides it), click a tray tab (adds it)
-- [ ] Tabs pane, Menu Bar view (last in the picker, only there): icons appear for the modules turned on, clicking one, or a module row (on or off), shows its window; the island slides left and the menu bar in from the right, and back; only the menu bar switches show; back in another view only the tab lists show
+- [ ] Content pane (was Tabs): click a row and a tab in the preview to see it; drag a preview tab onto another (swaps), a tray tab onto a tab (replaces it), a tab onto the tray (hides it), click a tray tab (adds it)
+- [ ] Content pane, Menu Bar view (last in the picker, only there): icons appear for the modules turned on, clicking one, or a module row (on or off), shows its window; the island slides left and the menu bar in from the right, and back; only the menu bar switches show; back in another view only the tab lists show
 - [ ] The preview's arrow buttons and a two-finger swipe over it step Compact, Peek, Banner, Expanded
 - [ ] The Settings window: each pane opens, the last pane is remembered, the preview shows the pane's context (Compact, Expanded Home,
       Banner, and so on) and its picker switches presentations, and the **real island never moves** while Settings is open
@@ -449,7 +449,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Idle CPU is unchanged with it on and off (`ps -o cputime= -p PID` over 10 s); nothing is asked at launch
 
 **Shortcut tools (written, not run)**
-- [ ] Settings → Tools → **Add Shortcut Tool…**: the list shows your Shortcuts, choosing one names the tool, the symbol preview and the sixteen buttons work, **Test** runs it, **Save** adds it; a third is refused with the button dimmed; Edit and Remove work
+- [ ] Settings → Content → Tools → **Add Shortcut Tool…**: the list shows your Shortcuts, choosing one names the tool, the symbol preview and the sixteen buttons work, **Test** runs it, **Save** adds it; a third is refused with the button dimmed; Edit and Remove work
 - [ ] In the Tools tab it is in the grid, can be pinned to the row, and is in Quick Tools (6 by 2 shows it); pressing it shows the blue working activity, then a green *Done*; a Shortcut that fails shows a red banner; right-click → Edit or Remove works
 - [ ] Rename or delete the Shortcut in the Shortcuts app, reopen the Tools tab: the tool is dimmed and the banner offers **Edit Tool**
 - [ ] Export and Import carry the tools; Reset All removes them. The icon note: confirm you are happy to pick the symbol, or see docs/plans/shortcut-icons.md for what to check on a real Mac
@@ -486,7 +486,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Widget sizes (Settings, Size in a widget's options): every widget at every size draws without clipping; Today 3 × 3 is the month; Music 3 × 2 plays, pauses, and scrubs; Quick Tools 6 × 1 and 6 × 2 run tools; Weather 6 × 1 and 3 × 2 show the forecast; a size that won't fit is dimmed; ⌘Z undoes a size change; the Listening and Dashboard presets open without clipping; idle CPU with Home closed is unchanged (`ps -o cputime= -p PID` over 10 s)
 - [ ] Weather from a real city; changing it updates after a pause in typing
 - [ ] Pomodoro chains and stops after the long break; the streak and chart update
-- [ ] Settings → Clock (written, not run): the preview shows the Clock tab on Pomodoro; changing Focus Length while idle changes the ring's time at once; changing it while a session runs leaves that session as it was and the next focus session takes it; Short Break, Long Break, and Sessions Before Long Break do the same ("n of m" and when the long break comes); quit and reopen keeps them; Export and Import carry them; Reset All Settings puts back 25, 5, 15, 4; search finds "pomodoro"; the tour stop "Set Your Pomodoro" rings Focus Length
+- [ ] Settings → Content → Clock (written, not run): the preview shows the Clock tab on Pomodoro; changing Focus Length while idle changes the ring's time at once; changing it while a session runs leaves that session as it was and the next focus session takes it; Short Break, Long Break, and Sessions Before Long Break do the same ("n of m" and when the long break comes); quit and reopen keeps them; Export and Import carry them; Reset All Settings puts back 25, 5, 15, 4; search finds "pomodoro"; the tour stop "Set Your Pomodoro" rings Focus Length
 - [ ] The timer dial: a two-finger horizontal swipe over it scrubs (and coasts), the same swipe elsewhere changes tabs, swipe up
       over it closes, a mouse wheel steps a minute, a drag follows the pointer 1:1, a tap glides, the ruler stretches at 1 minute,
       and haptics tap at the ends; the same in a torn-off Clock window
@@ -521,11 +521,16 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 **Features catalog (F1)** *(written, not run)*
 - [ ] `defaults write com.ethantiller.MacIsland features.available -dict music -bool false` and a relaunch: the Media tab and its menu-bar icon (if it had one) are gone; deleting the key (`defaults delete com.ethantiller.MacIsland features.available`) and relaunching brings both back in the same place
 - [ ] With Music off and Media selected in the island, nothing is left on screen that names Media; turn it back on and the tab returns where it was
-- [ ] Settings → Shelf → Clipboard History → Off still stops the clipboard history (the same switch as the Clipboard feature), and an install that had it Off before this build still has it off
+- [ ] Settings → Features → Clipboard off stops the clipboard history (it was Shelf → Clipboard History → Off), and an install that had it Off before this build still has it off
 - [ ] `open "macisland://open?module=media"` with Music off does nothing; with it on, opens Media
 - [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
+
+**Content pane (F5)** *(written, not run)*
+- [ ] The sidebar reads General, Features, Content, Home, Notifications, Privacy, and the window still meets its 830 pt minimum
+- [ ] Every former Media, Clock, Shelf, and Tools setting is under Content (click the module's row, or its tab in the preview) and from search, and works as before; the tour's Content stops show their module
+- [ ] A module switched off in Features is listed under Off in Features with Open Features; the island's right-click Edit on a Shortcut tool opens Content on Tools with its sheet
 
 **Features pane (F3)** *(written, not run)*
 - [ ] Settings → Features is second in the sidebar; every row turns its feature off and on with the island following at once, and a row that stops something running says what stopped

@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 796 tests, about a second.
+lines; 800 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -349,14 +349,14 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `PreviewFeatures.swift` | `IslandFeatures` from sample data, the samples, and the inert doubles |
 | `CustomWidgetSheet.swift`, `PrivacyPane.swift`, `PrivacyAccess.swift` | Making a custom widget, and the Privacy pane (what leaves, what runs, permission states) |
 | `MenuBarPreview.swift` | The preview's Menu Bar view: a menu-bar strip and the chosen module's window |
-| `TabEditor.swift` | The Tabs pane's canvas: the preview's tab strip and the Not Shown tray under it (swap, replace, hide, add) |
+| `TabEditor.swift` | The Content pane's canvas: the preview's tab strip and the Not Shown tray under it (swap, replace, hide, add) |
 | `HomeEditor.swift`, `HomeCanvas.swift`, `WidgetGallery.swift`, `HomeLayoutEditor.swift`, `WidgetInspector.swift`, `HomeArchive.swift` | The Home editor: the controller (gestures, keys, undo), the chrome over the preview (handles, badges, room to grow, the lifted widget, the hint), the gallery of widgets to add (chips, each size at 1:1, `FlowLayout`), the Layout section (presets, Save, file menu), the selected widget's options, and layout export and import |
 | `Dropdown.swift` | The styled controls used across Settings: `StyledDropdown`, `DropdownItem`, `SettingsDropdown`, `SettingsSegmented`, `FieldButton` |
 | `SettingsSidebar.swift`, `SettingsSearch.swift`, `SettingsWindow.swift` | The sidebar (search field, hide and show button, panes or results), the pure search (an entry for each setting, and the ranking), and the window setup (resizable, transparent title bar, sidebar material) |
 | `ShortcutRecorder.swift`, `KeyCombo.swift` | Recording a global shortcut, and the key combination it stores |
-| `ShelfPane.swift` | The Shelf pane (drag target, screenshots, retention, clipboard limit) |
 | `SettingsArchive.swift` | The settings file (make, read, `restore`, `resetAll`) and its panels |
-| `GeneralPane.swift`, `FeaturesPane.swift`, `TabsPane.swift`, `HomePane.swift`, `MediaPane.swift`, `ClockPane.swift`, `ToolsPane.swift`, `ShortcutToolSheet.swift`, `NotificationsPane.swift`, `ShelfPane.swift`, `PrivacyPane.swift` | One pane each |
+| `GeneralPane.swift`, `FeaturesPane.swift`, `TabsPane.swift` (Content), `HomePane.swift`, `NotificationsPane.swift`, `PrivacyPane.swift` | One pane each |
+| `MediaPane.swift`, `ClockPane.swift`, `ShelfPane.swift`, `ToolsPane.swift` | The options of Media, Clock, Shelf, and Tools (`MediaOptions`, `ClockOptions`, `ShelfOptions`, `ToolsOptions`), shown in Content while the module is selected; `ShortcutToolSheet.swift` is the Shortcut tool editor |
 | `GlobalHotkey.swift` | Carbon hotkeys with ids |
 | `LaunchAtLogin.swift` | Start at login (bundle only) |
 
@@ -364,7 +364,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 49 files, about 10,900 lines, **796 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 49 files, about 10,900 lines, **800 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |

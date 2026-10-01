@@ -241,7 +241,7 @@ struct ShortcutToolTests {
         viewModel.runShortcutTool(made)
         #expect(!ran && viewModel.banner?.title.contains("Isn") == true)
         viewModel.banner?.actions.first?.perform()
-        #expect(opened.first?.0 == .tools && viewModel.settings.requestedShortcutToolEdit == made.id)
+        #expect(opened.first?.0 == .tabs && viewModel.settings.requestedShortcutToolEdit == made.id)
     }
 
     @Test func installedShortcutsAreListedOnlyWhenThereIsAToolAndAnEmptyAnswerSaysNothing() async {

@@ -22,16 +22,13 @@ struct HomePane: View {
             HomeLayoutEditor(editor: editor)
             Section {
                 FeatureOffNote(settings: settings, feature: .calendar)
-                FeatureOffNote(settings: settings, feature: .reminders)
-                Toggle("Due Reminders", isOn: Bindable(settings).showsReminders)
-                    .disabled(!settings.isOn(.reminders))
-                    .tourAnchor(.calendarEvents)
                 Button("Open Internet Accounts", action: AgendaMonitor.openInternetAccounts)
+                    .tourAnchor(.calendarEvents)
             } header: {
                 Text("Up Next").id(SettingsAnchor.upNext)
             } footer: {
                 Text(
-                    "Meetings (Calendar, in Features) and due reminders show in Up Next on Home, and announce themselves as banners. The Reminders tab works either way. Outlook, Google, and Exchange calendars come from Internet Accounts."
+                    "Meetings (Calendar, in Features) and due reminders (Content, Reminders) show in Up Next on Home, and announce themselves as banners. Outlook, Google, and Exchange calendars come from Internet Accounts."
                 )
             }
             Section {

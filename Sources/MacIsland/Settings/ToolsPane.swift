@@ -1,13 +1,14 @@
 import SwiftUI
 
-struct ToolsPane: View {
+/// The Tools module's options: how many tools the row shows, the tools made from Shortcuts, and the row's order. The sheet that edits a
+/// Shortcut tool belongs to the Content pane (it also opens from the Tools tab's right-click menu).
+struct ToolsOptions: View {
     let settings: AppSettings
     let preview: IslandPreviewModel?
-
-    @State private var editing: ShortcutTool?
+    @Binding var editing: ShortcutTool?
 
     var body: some View {
-        Form {
+        Group {
             Section {
                 LabeledContent("Tools in the Row") {
                     SettingsSegmented(
@@ -56,16 +57,6 @@ struct ToolsPane: View {
             } footer: {
                 Text("Drag a tool to reorder the row. Right-click for Move Up and Move Down.")
             }
-        }
-        .formStyle(.grouped)
-        .sheet(item: $editing) { tool in
-            ShortcutToolSheet(tool: tool) { settings.saveShortcutTool($0) }
-        }
-        // The Tools tab's right-click menu asks for a tool's sheet.
-        .task(id: settings.requestedShortcutToolEdit) {
-            guard let id = settings.requestedShortcutToolEdit else { return }
-            settings.requestedShortcutToolEdit = nil
-            editing = settings.shortcutTool(id: id)
         }
     }
 }

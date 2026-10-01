@@ -1,10 +1,11 @@
 import SwiftUI
 
-struct MediaPane: View {
+/// The Media module's options, shown in Content while Media is selected.
+struct MediaOptions: View {
     let settings: AppSettings
 
     var body: some View {
-        Form {
+        Group {
             Section {
                 FeatureOffNote(settings: settings, feature: .music)
                 Toggle("Show Music Beside the Notch", isOn: Bindable(settings).showsMusicCompact)
@@ -24,6 +25,5 @@ struct MediaPane: View {
                 Text("Looks up lyrics on lrclib.net using the track\u{2019}s name, artist, album, and length.")
             }
         }
-        .formStyle(.grouped)
     }
 }

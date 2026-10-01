@@ -29,6 +29,13 @@ struct PreviewContext: Equatable {
     var clockMode: ClockMode?
 }
 
+extension PreviewContext {
+    /// What the preview shows for a module's options in Content: its tab, and for Clock the Pomodoro its options are about.
+    static func options(for module: IslandModule) -> PreviewContext {
+        PreviewContext(presentation: .expanded, tab: module, clockMode: module == .clock ? .pomodoro : nil)
+    }
+}
+
 /// The island the Settings window draws beside its controls. It is the real `IslandView` over a second view
 /// model built from sample data (`PreviewFeatures`), so it can't drift from the island, and it has its own
 /// presentation and tab, so the real panel never opens or animates. It reads the live `AppSettings`, so a change

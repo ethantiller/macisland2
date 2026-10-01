@@ -54,7 +54,7 @@ struct SettingsSearchTests {
         #expect(titles("calendar").first == "Calendar")
         let results = SettingsSearch.results(for: "reminders")
         let names = results.map { "\($0.pane.rawValue)/\($0.title)" }
-        #expect(names.firstIndex(of: "home/Due Reminders")! < names.firstIndex(of: "notifications/Due Reminders")!)
+        #expect(names.firstIndex(of: "tabs/Due Reminders")! < names.firstIndex(of: "notifications/Due Reminders")!)
     }
 
     @Test func everyEntryIsAUniquePlaceInARealPane() {

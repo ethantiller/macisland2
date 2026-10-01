@@ -8,6 +8,8 @@ struct SettingsSearchEntry: Identifiable, Equatable {
     var keywords: [String] = []
     /// The part of the pane to bring into view (`SettingsAnchor`), or nil for the top.
     var anchor: String?
+    /// The module the Content pane selects to show the setting, for one that is a module's option.
+    var module: IslandModule?
 
     var id: String { "\(pane.rawValue)/\(title)" }
 }
@@ -20,18 +22,20 @@ enum SettingsAnchor {
     static let guide = "general.guide"
     static let featurePresets = "features.presets"
     static let menuBar = "tabs.menubar"
+    static let dueReminders = "tabs.reminders"
+    static let options = "tabs.options"
     static let widgets = "home.widgets"
     static let layout = "home.layout"
     static let upNext = "home.upnext"
     static let weather = "home.weather"
-    static let files = "shelf.files"
-    static let clipboard = "shelf.clipboard"
-    static let music = "media.music"
-    static let lyrics = "media.lyrics"
-    static let pomodoro = "clock.pomodoro"
-    static let toolsRow = "tools.row"
-    static let rowOrder = "tools.roworder"
-    static let shortcutTools = "tools.shortcuts"
+    static let files = "tabs.files"
+    static let clipboard = "tabs.clipboard"
+    static let music = "tabs.media"
+    static let lyrics = "tabs.lyrics"
+    static let pomodoro = "tabs.pomodoro"
+    static let toolsRow = "tabs.row"
+    static let rowOrder = "tabs.roworder"
+    static let shortcutTools = "tabs.shortcuts"
     static let interruptions = "notifications.interruptions"
     static let power = "notifications.power"
     static let devices = "notifications.devices"
@@ -131,8 +135,8 @@ enum SettingsSearch {
                 pane: .home, title: "Reset Home to Everyday", keywords: ["default", "layout"],
                 anchor: SettingsAnchor.layout),
             .init(
-                pane: .home, title: "Due Reminders", keywords: ["up next", "reminders", "tasks"],
-                anchor: SettingsAnchor.upNext),
+                pane: .tabs, title: "Due Reminders", keywords: ["up next", "reminders", "tasks"],
+                anchor: SettingsAnchor.dueReminders, module: .reminders),
             .init(
                 pane: .home, title: "Internet Accounts",
                 keywords: ["calendar", "outlook", "google", "exchange", "accounts"],
@@ -143,51 +147,51 @@ enum SettingsSearch {
                 anchor: SettingsAnchor.weather),
             // Shelf
             .init(
-                pane: .shelf, title: "When You Drag a File",
+                pane: .tabs, title: "When You Drag a File",
                 keywords: ["drop", "airdrop", "target", "shelf only", "drag"],
-                anchor: SettingsAnchor.files),
+                anchor: SettingsAnchor.files, module: .shelf),
             .init(
-                pane: .shelf, title: "Add New Screenshots to the Shelf", keywords: ["screenshot", "capture", "screen"],
-                anchor: SettingsAnchor.files),
+                pane: .tabs, title: "Add New Screenshots to the Shelf", keywords: ["screenshot", "capture", "screen"],
+                anchor: SettingsAnchor.files, module: .shelf),
             .init(
-                pane: .shelf, title: "Remove Files from the Shelf",
-                keywords: ["retention", "clean", "delete", "expire", "day", "week"], anchor: SettingsAnchor.files),
+                pane: .tabs, title: "Remove Files from the Shelf",
+                keywords: ["retention", "clean", "delete", "expire", "day", "week"], anchor: SettingsAnchor.files, module: .shelf),
             .init(
-                pane: .shelf, title: "Clipboard History",
-                keywords: ["copy", "paste", "items", "pasteboard", "limit", "off"], anchor: SettingsAnchor.clipboard),
+                pane: .tabs, title: "Clipboard History",
+                keywords: ["copy", "paste", "items", "pasteboard", "limit", "off"], anchor: SettingsAnchor.clipboard, module: .shelf),
             // Media
             .init(
-                pane: .media, title: "Show Music Beside the Notch",
+                pane: .tabs, title: "Show Music Beside the Notch",
                 keywords: ["compact", "now playing", "collapsed", "art"],
-                anchor: SettingsAnchor.music),
+                anchor: SettingsAnchor.music, module: .media),
             .init(
-                pane: .media, title: "Synced Lyrics", keywords: ["lrc", "lrclib", "words", "song", "karaoke"],
-                anchor: SettingsAnchor.lyrics),
+                pane: .tabs, title: "Synced Lyrics", keywords: ["lrc", "lrclib", "words", "song", "karaoke"],
+                anchor: SettingsAnchor.lyrics, module: .media),
             // Clock
             .init(
-                pane: .clock, title: "Focus Length",
-                keywords: ["pomodoro", "work", "session", "minutes", "25", "timer"], anchor: SettingsAnchor.pomodoro),
+                pane: .tabs, title: "Focus Length",
+                keywords: ["pomodoro", "work", "session", "minutes", "25", "timer"], anchor: SettingsAnchor.pomodoro, module: .clock),
             .init(
-                pane: .clock, title: "Short Break",
-                keywords: ["pomodoro", "rest", "minutes", "5", "timer"], anchor: SettingsAnchor.pomodoro),
+                pane: .tabs, title: "Short Break",
+                keywords: ["pomodoro", "rest", "minutes", "5", "timer"], anchor: SettingsAnchor.pomodoro, module: .clock),
             .init(
-                pane: .clock, title: "Long Break",
-                keywords: ["pomodoro", "rest", "minutes", "15", "timer"], anchor: SettingsAnchor.pomodoro),
+                pane: .tabs, title: "Long Break",
+                keywords: ["pomodoro", "rest", "minutes", "15", "timer"], anchor: SettingsAnchor.pomodoro, module: .clock),
             .init(
-                pane: .clock, title: "Sessions Before Long Break",
-                keywords: ["pomodoro", "cycle", "rounds", "focus", "four", "4"], anchor: SettingsAnchor.pomodoro),
+                pane: .tabs, title: "Sessions Before Long Break",
+                keywords: ["pomodoro", "cycle", "rounds", "focus", "four", "4"], anchor: SettingsAnchor.pomodoro, module: .clock),
             // Tools
             .init(
-                pane: .tools, title: "Tools in the Row",
+                pane: .tabs, title: "Tools in the Row",
                 keywords: ["pin", "pinned", "4", "6", "8", "count", "how many"],
-                anchor: SettingsAnchor.toolsRow),
+                anchor: SettingsAnchor.toolsRow, module: .tools),
             .init(
-                pane: .tools, title: "Shortcut Tools",
+                pane: .tabs, title: "Shortcut Tools",
                 keywords: ["shortcuts", "automation", "run", "custom", "tool", "icon", "symbol", "add"],
-                anchor: SettingsAnchor.shortcutTools),
+                anchor: SettingsAnchor.shortcutTools, module: .tools),
             .init(
-                pane: .tools, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
-                anchor: SettingsAnchor.rowOrder),
+                pane: .tabs, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
+                anchor: SettingsAnchor.rowOrder, module: .tools),
             // Notifications
             .init(
                 pane: .notifications, title: "Quiet in Focus", keywords: ["do not disturb", "dnd", "silence", "mute"],

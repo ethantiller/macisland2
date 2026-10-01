@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// The Pomodoro's lengths. The preview shows the Clock tab on Pomodoro, so a change is seen on its ring.
-struct ClockPane: View {
+/// The Clock module's options: the Pomodoro's lengths. The preview shows the Clock tab on Pomodoro, so a change is seen on its ring.
+struct ClockOptions: View {
     let settings: AppSettings
+    let preview: IslandPreviewModel?
 
     var body: some View {
-        Form {
+        Group {
             Section {
                 SettingsDropdown(
                     title: "Focus Length", selection: Bindable(settings).pomodoroFocus,
@@ -32,7 +33,7 @@ struct ClockPane: View {
                 )
             }
         }
-        .formStyle(.grouped)
+        .onAppear { preview?.show(TabsPane.previewContext(for: .clock)) }
     }
 
     /// The usual choices, plus the current value when it is not one of them (a number from an imported file).
