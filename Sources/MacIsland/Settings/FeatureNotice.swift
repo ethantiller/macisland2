@@ -71,7 +71,8 @@ extension Feature {
         case .calendar: PreviewContext(presentation: .banner, event: .meeting)
         case .weather: PreviewContext(presentation: .peek)
         case .volumeHUD: PreviewContext(presentation: .banner, showsVolume: true)
-        case .agents, .mixer, .system, .downloads, .chooseActivity, .notifications: nil
+        case .system: PreviewContext(presentation: .expanded, tab: .home)
+        case .agents, .mixer, .downloads, .chooseActivity, .notifications: nil
         }
     }
 

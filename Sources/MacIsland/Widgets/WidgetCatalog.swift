@@ -7,6 +7,8 @@ enum BuiltInWidget: String, CaseIterable, Codable {
     case today, music, quickTools, clockActions
     // New, each reusing a view or a model that exists.
     case weather, battery, reminders, note
+    // Off until the System feature is switched on.
+    case system
 }
 
 /// One widget in a layout: one of the built-ins, or one the person made.
@@ -53,7 +55,7 @@ enum WidgetID: Hashable, Codable {
 
 /// What a widget reads. The Privacy pane and the idle budget are written from this.
 enum WidgetSource: Equatable {
-    case agenda, nowPlaying, pinnedTools, clock, weather, battery, reminders, notes
+    case agenda, nowPlaying, pinnedTools, clock, weather, battery, reminders, notes, system
     case shortcut, web, folder, command
 }
 
@@ -142,6 +144,10 @@ enum WidgetCatalog {
             return make(
                 "Note", "note.text", sizes: [GridSize(2, 1), GridSize(3, 1), GridSize(3, 2), GridSize(6, 2)],
                 default: GridSize(3, 1), source: .notes, tap: .openModule(.notes))
+        case .system:
+            return make(
+                "System", "cpu", sizes: [GridSize(1, 1), GridSize(2, 1), GridSize(3, 1), GridSize(3, 2)],
+                default: GridSize(2, 1), source: .system, refresh: .whileVisible(.seconds(2)), tint: .attention)
         }
     }
 

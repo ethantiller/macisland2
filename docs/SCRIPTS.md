@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 829 tests, about a second.
+lines;  tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -241,6 +241,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `HomeView.swift` | The Home module: the widget grid, and the month calendar it opens |
 | `HomeGrid.swift` | `HomeGrid` (the grid from a `HomeLayout`) and `HomeWidgetView` (a widget at a size) |
 | `MoreWidgets.swift` | Weather, Battery, Reminders, Note, and custom widgets, each at its sizes |
+| `SystemWidget.swift` | The System card at its four sizes (reads only while shown; red only for needs-you) |
 | `HomeWidgets.swift` | The boxes: `TimeWidget`, `MediaWidget`, `QuickActionsGrid`, `HomeAction` and `HomeActionPill` |
 | `HomeCards.swift` | Pieces the idle peek reuses: `DateInline`, `UpNextLabel`, `QuickToolsRow`, `QuickToolButton`, `QuickTimerChips`, `MacBatteryGlance` |
 | `MonthGrid.swift` | Six-week month layout and its view |
@@ -328,6 +329,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `System/AudioAccessoryMonitor.swift` | Bluetooth headphones connecting, and their battery |
 | `System/PrivacyMonitor.swift` | Which app is using the microphone, from CoreAudio property listeners (no polling) |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
+| `System/SystemSampler.swift` | `SystemMath` (pure), `LiveSystemSampler` (Mach calls, memory pressure), and `SystemModel` (samples only while the widget runs it) |
 | `System/FocusMode.swift` | Whether a Focus is on, read when needed or while the Focus button shows; switching through Shortcuts |
 | `System/DiskSpace.swift` | `DiskRule` (warn under 10 GB, re-arm above 15 GB) and `DiskSpace`, checked on events |
 | `System/BluetoothDevices.swift` | Paired audio devices, connecting, and `IOBluetoothProvider` behind `BluetoothDeviceProviding` |
@@ -365,7 +367,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 51 files, about 10,900 lines, **829 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 52 files, about 10,900 lines, ** tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -395,6 +397,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `OptionalAccessTests.swift` | Optional permissions: never part of the gate, never asked by turning a feature on or by a preset, asked once by Allow, and the evidence record |
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
+| `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

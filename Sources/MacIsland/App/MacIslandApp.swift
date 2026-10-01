@@ -61,7 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             mirror: CameraMirror(provider: AVCameraProvider()),
             screenRecorder: ScreenRecorder(recorder: SCKScreenRecorder(), shelf: shelf),
             voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf),
-            widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher())
+            widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
+            system: SystemModel(sampler: LiveSystemSampler())
         )
     }
 

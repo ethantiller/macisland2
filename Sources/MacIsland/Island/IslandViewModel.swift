@@ -176,6 +176,7 @@ struct IslandFeatures {
     let screenRecorder: ScreenRecorder
     let voice: VoiceRecorder
     let widgets: CustomWidgetValues
+    let system: SystemModel
 }
 
 @MainActor

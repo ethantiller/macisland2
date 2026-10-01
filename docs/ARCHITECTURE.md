@@ -136,6 +136,7 @@ swipe (`SwipeRecognizer` in a local scroll monitor, since the preview is look-on
 
 ### Home widgets
 
+**The System widget** (`Home/SystemWidget.swift`, `System/SystemSampler.swift`) reads only public things: CPU from `host_processor_info(PROCESSOR_CPU_LOAD_INFO)` (the share of busy ticks between two looks, with wrapping subtraction and a nil answer for an interval with no ticks; the array is freed with `vm_deallocate`), memory from `host_statistics64(HOST_VM_INFO64)` (active + wired + compressed pages) and `ProcessInfo.physicalMemory`, pressure from a `DispatchSource.makeMemoryPressureSource`, battery from `BatteryMonitor.readInternalBattery`, and how hot the Mac is from `ProcessInfo.thermalState`. Temperatures in degrees and fan speeds need the SMC or private HID calls and are not read. `SystemModel.run()` is a `.task` on the widget, so it looks every 2 s only while the widget is on screen and the pressure source exists only then; `SystemSampling` is the seam tests stub. The widget is offered only while the System feature is on (`BuiltInWidget.system`, `WidgetCatalog.feature(of:)`).
 `Widgets/` is pure: `WidgetCatalog` describes each `BuiltInWidget` (the `sizes` it has a layout for and its `defaultSize`, what it
 reads, how it refreshes, its one tint, its tap), and `HomeLayout` (`Codable`, version 2) is an ordered list of `WidgetPlacement` (widget,
 `GridSize`, options) plus `hidden` (off Home, each keeping its options and last size). **Positions are never stored**: `HomeGridSpec.pack` puts each
@@ -687,7 +688,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **829 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: ** tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

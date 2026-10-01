@@ -120,6 +120,7 @@ struct HomeWidgetView: View {
         case .builtIn(.clockActions): HomeActionPill(viewModel: viewModel, options: placement.options, size: size)
         case .builtIn(.weather): WeatherWidget(viewModel: viewModel, size: size)
         case .builtIn(.battery): BatteryWidget(size: size)
+        case .builtIn(.system): SystemWidget(model: viewModel.system, size: size)
         case .builtIn(.reminders): RemindersWidget(viewModel: viewModel, size: size)
         case .builtIn(.note): NoteWidget(viewModel: viewModel, options: placement.options, size: size)
         case .custom(let id):

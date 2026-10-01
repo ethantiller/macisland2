@@ -58,7 +58,8 @@ enum TestSupport {
                     transcriber: transcriber ?? StubTranscriber(), notes: notes, shelf: shelf,
                     folder: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
                 ),
-                widgets: CustomWidgetValues(fetcher: StubWidgetFetcher())
+                widgets: CustomWidgetValues(fetcher: StubWidgetFetcher()),
+                system: SystemModel(sampler: StubSystemSampler())
             ))
         viewModel.geometry = geometry
         return viewModel
@@ -207,5 +208,23 @@ final class StubWidgetFetcher: WidgetValueFetching, @unchecked Sendable {
         if let gate { for await _ in gate { break } }
         if let failure { throw failure }
         return WidgetValue(text: text, detail: nil, fetchedAt: Date())
+    }
+}
+
+/// Looks at nothing: counts its looks and says what it was told to.
+@MainActor
+final class StubSystemSampler: SystemSampling {
+    var reading = SystemReading(
+        cpu: 0.5, memoryUsed: 8 << 30, memoryTotal: 16 << 30, pressure: .normal, thermal: .nominal, battery: nil)
+    private(set) var samples = 0
+    private(set) var starts = 0
+    private(set) var stops = 0
+
+    func start() { starts += 1 }
+    func stop() { stops += 1 }
+
+    func sample() -> SystemReading {
+        samples += 1
+        return reading
     }
 }

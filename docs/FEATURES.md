@@ -161,7 +161,7 @@ Home & Widgets in Settings arranges it (see below).
 **Widgets.** Home is a grid of 6 columns by up to 3 rows (472 pt wide, 64 to 212 pt tall): each widget takes one of a few sizes, and Home is exactly as tall as its rows. Widgets fill in reading order, so removing one closes the gap. Built in: **Today** (date and Up Next),
 **Music**, **Quick Tools** (a 2 by 2 of round buttons; your first four pinned tools, or four you pick), **Timers & Shelf** (two
 timer lengths, Pomodoro, Shelf; each can be changed or hidden), **Weather** (the city from Settings; the unit follows macOS's
-own Temperature choice), **Battery** (red at 20% or less, not charging), **Reminders** (the first two, checked
+own Temperature choice), **Battery** (red at 20% or less, not charging), **System** (CPU, memory, battery, and how hot the Mac is; off until the System feature is on), **Reminders** (the first two, checked
 off in place), and **Note** (the first lines of your latest note, or one you pick). Presets: **Everyday** (the default),
 **Focus**, **Listening** (the player at 6 by 2), **Minimal**, and **Dashboard** (music, weather, today, tools, and timers in three rows). A widget that doesn't fit goes off Home, with its options and size, never deleted. (The old Timer Chips widget is now Timers & Shelf.)
 
@@ -175,6 +175,7 @@ off in place), and **Note** (the first lines of your latest note, or one you pic
 | Timers & Shelf | **5 × 1**: timers, Pomodoro, Shelf; 2 × 1: the timers; 3 × 1: and Pomodoro; 4 × 1 and 6 × 1: and Shelf |
 | Weather | **1 × 1**: symbol, temperature, place; 2 × 1: and the condition; 3 × 1: and the high and low; 6 × 1: now and the next five hours; 3 × 2: now and five days |
 | Battery | **1 × 1**: percent; 2 × 1: and whether it is charging |
+| System (off until the System feature is on) | **2 × 1**: CPU and memory; 1 × 1: CPU; 3 × 1: and the battery (or how hot the Mac is on one without); 3 × 2: each on its own row with a bar, and the thermal state in words. Read every 2 seconds only while Home is showing. Red appears only for memory pressure that is critical, the Mac running hot, or a battery at 20% or less that isn't charging |
 | Reminders | **3 × 1**: two, with due text; 2 × 1: two, titles only; 3 × 2 and 6 × 2: four |
 | Note | **3 × 1**: the title and two lines; 2 × 1: one line; 3 × 2 and 6 × 2: up to six |
 | Your own | **2 × 1**: glyph beside the value; 1 × 1: glyph over the value; 3 × 1 (a button has 1 × 1 and 2 × 1) |

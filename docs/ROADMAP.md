@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (829 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` ( tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -526,6 +526,10 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
+
+**System card (S)** *(written, not run)*
+- [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
+- [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget
 
 **Calendar countdowns (K2)** *(written, not run)*
 - [ ] Right-click a meeting 50 minutes away in Up Next or Today, Add Countdown: the orange calendar glyph and m:ss show beside the notch at once, pair with music, show the title and Join in the peek, and are gone when the meeting starts

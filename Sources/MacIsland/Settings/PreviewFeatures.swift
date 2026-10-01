@@ -78,12 +78,25 @@ enum PreviewFeatures {
             voice: VoiceRecorder(
                 transcriber: InertTranscriber(), notes: notes, shelf: shelf,
                 folder: scratch.directory.appendingPathComponent("Voice")),
-            widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher())
+            widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher()),
+            system: SystemModel(sampler: PreviewSystemSampler())
         )
     }
 }
 
 /// What the preview shows: a track, a forecast, a meeting.
+/// Fixed readings for the Settings preview, so it never reads the Mac.
+@MainActor
+final class PreviewSystemSampler: SystemSampling {
+    func start() {}
+    func stop() {}
+    func sample() -> SystemReading {
+        SystemReading(
+            cpu: 0.23, memoryUsed: 11 << 30, memoryTotal: 16 << 30, pressure: .normal, thermal: .nominal,
+            battery: (percent: 82, onAC: false))
+    }
+}
+
 enum PreviewSamples {
     /// The level the volume HUD shows in the preview.
     static let volume = VolumeLevel(fraction: 0.62, isMuted: false)

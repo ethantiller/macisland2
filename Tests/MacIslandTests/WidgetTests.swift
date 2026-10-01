@@ -159,7 +159,7 @@ struct HomeLayoutTests {
                         && (1...Theme.Metrics.homeMaxRows).contains($0.rows)
                 }, "\(widget)")
         }
-        #expect(BuiltInWidget.allCases.count == 8)
+        #expect(BuiltInWidget.allCases.count == 9)
     }
 
     @Test func aCustomWidgetHasSizesByItsKind() {
