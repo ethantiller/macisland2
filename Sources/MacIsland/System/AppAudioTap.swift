@@ -3,6 +3,7 @@ import CoreAudio
 import Foundation
 
 /// A running tap: one app's sound, taken out of the system mix and played again, at a level, on an output.
+@MainActor
 protocol AudioTap: AnyObject {
     /// Whether any sound has come through. A tap that is allowed hears the app; one that isn't hears silence.
     var heardSound: Bool { get }
@@ -92,7 +93,7 @@ final class TapState: @unchecked Sendable {
 final class CoreAudioTapper: AudioTapping {
     func start(processObjects: [AudioObjectID], outputUID: String?, level: Float) -> AudioTap? {
         guard !processObjects.isEmpty else { return nil }
-        let description = CATapDescription(stereoMixdownOfProcesses: processObjects.map { NSNumber(value: $0) })
+        let description = CATapDescription(stereoMixdownOfProcesses: processObjects)
         description.uuid = UUID()
         description.muteBehavior = .mutedWhenTapped
         description.isPrivate = true

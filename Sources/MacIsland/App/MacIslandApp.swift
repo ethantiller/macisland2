@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         music: { [weak self] on in on ? self?.features.nowPlaying.start() : self?.features.nowPlaying.stop() },
         screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() },
         agents: { [weak self] on in self?.applyAgents(on) },
-        mixer: { [weak self] on in self?.applyMixer(on) }))
+        mixer: { [weak self] on in self?.applyMixer(on) })
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
