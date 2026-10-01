@@ -75,7 +75,8 @@ extension Feature {
         case .agents: PreviewContext(presentation: .expanded, tab: .agents)
         case .mixer: PreviewContext(presentation: .expanded, tab: .media, showsMixer: true)
         case .chooseActivity: PreviewContext(presentation: .peek, twoActivities: true)
-        case .downloads, .notifications: nil
+        case .downloads: PreviewContext(presentation: .expanded, tab: .shelf, shelfMode: .downloads)
+        case .notifications: nil
         }
     }
 

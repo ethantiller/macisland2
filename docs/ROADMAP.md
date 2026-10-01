@@ -552,6 +552,10 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Choose the Activity on, a running timer and music: hover shows a row of chips in the peek; choosing Music puts the art on the leading side and the player in the peek; when the music stops the timer leads again, and with the feature off nothing changes
 - [ ] The peek does not jump under the pointer when an activity starts or ends
 
+**Downloads in the Shelf (G1)** *(written, not run)*
+- [ ] With Downloads on in Features, the Shelf's header has a third segment; a Safari download shows as arriving with a ring and then as a file, dragging it out copies it, Add to Shelf keeps it, and nothing in this mode can delete a file
+- [ ] With the mode hidden, no file-system source is open (`lsof -p $(pgrep -x MacIsland) | grep Downloads` shows nothing)
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget

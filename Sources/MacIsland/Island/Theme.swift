@@ -143,6 +143,8 @@ enum Theme {
         static let levelBarHeight: CGFloat = 4
         static let clipboardCardWidth: CGFloat = 108
         static let shelfChoiceWidth: CGFloat = 150
+        /// The Shelf's choice with Downloads in it as a third.
+        static let shelfChoiceWidthThree: CGFloat = 235
         /// The Shelf: a Files or Clipboard choice, and cards tall enough for a smart action.
         static let shelfHeight: CGFloat = 96
         /// A file's preview on the Shelf: as large as the row allows under the header, with its name below.

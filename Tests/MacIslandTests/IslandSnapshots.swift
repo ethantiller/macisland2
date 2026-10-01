@@ -270,6 +270,20 @@ struct IslandSnapshots {
         }
     }
 
+    /// The Shelf's Downloads mode (G1), over a folder of sample files.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderDownloads() {
+        let viewModel = makeViewModel()
+        _ = PreviewSamples.downloads(in: viewModel.downloads.folder)
+        defer { try? FileManager.default.removeItem(at: viewModel.downloads.folder) }
+        viewModel.settings.setOn(.downloads, true)
+        viewModel.downloads.reload()
+        viewModel.selectedTab = .shelf
+        viewModel.state = .expanded
+        viewModel.setShelfMode(.downloads)
+        render(viewModel, "05d-expanded-shelf-downloads")
+    }
+
     /// The peek's row of live activities (Choose the Activity): a timer and music, with the timer leading.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderChooseActivity() {

@@ -20,7 +20,7 @@ for name in \
     11-banner-airpods 12-banner-low-battery \
     03e-peek-idle-weather 03b-peek-media 03i-peek-choose-activity 03f-peek-timer-compact 03g-peek-pomodoro 03h-peek-stopwatch \
     04a-expanded-home 04a-expanded-home-calendar 04-expanded-media 04b-expanded-media-lyrics 04g-expanded-media-mixer 04h-expanded-media-mixer-needs-access \
-    04c-expanded-reminders 04e-right-tab 05-expanded-shelf-empty 06-expanded-timer 06b-expanded-pomodoro 06c-expanded-timer-setter 04f-home-preset-3-listening 04f-home-preset-5-dashboard 31-widget-sizes \
+    04c-expanded-reminders 04e-right-tab 05-expanded-shelf-empty 05d-expanded-shelf-downloads 06-expanded-timer 06b-expanded-pomodoro 06c-expanded-timer-setter 04f-home-preset-3-listening 04f-home-preset-5-dashboard 31-widget-sizes \
     07-expanded-stopwatch 08a-expanded-tools-more 08c-expanded-tools-eight 08d-expanded-notes \
     12b-banner-two-actions 14-compact-recording 14b-peek-voice \
     40-guide-01-welcome 40-guide-06-modules 40-guide-09-calendars 40-guide-19-finish 43-tour-03-shortcut; do

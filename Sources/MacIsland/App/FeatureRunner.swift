@@ -98,7 +98,9 @@ final class FeatureRunner {
         case .mixer:
             // Off, every tap is given back; on, it listens again (and taps nothing until something is adjusted and the access allows).
             mixer(on)
-        case .volumeHUD, .system, .downloads, .chooseActivity, .notifications:
+        case .downloads:
+            if !on { features.downloads.stop() }  // the folder is watched only while the mode shows
+        case .volumeHUD, .system, .chooseActivity, .notifications:
             break  // `volumeHUD` follows its own setting; the rest arrive with their packages
         }
         viewModel.leaveModuleThatIsOff()

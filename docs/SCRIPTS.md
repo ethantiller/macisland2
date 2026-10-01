@@ -292,7 +292,8 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | --- | --- |
 | `ShelfModel.swift` | The files on the Shelf (paths only, plus the folder MacIsland owns for results) and AirDrop |
 | `ShelfThumbnails.swift` | QuickLook thumbnails for Shelf files, cached in memory |
-| `ShelfView.swift` | The Files and Clipboard views, drop tiles, item and card views with their menus |
+| `DownloadsFolder.swift` | `DownloadItem`, `DownloadsScan` (newest twenty, arriving files), and `DownloadsFolder` (watched only while the mode shows) |
+| `ShelfView.swift` | The Files, Downloads, and Clipboard views, drop tiles, item and card views with their menus |
 | `ClipboardHistory.swift` | The pasteboard poller and the memory-only history (0, 10, 25, or 50 items) |
 | `ClipboardSearch.swift`, `ClipboardSearchField.swift`, `ClipboardPaste.swift` | The pure search (every word, ranges, segments), the header's search field and the command-key monitor, and the paste seam (`Pasting`, `LivePaster`) with the command-digit keys |
 | `SmartAction.swift` | Detects a lone link, address, or `#hex` color and names the action |
@@ -388,7 +389,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 56 files, about 13,500 lines, 938 tests. Swift Testing.
+`Tests/MacIslandTests/`: 57 files, about 13,600 lines, 946 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -420,6 +421,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
 | `MixerTests.swift` | The limiter on buffers, helper grouping, and the Mixer's rules with a stub list and stub taps |
+| `DownloadsTests.swift` | The newest twenty, arriving files, the mode and the feature, and watching only while shown |
 | `ChooseActivityTests.swift` | The chosen activity leading the pair and the peek, alerts first, the choice ending, and the peek's height |
 | `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |
 | `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |

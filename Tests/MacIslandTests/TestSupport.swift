@@ -68,7 +68,8 @@ enum TestSupport {
                 agents: AgentActivity(),
                 mixer: AppMixer(
                     settings: settings, listing: mixerApps ?? StubAppList(), tapper: mixerTaps ?? StubTapper(),
-                    defaults: defaults)
+                    defaults: defaults),
+                downloads: DownloadsFolder(folder: scratch.appendingPathComponent("Downloads"))
             ))
         viewModel.geometry = geometry
         return viewModel

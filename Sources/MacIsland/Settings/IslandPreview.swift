@@ -29,6 +29,8 @@ struct PreviewContext: Equatable {
     var showsMixer = false
     /// A timer runs beside the music, so the peek has two things to choose between.
     var twoActivities = false
+    /// The Shelf mode the Shelf tab opens on in the preview. Nil leaves it as it was.
+    var shelfMode: ShelfMode?
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
     var clockMode: ClockMode?
 }
@@ -152,6 +154,7 @@ final class IslandPreviewModel {
                 viewModel.selectedTab = context.tab
                 viewModel.showsMediaOutputs = context.showsMixer
                 if let mode = context.clockMode { viewModel.clockMode = mode }
+                if let mode = context.shelfMode { viewModel.shelfMode = mode }
                 viewModel.state = .expanded
             case .menuBar:
                 // The island keeps the state it had: it shrinks and slides away as it is, and comes back the same.

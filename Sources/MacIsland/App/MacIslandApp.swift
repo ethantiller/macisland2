@@ -64,7 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
             system: SystemModel(sampler: LiveSystemSampler()),
             agents: AgentActivity(),
-            mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper())
+            mixer: AppMixer(settings: settings, listing: CoreAudioAppList(), tapper: CoreAudioTapper()),
+            downloads: DownloadsFolder()
         )
     }
 

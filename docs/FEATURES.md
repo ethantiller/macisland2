@@ -225,7 +225,7 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 
 ![Shelf](images/05-expanded-shelf-empty.png)
 
-A **Files / Clipboard** choice. **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
+A **Files / Clipboard** choice (and **Downloads**, a third, while that feature is on; see below). **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
 from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab strip; pressing it again on the Shelf closes it.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
@@ -249,6 +249,10 @@ from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab str
     footnotes, text boxes, and tracked changes do not.
   - **Resize** is half size, or 1920 or 1280 px on the long edge (never larger than the original); **Compress** makes a JPEG at
     quality 0.7.
+- **Downloads** (off until it is switched on in Settings → Features; it uses the Downloads permission from the guide). The newest twenty items in your Downloads folder, most recent first, as the Shelf's tiles: a thumbnail, drag out to copy it, double-click to open, Space for Quick Look, and the file menu, with **Add to Shelf** in place of Remove (Downloads is the folder itself, so nothing here deletes anything). A file a browser is still writing (`.download`, `.crdownload`, `.part`) shows dimmed with a blue progress ring. **Open Downloads** is in the header. The folder is listed when the mode shows and watched only while it does.
+
+  ![Downloads](images/05d-expanded-shelf-downloads.png)
+
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An

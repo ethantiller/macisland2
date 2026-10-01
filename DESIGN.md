@@ -36,7 +36,7 @@ There are 7 modules, and an eighth, **Agents**, that is off until it is switched
 | --- | --- |
 | Home | A dashboard of widgets on a 6 by 3 grid: today (opens a month calendar), what is next, what is playing, the everyday tools, timers, Shelf |
 | Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics; the Mixer (a row per app, up to four before it scrolls) behind the same output button when it is on |
-| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
+| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Downloads (the newest twenty in the folder, when that feature is on; its tiles are the Shelf's, and `shelfChoiceWidthThree` makes room for the third segment) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
 | Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Clean Keyboard, Mirror, Record Screen |

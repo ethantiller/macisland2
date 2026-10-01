@@ -82,7 +82,8 @@ enum PreviewFeatures {
             widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher()),
             system: SystemModel(sampler: PreviewSystemSampler()),
             agents: PreviewSamples.agents(),
-            mixer: PreviewSamples.mixer(defaults: defaults)
+            mixer: PreviewSamples.mixer(defaults: defaults),
+            downloads: PreviewSamples.downloads(in: scratch.directory.appendingPathComponent("Downloads"))
         )
     }
 }
@@ -169,6 +170,22 @@ enum PreviewSamples {
             ],
         ]
         return (try? JSONSerialization.data(withJSONObject: root)) ?? Data()
+    }
+
+    /// A few files in a folder of the preview's own, one still arriving, so the Shelf's Downloads mode has something to draw.
+    @MainActor
+    static func downloads(in folder: URL) -> DownloadsFolder {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let now = Date()
+        for (index, name) in ["Invoice March.pdf", "Photo.jpg", "Archive.zip", "Notes.txt", "Report.pdf.download"].enumerated() {
+            let url = folder.appendingPathComponent(name)
+            FileManager.default.createFile(atPath: url.path, contents: Data("x".utf8))
+            try? FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(-Double(index) * 60)], ofItemAtPath: url.path)
+        }
+        let downloads = DownloadsFolder(folder: folder)
+        downloads.reload()
+        return downloads
     }
 
     /// Four apps and a level, with nothing behind them: no process list and no tap. Access reads as given, so the panel draws.

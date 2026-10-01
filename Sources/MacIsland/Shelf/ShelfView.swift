@@ -18,8 +18,14 @@ enum DropZone: Equatable {
 enum ShelfMode: String, CaseIterable, Identifiable {
     case files = "Files"
     case clipboard = "Clipboard"
+    case downloads = "Downloads"
 
     var id: Self { self }
+
+    /// The modes the header offers: Files, and the others only while their feature is on.
+    static func available(clipboard: Bool, downloads: Bool) -> [ShelfMode] {
+        [.files] + (clipboard ? [.clipboard] : []) + (downloads ? [.downloads] : [])
+    }
 }
 
 struct ShelfView: View {
@@ -29,6 +35,7 @@ struct ShelfView: View {
     private var shelf: ShelfModel { viewModel.shelf }
     private var clipboard: ClipboardHistory { viewModel.clipboard }
     @State private var commandKeys = CommandKeyMonitor()
+    private var downloads: DownloadsFolder { viewModel.downloads }
 
     /// The split drop target shows only while a file is actually being dragged, so a missed exit
     /// can never leave it covering the Shelf.
@@ -44,13 +51,21 @@ struct ShelfView: View {
                 viewModel.sweepShelf()
                 shelf.verify()
                 syncCommandKeys(showing: viewModel.isClipboardShowing)
+                syncDownloads(showing: viewModel.isDownloadsShowing)
             }
             // The search is for this visit, and ⌘ is listened to only while the clipboard shows.
             .onDisappear {
                 viewModel.clipboardQuery = ""
                 syncCommandKeys(showing: false)
+                syncDownloads(showing: false)
             }
             .onChange(of: viewModel.isClipboardShowing) { _, showing in syncCommandKeys(showing: showing) }
+            .onChange(of: viewModel.isDownloadsShowing) { _, showing in syncDownloads(showing: showing) }
+    }
+
+    /// The Downloads folder is listed and watched only while its mode shows.
+    private func syncDownloads(showing: Bool) {
+        if showing { downloads.start() } else { downloads.stop() }
     }
 
     private func syncCommandKeys(showing: Bool) {
@@ -93,10 +108,11 @@ struct ShelfView: View {
                     switch viewModel.shelfMode {
                     case .files: files
                     case .clipboard: clipboardList
+                    case .downloads: downloadsList
                     }
                 }
             }
-            .quickLookPreview(quickLook, in: shelf.items)
+            .quickLookPreview(quickLook, in: viewModel.shelfMode == .downloads ? viewModel.shownDownloadURLs : shelf.items)
         }
     }
 
@@ -107,11 +123,13 @@ struct ShelfView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            if viewModel.settings.isOn(.clipboard) {
-                SegmentedChoice(options: ShelfMode.allCases, selection: viewModel.shelfMode, title: \.rawValue) {
+            let modes = ShelfMode.available(
+                clipboard: viewModel.settings.isOn(.clipboard), downloads: viewModel.settings.isOn(.downloads))
+            if modes.count > 1 {
+                SegmentedChoice(options: modes, selection: viewModel.shelfMode, title: \.rawValue) {
                     viewModel.setShelfMode($0)
                 }
-                .frame(width: Theme.Metrics.shelfChoiceWidth)
+                .frame(width: modes.count > 2 ? Theme.Metrics.shelfChoiceWidthThree : Theme.Metrics.shelfChoiceWidth)
             }
             if viewModel.shelfMode == .clipboard, viewModel.settings.isOn(.clipboard), !clipboard.entries.isEmpty {
                 ClipboardSearchField(viewModel: viewModel)
@@ -129,6 +147,8 @@ struct ShelfView: View {
                 ShelfTextButton(title: "Clear All", action: shelf.clear)
             case .clipboard where !clipboard.entries.isEmpty:
                 ShelfTextButton(title: "Clear All", action: clipboard.clear)
+            case .downloads:
+                ShelfTextButton(title: "Open Downloads") { NSWorkspace.shared.open(downloads.folder) }
             default:
                 EmptyView()
             }
@@ -143,6 +163,25 @@ struct ShelfView: View {
             ShelfRow {
                 ForEach(shelf.items, id: \.self) { url in
                     ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var downloadsList: some View {
+        if !downloads.canRead {
+            emptyState("MacIsland can\u{2019}t read Downloads. Allow it in Privacy.", systemImage: "lock")
+        } else if downloads.items.isEmpty {
+            emptyState("Nothing in Downloads yet", systemImage: "arrow.down.circle")
+        } else {
+            ShelfRow {
+                ForEach(downloads.items) { item in
+                    ShelfItemView(
+                        url: item.url, viewModel: viewModel, onRemove: {},
+                        source: .downloads(
+                            name: item.name, progress: item.isArriving
+                                ? (DownloadsScan.fraction(of: item, in: viewModel.transfers.transfers) ?? 0) : nil))
                 }
             }
         }
@@ -467,10 +506,29 @@ private struct ShelfResultStrip: View {
     }
 }
 
+/// Where a tile comes from: the Shelf, which keeps what was put there, or Downloads, which is the folder itself and is never emptied
+/// from here.
+enum ShelfItemSource: Equatable {
+    case shelf
+    /// `progress` is how far along an arriving file is (nil for a finished one).
+    case downloads(name: String, progress: Double?)
+}
+
 private struct ShelfItemView: View {
     let url: URL
     let viewModel: IslandViewModel
     let onRemove: () -> Void
+    var source: ShelfItemSource = .shelf
+
+    private var isShelf: Bool { source == .shelf }
+
+    private var displayName: String {
+        if case .downloads(let name, _) = source { name } else { url.lastPathComponent }
+    }
+
+    private var arrivingProgress: Double? {
+        if case .downloads(_, let progress) = source { progress } else { nil }
+    }
 
     @State private var isHovering = false
     @State private var thumbnail: NSImage?
@@ -496,7 +554,16 @@ private struct ShelfItemView: View {
             preview
                 .frame(width: Theme.Metrics.shelfThumbnail, height: Theme.Metrics.shelfThumbnail)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.nestedRadius, style: .continuous))
-            Text(url.lastPathComponent)
+                .overlay {
+                    // Still arriving: its progress, in the color of work in progress, over a dimmed icon.
+                    if let progress = arrivingProgress {
+                        ProgressRing(progress: progress, tint: Theme.Tint.working, lineWidth: 3)
+                            .frame(width: Theme.Metrics.shelfThumbnail / 2, height: Theme.Metrics.shelfThumbnail / 2)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .opacity(arrivingProgress == nil ? 1 : 0.6)
+            Text(displayName)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Palette.secondary)
                 .lineLimit(1)
@@ -504,7 +571,7 @@ private struct ShelfItemView: View {
         }
         .frame(width: 64)
         .overlay(alignment: .topTrailing) {
-            if isHovering {
+            if isHovering, isShelf {
                 ShelfRemoveButton(name: url.lastPathComponent, action: onRemove)
                     .offset(x: Theme.Metrics.shelfRemoveHit / 4, y: -Theme.Metrics.shelfRemoveHit / 4)
             }
@@ -558,13 +625,18 @@ private struct ShelfItemView: View {
             }
             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             Divider()
-            Button("Remove", action: onRemove)
+            if isShelf {
+                Button("Remove", action: onRemove)
+            } else {
+                Button("Add to Shelf") { viewModel.shelf.add([url]) }
+            }
         }
-        .help("\(url.lastPathComponent)\nDouble-click to open. Drag out to use it. Right-click for more.")
+        .help("\(displayName)\nDouble-click to open. Drag out to use it. Right-click for more.")
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(url.lastPathComponent)
+        .accessibilityLabel(displayName)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "Open") { NSWorkspace.shared.open(url) }
-        .accessibilityAction(named: "Remove", onRemove)
+        .accessibilityAction(named: "Add to Shelf") { if !isShelf { viewModel.shelf.add([url]) } }
+        .accessibilityAction(named: "Remove") { if isShelf { onRemove() } }
     }
 }

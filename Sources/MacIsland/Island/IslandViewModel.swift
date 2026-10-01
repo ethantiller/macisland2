@@ -180,6 +180,7 @@ struct IslandFeatures {
     let system: SystemModel
     let agents: AgentActivity
     let mixer: AppMixer
+    let downloads: DownloadsFolder
 }
 
 @MainActor
@@ -661,6 +662,7 @@ final class IslandViewModel {
     func leaveModuleThatIsOff() {
         // Without the Clipboard feature the Shelf has one mode.
         if shelfMode == .clipboard, !features.settings.isOn(.clipboard) { shelfMode = .files }
+        if shelfMode == .downloads, !features.settings.isOn(.downloads) { shelfMode = .files }
         if selectedTab != .home, !features.settings.isShown(selectedTab) { select(.home) }
     }
 
@@ -977,6 +979,7 @@ final class IslandViewModel {
 
     func setShelfMode(_ mode: ShelfMode) {
         guard mode != .clipboard || features.settings.isOn(.clipboard) else { return }
+        guard mode != .downloads || features.settings.isOn(.downloads) else { return }
         withAnimation(Theme.Motion.resize) { shelfMode = mode }
         features.settings.shelfMode = mode
     }
@@ -1013,8 +1016,8 @@ final class IslandViewModel {
 
     /// Space over a Shelf file. Returns `false` when there is nothing to preview, so the key passes on.
     func quickLookHoveredItem() -> Bool {
-        guard state == .expanded, selectedTab == .shelf, shelfMode == .files, let url = hoveredShelfItem,
-            features.shelf.items.contains(url)
+        guard state == .expanded, selectedTab == .shelf, let url = hoveredShelfItem,
+            shelfMode == .files ? features.shelf.items.contains(url) : shownDownloadURLs.contains(url)
         else { return false }
         showQuickLook(url)
         return true
@@ -1070,6 +1073,16 @@ final class IslandViewModel {
 
     /// The copies that match what is typed, newest first.
     var shownClipboardEntries: [ClipboardEntry] { features.clipboard.matches(clipboardQuery) }
+
+    /// The Shelf is open on its Downloads, which is the only time the folder is watched.
+    var isDownloadsShowing: Bool {
+        state == .expanded && selectedTab == .shelf && shelfMode == .downloads && features.settings.isOn(.downloads)
+    }
+
+    /// The files Quick Look can step through in Downloads.
+    var shownDownloadURLs: [URL] {
+        shelfMode == .downloads ? features.downloads.items.filter { !$0.isArriving }.map(\.url) : []
+    }
 
     /// The Shelf is open on its Clipboard, which is where the paste keys work.
     var isClipboardShowing: Bool {
