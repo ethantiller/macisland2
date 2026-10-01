@@ -650,7 +650,7 @@ struct FeatureCatalogTests {
         #expect(Feature.calendar.previewContext?.event == .meeting)
         #expect(Feature.weather.previewContext?.presentation == .peek)
         #expect(Feature.shelf.previewContext?.fileDrag == true)
-        #expect(!Feature.agents.isBuilt && !Feature.mixer.isBuilt)
+        #expect(!Feature.mixer.isBuilt)
     }
 
     @Test func anOffFeatureIsKeptApartFromItsSettings() {
@@ -698,7 +698,7 @@ struct FeatureCatalogTests {
         live.settings.setOn(.music, false)
         #expect(pane.selected == .home, "a module turned off elsewhere hands the selection to Home")
         let off = IslandModule.allCases.filter { $0.isAvailable && !live.settings.isShown($0) }
-        #expect(off == [.media])
+        #expect(Set(off) == [.media, .agents], "Agents is off by default")
         #expect(Feature.module(for: .media) == .music, "Open Features goes to the Music row")
         #expect(SettingsAnchor.feature(.music) == "features.music")
     }

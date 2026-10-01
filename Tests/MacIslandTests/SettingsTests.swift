@@ -27,10 +27,11 @@ struct SettingsTests {
         #expect(settings.tabs.count >= 1)
         #expect(settings.tabs.count <= Theme.Metrics.maxTabs + Theme.Metrics.maxRightTabs)
 
-        // Unavailable modules can't be added, and a full strip refuses another.
+        // A full strip (five left, one right) refuses another.
         let full = AppSettings(defaults: makeDefaults())
-        full.toggleTab(.agents)
-        #expect(full.tabs == IslandModule.defaultTabs)
+        full.toggleTab(.notes)
+        full.toggleTab(.shelf)
+        #expect(full.tabs == IslandModule.defaultTabs + [.notes])
         #expect(AppSettings.normalized([]) == IslandModule.defaultTabs)
     }
 

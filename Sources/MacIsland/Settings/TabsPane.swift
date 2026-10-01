@@ -79,8 +79,7 @@ struct TabsPane: View {
             } header: {
                 Text("Notes").id(SettingsAnchor.options)
             }
-        case .agents:
-            EmptyView()
+        case .agents: AgentsOptions(settings: settings)
         }
     }
 }
@@ -291,5 +290,38 @@ private struct MenuBarSection: View {
         .contentShape(Rectangle())
         .onTapGesture { preview?.showMenuBar(module) }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The AI Agents module's options: which agents are read, whether a working one shows beside the notch, and the shortest task that
+/// gets a notice.
+struct AgentsOptions: View {
+    let settings: AppSettings
+
+    var body: some View {
+        Section {
+            FeatureOffNote(settings: settings, feature: .agents)
+            ForEach(AgentKind.allCases) { agent in
+                Toggle(
+                    agent.rawValue,
+                    isOn: Binding(get: { settings.reads(agent) }, set: { settings.setReads(agent, $0) })
+                )
+                // At least one stays on.
+                .disabled(settings.reads(agent) && AgentKind.allCases.filter(settings.reads).count == 1)
+            }
+            Toggle("Show a Working Agent Beside the Notch", isOn: Bindable(settings).showsAgentCompact)
+            SettingsDropdown(
+                title: "Tell Me When a Task Finishes", selection: Bindable(settings).agentFinishMinimum,
+                options: AppSettings.agentMinimums.map { DropdownOption($0, Self.words($0)) })
+        } header: {
+            Text("AI Agents").id(SettingsAnchor.agents)
+        } footer: {
+            Text("Read from the logs Claude Code and Codex keep in your home folder. Nothing is sent.")
+        }
+    }
+
+    /// "After 30 seconds", "After 1 minute", "After 2 minutes".
+    static func words(_ seconds: Int) -> String {
+        seconds < 60 ? "After \(seconds) seconds" : (seconds == 60 ? "After 1 minute" : "After \(seconds / 60) minutes")
     }
 }

@@ -72,7 +72,8 @@ extension Feature {
         case .weather: PreviewContext(presentation: .peek)
         case .volumeHUD: PreviewContext(presentation: .banner, showsVolume: true)
         case .system: PreviewContext(presentation: .expanded, tab: .home)
-        case .agents, .mixer, .downloads, .chooseActivity, .notifications: nil
+        case .agents: PreviewContext(presentation: .expanded, tab: .agents)
+        case .mixer, .downloads, .chooseActivity, .notifications: nil
         }
     }
 

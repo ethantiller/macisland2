@@ -139,6 +139,8 @@ The full story, with state machines, data flow, and the lessons learned, is in
 
 ## Privacy and permissions
 
+When AI Agents is on, it reads the Claude Code and Codex logs in your home folder (nothing is sent).
+
 Nothing leaves the Mac except: the **city name** you type in Settings (to Open-Meteo, for weather), and the **track's
 name, artist, album, and length** (to lrclib.net, for synced lyrics; can be turned off). Clipboard history stays in memory.
 Web searches open in your browser. **Widgets you make** can also send one HTTPS request to the address you type (a web

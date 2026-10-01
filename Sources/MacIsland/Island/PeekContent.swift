@@ -13,6 +13,8 @@ struct PeekContent: View {
                     isPeek: true)
             case .timer, .pomodoro, .stopwatch:
                 ClockPeekView(viewModel: viewModel)
+            case .agent:
+                AgentPeekView(agents: viewModel.agents)
             case .countdown(let event):
                 CountdownPeekView(event: event, agenda: viewModel.agenda)
             case .recording(.voice):

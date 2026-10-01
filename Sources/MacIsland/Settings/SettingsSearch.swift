@@ -23,6 +23,7 @@ enum SettingsAnchor {
     static let featurePresets = "features.presets"
     static let menuBar = "tabs.menubar"
     static let dueReminders = "tabs.reminders"
+    static let agents = "tabs.agents"
     static let options = "tabs.options"
     static let widgets = "home.widgets"
     static let layout = "home.layout"
@@ -42,6 +43,7 @@ enum SettingsAnchor {
     static let devices = "notifications.devices"
     static let yourDay = "notifications.day"
     static let storage = "notifications.storage"
+    static let agentNotices = "notifications.agents"
     static let leavesThisMac = "privacy.leaves"
     static let runs = "privacy.runs"
     static let access = "privacy.access"
@@ -193,6 +195,7 @@ enum SettingsSearch {
             .init(
                 pane: .tabs, title: "Sessions Before Long Break",
                 keywords: ["pomodoro", "cycle", "rounds", "focus", "four", "4"], anchor: SettingsAnchor.pomodoro, module: .clock),
+            // Agents (a module of Content, there once the feature is built)
             // Tools
             .init(
                 pane: .tabs, title: "Tools in the Row",
@@ -267,7 +270,7 @@ enum SettingsSearch {
                     "permissions", "calendar", "reminders", "camera", "microphone", "accessibility", "screen recording",
                     "bluetooth", "system settings",
                 ], anchor: SettingsAnchor.access),
-        ] + featureEntries + optionalAccessEntries
+        ] + featureEntries + optionalAccessEntries + agentEntries
 
     /// A row in the Features pane for each feature this build has.
     static var featureEntries: [SettingsSearchEntry] {
@@ -276,6 +279,25 @@ enum SettingsSearch {
                 pane: .features, title: $0.title, keywords: $0.keywords + ["feature", "turn off", "turn on", "switch"],
                 anchor: SettingsAnchor.feature($0))
         }
+    }
+
+    /// The options of the AI Agents module, in Content.
+    static var agentEntries: [SettingsSearchEntry] {
+        guard Feature.agents.isBuilt else { return [] }
+        return [
+            SettingsSearchEntry(
+                pane: .tabs, title: "Claude Code and Codex",
+                keywords: ["agents", "ai", "logs", "tasks", "working", "which"], anchor: SettingsAnchor.agents,
+                module: .agents),
+            SettingsSearchEntry(
+                pane: .tabs, title: "Show a Working Agent Beside the Notch",
+                keywords: ["agent", "sparkles", "compact", "claude", "codex"], anchor: SettingsAnchor.agents,
+                module: .agents),
+            SettingsSearchEntry(
+                pane: .tabs, title: "Tell Me When a Task Finishes",
+                keywords: ["agent", "done", "notice", "minimum", "minutes", "claude", "codex"],
+                anchor: SettingsAnchor.agents, module: .agents),
+        ]
     }
 
     /// The Privacy pane's Optional Access section is there once a feature that needs one is.

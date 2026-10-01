@@ -79,7 +79,8 @@ enum PreviewFeatures {
                 transcriber: InertTranscriber(), notes: notes, shelf: shelf,
                 folder: scratch.directory.appendingPathComponent("Voice")),
             widgets: CustomWidgetValues(fetcher: SampleWidgetFetcher()),
-            system: SystemModel(sampler: PreviewSystemSampler())
+            system: SystemModel(sampler: PreviewSystemSampler()),
+            agents: PreviewSamples.agents()
         )
     }
 }
@@ -166,6 +167,17 @@ enum PreviewSamples {
             ],
         ]
         return (try? JSONSerialization.data(withJSONObject: root)) ?? Data()
+    }
+
+    /// A task for the Agents module and the closed island.
+    @MainActor
+    static func agents() -> AgentActivity {
+        let activity = AgentActivity()
+        let started = Date().addingTimeInterval(-252)
+        activity.ingest(
+            AgentLogEvent(kind: .turnStarted, sessionID: "preview", cwd: "/Users/you/code/island", model: "claude-opus-4-5-20251101", date: started),
+            agent: .claudeCode, session: "preview", announces: false)
+        return activity
     }
 
     static func nextEvent() -> AgendaItem {

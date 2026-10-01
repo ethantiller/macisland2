@@ -59,7 +59,8 @@ enum TestSupport {
                     folder: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
                 ),
                 widgets: CustomWidgetValues(fetcher: StubWidgetFetcher()),
-                system: SystemModel(sampler: StubSystemSampler())
+                system: SystemModel(sampler: StubSystemSampler()),
+                agents: AgentActivity()
             ))
         viewModel.geometry = geometry
         return viewModel

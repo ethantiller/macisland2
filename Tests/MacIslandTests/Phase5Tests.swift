@@ -26,7 +26,6 @@ struct MenuBarAndWindowTests {
         #expect(settings.menuBarModules.isEmpty)
         settings.setInMenuBar(.media, true)
         settings.setInMenuBar(.media, true)
-        settings.setInMenuBar(.agents, true)
         #expect(settings.menuBarModules == [.media])
         #expect(AppSettings(defaults: defaults).isInMenuBar(.media))
         settings.setInMenuBar(.media, false)
@@ -49,7 +48,6 @@ struct MenuBarAndWindowTests {
         }
         watch()
         settings.setInMenuBar(.media, false)
-        settings.setInMenuBar(.agents, true)
         #expect(changes == 0)
         settings.setInMenuBar(.media, true)
         #expect(changes == 1)

@@ -42,6 +42,9 @@ struct PrivacyPane: View {
 
             Section {
                 row("Now Playing adapter", "/usr/bin/perl runs a bundled script that reads what is playing.")
+                if settings.isOn(.agents) {
+                    row("AI Agents", "Reads the Claude Code and Codex logs in your home folder. Nothing is sent.")
+                }
                 ForEach(shortcutWidgets) { widget in
                     if case .shortcut(let name, _) = widget.source {
                         row(

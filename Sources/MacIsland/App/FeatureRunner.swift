@@ -10,11 +10,13 @@ final class FeatureRunner {
     private let viewModel: IslandViewModel
     private let music: (Bool) -> Void
     private let screenshots: (Bool) -> Void
+    private let agents: (Bool) -> Void
 
     init(
         features: IslandFeatures, viewModel: IslandViewModel, music: @escaping (Bool) -> Void,
-        screenshots: @escaping (Bool) -> Void
+        screenshots: @escaping (Bool) -> Void, agents: @escaping (Bool) -> Void = { _ in }
     ) {
+        self.agents = agents
         self.features = features
         self.viewModel = viewModel
         self.music = music
@@ -51,6 +53,7 @@ final class FeatureRunner {
     /// At launch: starts only what is on, and prompts for nothing.
     func startAtLaunch() {
         if settings.isOn(.music) { music(true) }
+        if settings.isOn(.agents) { agents(true) }
         settings.syncHomeWidgets()
         viewModel.leaveModuleThatIsOff()
     }
@@ -84,7 +87,11 @@ final class FeatureRunner {
             }
         case .weather:
             features.weather.configure(city: Self.weatherCity(settings))
-        case .volumeHUD, .agents, .mixer, .system, .downloads, .chooseActivity, .notifications:
+        case .agents:
+            // Off, the stream is torn down and what was seen is forgotten; on (or the agents read changed), it starts again.
+            if !on { features.agents.reset() }
+            agents(on)
+        case .volumeHUD, .mixer, .system, .downloads, .chooseActivity, .notifications:
             break  // `volumeHUD` follows its own setting; the rest arrive with their packages
         }
         viewModel.leaveModuleThatIsOff()

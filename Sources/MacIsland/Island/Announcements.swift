@@ -7,6 +7,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
     case headphones, drive, hotspot, unlocked
     case meeting, reminderDue, rainSoon
     case download, lowDisk
+    case agentDone
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .rainSoon: "Rain Soon"
         case .download: "Downloads"
         case .lowDisk: "Low Disk Space"
+        case .agentDone: "Task Finished"
         }
     }
 
@@ -32,6 +34,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case devices = "Devices"
         case day = "Your Day"
         case storage = "Storage"
+        case agents = "AI Agents"
 
         var id: String { rawValue }
     }
@@ -42,6 +45,7 @@ enum AmbientEvent: String, CaseIterable, Identifiable {
         case .headphones, .drive, .hotspot, .unlocked: .devices
         case .meeting, .reminderDue, .rainSoon: .day
         case .download, .lowDisk: .storage
+        case .agentDone: .agents
         }
     }
 }
@@ -56,6 +60,12 @@ enum Announcement {
 /// island does.
 @MainActor
 enum Announcements {
+    /// A task an agent worked on has finished: "Done 4:12", in green, with the module's sparkles.
+    static func agentDone(duration: TimeInterval) -> IslandAlert {
+        IslandAlert(
+            systemImage: "sparkles", tint: Theme.Tint.positive, text: "Done " + formatTime(duration), opensTab: .agents)
+    }
+
     static func charging(percent: Int) -> IslandAlert {
         IslandAlert(systemImage: "bolt.fill", tint: Theme.Tint.positive, text: "\(percent)%", isCharging: true)
     }
@@ -171,6 +181,7 @@ enum Announcements {
         case .rainSoon: .banner(rainSoon(start: Date().addingTimeInterval(20 * 60)))
         case .download: .alert(downloadSaved)
         case .lowDisk: .banner(lowDisk(free: 4_000_000_000).banner)
+        case .agentDone: .alert(agentDone(duration: 252))
         }
     }
 }

@@ -527,6 +527,11 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
 
+**AI Agents (A1)** *(written, not run; the Codex lines are unverified)*
+- [ ] With AI Agents on in Features, starting a Claude Code prompt shows the sparkles and a ticking time beside the notch within about a second; hover shows the project, agent, and model; a click opens Agents
+- [ ] A task of two minutes or more ends with the green "Done" notice; quitting Claude Code mid-task clears it with no notice; idle CPU with no agent running is unchanged
+- [ ] Codex: the same with a Codex task (**verify** the log lines on a Mac with Codex)
+
 **System card (S)** *(written, not run)*
 - [ ] Turn System on in Features, add the widget in Home (Add Widgets); the CPU figure moves with `yes > /dev/null` running and settles after
 - [ ] With Home closed, `ps -o cputime= -p $(pgrep -x MacIsland)` over 10 s matches the figure without the widget
@@ -566,7 +571,6 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 | --- | --- |
 | `ClipboardHistory` | Polls every 0.7 s while history is on (with the agenda's 30 s refresh, the only standing timers); **Off** in Settings → Shelf stops it |
 | `.swift-format` and `format.sh` | Never run over the codebase (~490 findings). Commit first, then format in its own commit |
-| `IslandModule.agents` | Reserved for the Agents idea |
 | Onboarding **Skip** | Temporary: delete `OnboardingModel.showsSkip` and what it guards (the Skip chip in `OnboardingView`, `OnboardingModel.skip()`) before release |
 | `Theme.Metrics.cardRadius` (10) vs `widgetRadius` (14) | Home uses 14; older cards and fields use 10. Unify later if it bothers |
 | No repo `LICENSE` | Only the vendored adapter's BSD-3 license is present |
@@ -592,8 +596,8 @@ Not planned, not promised.
 
 ### Agents module (unscheduled)
 
-The old plan for an eighth module. `IslandModule.agents` is reserved for it and `isAvailable` is false. Features: Developer API,
-Agent Activity, Agent Approvals, AI Usage Tracker (Claude Code, Codex), Shell Activity.
+**Built in part (A1):** the Agents module now reads the logs Claude Code and Codex keep in the home folder (see [FEATURES](FEATURES.md) and [ARCHITECTURE](ARCHITECTURE.md#ai-agents)): working agents beside the notch, a peek, the module's Now view, and a notice when a task finishes. It has no listener, no hooks, no approvals, and writes nothing to anyone's configuration. What follows is the rest of the old idea, which is not built: Developer API,
+Agent Approvals, and Shell Activity (usage is the planned A2).
 
 - **`Agents/LocalAPI.swift`.** An `NWListener` on **127.0.0.1** only, with a bearer token stored at
   `~/Library/Application Support/MacIsland/api-token` (create it 0600).

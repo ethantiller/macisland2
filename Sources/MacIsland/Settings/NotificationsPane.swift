@@ -17,7 +17,7 @@ struct NotificationsPane: View {
                     "While a Focus is on, banners and alerts wait. Anything that needs you still shows. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows."
                 )
             }
-            ForEach(AmbientEvent.Group.allCases) { group in
+            ForEach(AmbientEvent.Group.allCases.filter { $0 != .agents || settings.isOn(.agents) }) { group in
                 Section {
                     ForEach(AmbientEvent.allCases.filter { $0.group == group }) { event in
                         row(event)
@@ -43,6 +43,7 @@ struct NotificationsPane: View {
         case .devices: SettingsAnchor.devices
         case .day: SettingsAnchor.yourDay
         case .storage: SettingsAnchor.storage
+        case .agents: SettingsAnchor.agentNotices
         }
     }
 
@@ -56,6 +57,8 @@ struct NotificationsPane: View {
         case .reminderDue:
             if !settings.isOn(.reminders) { return "Turn on Reminders in Features." }
             return settings.showsReminders ? nil : "Turn on Due Reminders in Home."
+        case .agentDone:
+            return settings.isOn(.agents) ? nil : "Turn on AI Agents in Features."
         case .rainSoon:
             if !settings.isOn(.weather) { return "Turn on Weather in Features." }
             return settings.weatherCity.isEmpty ? "Set a city in Home." : nil

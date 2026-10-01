@@ -41,6 +41,10 @@ AirPlay on the right.
 Nothing live: the date, the weather (if a city is set), what is next (or this Mac's battery), your first four pinned tools,
 and `1m` / `5m` / `25m` timer chips.
 
+### AI Agents
+
+Off until it is switched on in Settings → Features. While Claude Code or Codex is working on a task, a sparkles glyph and the time it has run show beside the notch (just the glyph when something else is live too); hover shows up to two tasks with their project, agent, and model; a click opens the **Agents** module, which lists them or says "Nothing is running." Agents isn't one of the default tabs: put it in the strip in Settings → Content, or in the menu bar, or open it with `macisland://open?module=agents`. When a task ends well and ran at least the minimum you chose (Settings → Content → AI Agents: 30 seconds, 1, 2, or 5 minutes), a green "Done 4:12" notice flashes. It reads the logs Claude Code and Codex keep in your home folder, nothing is sent, and nothing is written. Those logs are undocumented and can change with a release.
+
 ### Timer, Pomodoro, and stopwatch peeks
 
 ![Timer peek](images/03f-peek-timer-compact.png)

@@ -9,8 +9,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     /// Modules that have a view. Settings offers only these.
     var isAvailable: Bool {
         switch self {
-        case .home, .media, .shelf, .clock, .reminders, .tools, .notes: true
-        case .agents: false
+        case .home, .media, .shelf, .clock, .reminders, .tools, .notes, .agents: true
         }
     }
 
@@ -143,6 +142,8 @@ enum CompactActivity: Equatable {
     /// An event about to start, in the hour before it does.
     case countdown(AgendaItem)
     case working(String)
+    /// An AI agent is working on a task.
+    case agent
     case transfer
     case media
     case none
@@ -177,6 +178,7 @@ struct IslandFeatures {
     let voice: VoiceRecorder
     let widgets: CustomWidgetValues
     let system: SystemModel
+    let agents: AgentActivity
 }
 
 @MainActor
@@ -295,6 +297,9 @@ final class IslandViewModel {
         if clockIsOn, features.stopwatch.isActive { list.append(.stopwatch) }
         if let event = activeCountdown { list.append(.countdown(event)) }
         if let job = features.work.current { list.append(.working(job.title)) }
+        if features.settings.isOn(.agents), features.settings.showsAgentCompact, !features.agents.liveTasks.isEmpty {
+            list.append(.agent)
+        }
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
         if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
             list.append(.media)
@@ -377,7 +382,7 @@ final class IslandViewModel {
         case .alert: return 64
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .countdown, .transfer: return 52
-        case .working, .recording: return 64
+        case .working, .recording, .agent: return 64
         case .media: return geometry.notchSize.height + 8
         }
     }
@@ -402,6 +407,7 @@ final class IslandViewModel {
         case .timer, .pomodoro, .stopwatch, .countdown: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)
         case .recording: Theme.Metrics.glanceHeight
+        case .agent: Theme.Metrics.glanceHeight
         default: Theme.Metrics.idlePeekHeight
         }
     }
@@ -451,7 +457,7 @@ final class IslandViewModel {
                     + (features.keepAwake.isOn ? Theme.Metrics.keepAwakeChipsHeight : 0)
         case .notes: Theme.Metrics.notesHeight
         case .reminders: Theme.Metrics.remindersHeight
-        case .agents: Theme.Metrics.glanceHeight
+        case .agents: Theme.Metrics.agentsHeight
         }
     }
 
@@ -799,6 +805,8 @@ final class IslandViewModel {
     func tapCompact() {
         if compactActivity == .recording(.screen), compactPair == nil {
             stopScreenRecording()
+        } else if compactActivity == .agent, compactPair == nil {
+            show(.agents)
         } else {
             open()
         }

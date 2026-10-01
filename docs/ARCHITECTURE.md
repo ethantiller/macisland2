@@ -433,6 +433,16 @@ if everything on it would leave, Today comes first. The gallery doesn't offer a 
 
 ---
 
+## AI Agents
+
+The Agents module (`Agents/`, `IslandModule.agents`, feature `agents`, off by default) reads only logs in the home folder, which no permission covers, and sends nothing. **Sources** (undocumented; parsed defensively, a line that doesn't decode is skipped): Claude Code `~/.claude/projects/<project>/<session>.jsonl` (and `~/.config/claude/projects`), where a `user` line that isn't meta or sidechain and has text starts a turn and an `assistant` line with a `stop_reason` of end_turn, stop_sequence, max_tokens, or refusal ends it (`isApiErrorMessage` ends it as a failure, `[Request interrupted by user` quietly); subagent logs under `<session>/subagents/` are the parent's activity. `~/.claude/sessions/<pid>.json` gives the process of a session, so a turn cut off by quitting ends quietly. Codex `~/.codex/sessions/**/*.jsonl`: `session_meta`, `turn_context`, and `event_msg` `task_started` then `task_complete` or `turn_aborted` (**verify** on a Mac with Codex). `AgentLogParser` (pure) turns a line into an `AgentLogEvent`; `AgentActivity` (pure state) keeps the open turns and tells `onFinish` when one ended well.
+
+**How it is read.** `AgentLogWatcher` (behind `AgentLogWatching`) is one FSEvents stream on the log folders: push, not a poll. A changed file is read from its last offset to its last newline off the main actor (`AgentLogTail`), and every file that exists when the stream starts begins at its end, so history is never read (A2 will). There is no repeating timer: while a turn is open, one task sleeps until the earliest turn would stop showing (ten minutes with no line; a later line shows it again). `FeatureRunner` starts the stream when AI Agents is on and tears it down, forgetting what it saw, when it is off.
+
+**On the island.** `CompactActivity.agent` ranks right after `working`: sparkles in `Tint.working` and the longest-running task's time (just the glyph in a pair); a click opens Agents. The peek is `AgentPeekView` (up to two tasks). `AgentsView` is the module (running tasks, or "Nothing is running."). A task that ends normally after the minimum (30 s, 1, 2, or 5 min, default 1) and within five minutes of now flashes `Announcements.agentDone` ("Done 4:12", green) as the `agentDone` event, in its own group in Notifications while the feature is on.
+
+---
+
 ## Floating surfaces
 
 `FloatingGlassPanel` is an `NSPanel` for a module torn off the island: resizable, moved by its background, no chrome, closed by its own button.

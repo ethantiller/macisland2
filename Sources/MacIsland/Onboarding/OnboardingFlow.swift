@@ -366,7 +366,7 @@ enum GuideCopy {
             case .tools: "Keep Awake, Ring Light, Mute Mic, Mirror, Record Screen, and more. Right-click one to pin it."
             case .shelf: "Files you drop and what you copied. Right-click a file to convert, zip, or share it."
             case .notes: "Notes, snippets, a Prompter, and voice notes turned into text on this Mac."
-            case .agents: ""
+            case .agents: "Shows when Claude Code or Codex is working, and tells you when a long task finishes."
             }
         var lines = [line]
         if !inTabs, let other = module.otherWayIn { lines.append(other) }

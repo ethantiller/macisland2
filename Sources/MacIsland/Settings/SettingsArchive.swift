@@ -24,6 +24,10 @@ struct SettingsArchive: Codable, Equatable {
     var showsReminders: Bool?
     var showsTimeLeft: Bool?
     var countsDownToEveryEvent: Bool?
+    var readsClaudeCode: Bool?
+    var readsCodex: Bool?
+    var showsAgentCompact: Bool?
+    var agentFinishMinimum: Int?
     var weatherCity: String?
     var dragTarget: String?
     var addsScreenshots: Bool?
@@ -76,6 +80,10 @@ struct SettingsArchive: Codable, Equatable {
         archive.showsReminders = settings.showsReminders
         archive.showsTimeLeft = settings.showsTimeLeft
         archive.countsDownToEveryEvent = settings.countsDownToEveryEvent
+        archive.readsClaudeCode = settings.readsClaudeCode
+        archive.readsCodex = settings.readsCodex
+        archive.showsAgentCompact = settings.showsAgentCompact
+        archive.agentFinishMinimum = settings.agentFinishMinimum
         archive.weatherCity = settings.weatherCity
         archive.dragTarget = settings.dragTarget.rawValue
         archive.addsScreenshots = settings.addsScreenshots
@@ -150,6 +158,15 @@ extension AppSettings {
         if let value = archive.showsReminders { showsReminders = value }
         if let value = archive.showsTimeLeft, value != showsTimeLeft { showsTimeLeft = value }
         if let value = archive.countsDownToEveryEvent { countsDownToEveryEvent = value }
+        // Both on first, so turning one off (below) is never refused for the other being off.
+        if archive.readsClaudeCode != nil || archive.readsCodex != nil {
+            setReads(.claudeCode, true)
+            setReads(.codex, true)
+            if archive.readsClaudeCode == false, archive.readsCodex != false { setReads(.claudeCode, false) }
+            if archive.readsCodex == false, archive.readsClaudeCode != false { setReads(.codex, false) }
+        }
+        if let value = archive.showsAgentCompact { showsAgentCompact = value }
+        if let value = archive.agentFinishMinimum, Self.agentMinimums.contains(value) { agentFinishMinimum = value }
         if let value = archive.weatherCity { weatherCity = value }
         if let value = archive.dragTarget.flatMap(DragTarget.init) { dragTarget = value }
         if let value = archive.addsScreenshots { addsScreenshots = value }

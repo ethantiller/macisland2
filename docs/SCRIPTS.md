@@ -234,6 +234,15 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `BoundedProcess.swift` | Runs one program with a time limit, an output cap, and a minimal environment |
 | `HomeLayoutEditing.swift` | The editor's pure edits: `inserting`, `placing`, `moving`, `resizing`, `removing`, `adding`, `applying` |
 
+### `Agents/`
+
+| File | Contains |
+| --- | --- |
+| `AgentLogParser.swift` | `AgentKind`, `AgentLogEvent`, and the pure parser for both tools' lines |
+| `AgentActivity.swift` | `AgentTask` and `AgentActivity`: open turns, the idle deadline, the finish notice |
+| `AgentLogWatcher.swift` | `AgentLogWatching`, the FSEvents watcher, `AgentLogTail` (a file's new whole lines), and where the logs are |
+| `AgentsView.swift` | The module's Now view, a task row, and the peek |
+
 ### `Home/`
 
 | File | Contains |
@@ -367,7 +376,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 52 files, about 10,900 lines, ** tests**. Swift Testing.
+`Tests/MacIslandTests/`: 53 files, about 10,900 lines, ** tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -398,6 +407,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
+| `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

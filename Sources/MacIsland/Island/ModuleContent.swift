@@ -32,7 +32,7 @@ struct ModuleContent: View {
         case .notes:
             NotesView(viewModel: viewModel)
         case .agents:
-            EmptyView()
+            AgentsView(viewModel: viewModel)
         }
     }
 }

@@ -226,6 +226,8 @@ enum Theme {
         static let keyCapRadius: CGFloat = 6
         /// The dot under a day in the month view that has an event.
         static let monthEventDot: CGFloat = 4
+        /// The Agents module's Now view: up to three running tasks.
+        static let agentsHeight: CGFloat = 96
         /// The Settings tour's callout: wide enough for the longest copy in four lines.
         static let tourCalloutWidth: CGFloat = 280
         /// The callout's arrow, and the space between the ring and the arrow's tip.

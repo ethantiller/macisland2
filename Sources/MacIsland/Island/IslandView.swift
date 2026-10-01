@@ -199,6 +199,8 @@ struct IslandView: View {
             Glyph(systemName: "calendar", tint: Theme.Tint.clock)
         case .working:
             WorkingGlyph()
+        case .agent:
+            Glyph(systemName: "sparkles", tint: Theme.Tint.working)
         case .transfer:
             TransferIcon(transfers: viewModel.transfers)
         case .media:
@@ -232,6 +234,8 @@ struct IslandView: View {
             Glyph(systemName: "calendar", tint: Theme.Tint.clock)
         case .working:
             WorkingGlyph()
+        case .agent:
+            Glyph(systemName: "sparkles", tint: Theme.Tint.working)
         case .transfer:
             TransferIcon(transfers: viewModel.transfers)
         case .media:
@@ -284,6 +288,10 @@ struct IslandView: View {
             CompactStopwatchText(stopwatch: viewModel.stopwatch)
         case .countdown(let event):
             CompactCountdownText(item: event, agenda: viewModel.agenda)
+        case .agent:
+            if let since = viewModel.agents.liveTasks.first?.startedAt {
+                ElapsedText(since: since, tint: Theme.Tint.working)
+            }
         case .working(let title):
             Text(title)
                 .font(Theme.Typography.compactNumeral)
@@ -491,7 +499,7 @@ private struct AppIcon: View {
     }
 }
 
-private struct ElapsedText: View {
+struct ElapsedText: View {
     let since: Date
     var tint: Color?
 

@@ -30,7 +30,7 @@ Glass never goes inside the island, and glass is never stacked on glass.
 Peek and a banner with buttons share a width of 380, so one becomes the other by changing height only; an alert banner (nothing to press) is narrower, 290.
 
 ### Modules and tabs
-There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/ROADMAP.md#ideas) for now.) The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and every module is reachable from its tab, the pencil, a drop, or a link. Settings open in a standard Settings window; the gear opens that window.
+There are 7 modules, and an eighth, **Agents**, that is off until it is switched on in Features: it is not a default tab (like Shelf and Notes, it opens from its compact activity, the menu bar, or a link) and shows beside the notch only while an agent works. The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and every module is reachable from its tab, the pencil, a drop, or a link. Settings open in a standard Settings window; the gear opens that window.
 
 | Module | Holds |
 | --- | --- |
@@ -59,7 +59,7 @@ Rules:
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, transfer, music. At most 2 activities show at once.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music. At most 2 activities show at once.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.

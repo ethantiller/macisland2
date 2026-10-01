@@ -62,7 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screenRecorder: ScreenRecorder(recorder: SCKScreenRecorder(), shelf: shelf),
             voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf),
             widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
-            system: SystemModel(sampler: LiveSystemSampler())
+            system: SystemModel(sampler: LiveSystemSampler()),
+            agents: AgentActivity()
         )
     }
 
@@ -72,10 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var featureRunner = FeatureRunner(
         features: features, viewModel: viewModel,
         music: { [weak self] on in on ? self?.features.nowPlaying.start() : self?.features.nowPlaying.stop() },
-        screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() })
+        screenshots: { [weak self] on in on ? self?.screenshotWatcher.start() : self?.screenshotWatcher.stop() },
+        agents: { [weak self] on in self?.applyAgents(on) }))
     private let batteryMonitor = BatteryMonitor()
     private let volumeMonitor = VolumeMonitor()
     private let screenshotWatcher = ScreenshotWatcher()
+    private let agentWatcher = AgentLogWatcher()
     private let accessoryMonitor = AudioAccessoryMonitor()
     private let bluetoothAccess = BluetoothAccess()
     private let diskSpace = DiskSpace()
@@ -217,6 +220,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         volumeMonitor.start()
         connectShelfChoices()
         connectFeatures()
+    }
+
+    /// Reads the agents' logs only while AI Agents is on: one FSEvents stream, torn down when it is off.
+    private func applyAgents(_ on: Bool) {
+        let features = features
+        agentWatcher.stop()
+        guard on else { return }
+        let settings = features.settings
+        features.agents.minimumDuration = { TimeInterval(settings.agentFinishMinimum) }
+        agentWatcher.onBatch = { batch in
+            guard settings.reads(batch.agent) else { return }
+            for event in batch.events {
+                features.agents.ingest(event, agent: batch.agent, session: batch.session)
+            }
+        }
+        agentWatcher.onProcesses = { features.agents.setProcesses($0) }
+        features.agents.onFinish = { [viewModel] _, duration in
+            viewModel.flash(Announcements.agentDone(duration: duration), event: .agentDone)
+        }
+        agentWatcher.start()
     }
 
     /// What a switch in the Features catalog does beyond what each feature's own setting already does.
@@ -703,6 +726,7 @@ struct ModuleMenuBars: Scene {
         menuBar(.reminders)
         menuBar(.tools)
         menuBar(.notes)
+        menuBar(.agents)
     }
 
     private func menuBar(_ module: IslandModule) -> some Scene {

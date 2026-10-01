@@ -190,6 +190,46 @@ final class AppSettings {
         didSet { defaults.set(countdowns.mapValues(\.timeIntervalSince1970), forKey: Key.countdowns) }
     }
 
+    // MARK: AI Agents
+
+    /// Which agents are read. At least one stays on.
+    private(set) var readsClaudeCode: Bool {
+        didSet { defaults.set(readsClaudeCode, forKey: Key.agentsClaude) }
+    }
+
+    private(set) var readsCodex: Bool {
+        didSet { defaults.set(readsCodex, forKey: Key.agentsCodex) }
+    }
+
+    /// Reads an agent's logs? Does nothing unless it changes something, and refuses to turn off the last one.
+    func setReads(_ agent: AgentKind, _ on: Bool) {
+        switch agent {
+        case .claudeCode:
+            guard readsClaudeCode != on, on || readsCodex else { return }
+            readsClaudeCode = on
+        case .codex:
+            guard readsCodex != on, on || readsClaudeCode else { return }
+            readsCodex = on
+        }
+        onFeatureChange?(.agents)
+    }
+
+    func reads(_ agent: AgentKind) -> Bool { agent == .claudeCode ? readsClaudeCode : readsCodex }
+
+    /// A working agent shows beside the notch while the island is closed.
+    var showsAgentCompact: Bool {
+        didSet { defaults.set(showsAgentCompact, forKey: Key.agentsCompact) }
+    }
+
+    /// The shortest task that gets a "Done" notice, in seconds.
+    static let agentMinimums = [30, 60, 120, 300]
+    var agentFinishMinimum: Int {
+        didSet {
+            if !Self.agentMinimums.contains(agentFinishMinimum) { agentFinishMinimum = 60; return }
+            defaults.set(agentFinishMinimum, forKey: Key.agentsMinimum)
+        }
+    }
+
     func hasCountdown(_ id: String) -> Bool { countdowns[id] != nil }
 
     /// Adds or removes a countdown. Does nothing unless it changes something.
@@ -414,6 +454,10 @@ final class AppSettings {
         static let hiddenCalendars = "agenda.hiddenCalendars"
         static let countdownAll = "agenda.countdownAll"
         static let countdowns = "agenda.countdowns"
+        static let agentsClaude = "agents.claude"
+        static let agentsCodex = "agents.codex"
+        static let agentsCompact = "agents.compact"
+        static let agentsMinimum = "agents.minimum"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
 
@@ -448,6 +492,14 @@ final class AppSettings {
         showsTimeLeft = defaults.bool(forKey: Key.timeLeft)
         hiddenCalendars = Set(defaults.stringArray(forKey: Key.hiddenCalendars) ?? [])
         countsDownToEveryEvent = defaults.bool(forKey: Key.countdownAll)
+        let storedClaude = defaults.object(forKey: Key.agentsClaude) as? Bool ?? true
+        let storedCodex = defaults.object(forKey: Key.agentsCodex) as? Bool ?? true
+        // At least one stays on: neither stored means a file edited by hand, and both are read.
+        readsClaudeCode = storedClaude || !storedCodex
+        readsCodex = storedCodex || !storedClaude
+        showsAgentCompact = defaults.object(forKey: Key.agentsCompact) as? Bool ?? true
+        let minimum = defaults.object(forKey: Key.agentsMinimum) as? Int ?? 60
+        agentFinishMinimum = Self.agentMinimums.contains(minimum) ? minimum : 60
         countdowns = (defaults.dictionary(forKey: Key.countdowns) as? [String: Double] ?? [:])
             .mapValues { Date(timeIntervalSince1970: $0) }
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
