@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -199,5 +200,38 @@ struct PlayerControlsTests {
         #expect(
             viewModel.mediaContentHeight(peek: false) - viewModel.mediaContentHeight(peek: true)
                 == Theme.Metrics.playerArtwork - Theme.Metrics.playerPeekArtwork + Theme.Metrics.playerTopInset)
+    }
+}
+
+@MainActor
+struct EqualizerTests {
+    @Test func barsBounceInCoreAnimationOnlyWhilePlaying() {
+        let view = EqualizerBarsView()
+        view.setFrameSize(NSSize(width: EqualizerMotion.width, height: EqualizerMotion.height))
+        view.configure(tint: .white, scale: 1, isMoving: true)
+        #expect(view.bars.allSatisfy { $0.animation(forKey: EqualizerBarsView.bounceKey) != nil })
+        // Pausing removes the loop, so nothing is left running; the bars settle to rest.
+        view.configure(tint: .white, scale: 1, isMoving: false)
+        #expect(view.bars.allSatisfy { $0.animation(forKey: EqualizerBarsView.bounceKey) == nil })
+        #expect(view.bars.map(\.bounds.height) == EqualizerMotion.restingHeights)
+    }
+
+    @Test func bounceLoopsWithoutASeam() {
+        let frames = EqualizerMotion.keyframes
+        #expect(frames.first == frames.last)
+        #expect(frames.min() == 4)
+        #expect(abs((frames.max() ?? 0) - 14) < 0.01)
+        // Each bar's height repeats after one period, so the loop matches the old timeline's motion.
+        for index in 0..<4 {
+            let later = 0.3 + EqualizerMotion.period(index)
+            #expect(abs(EqualizerMotion.height(index, at: 0.3) - EqualizerMotion.height(index, at: later)) < 0.001)
+        }
+    }
+
+    @Test func snapshotBarsAreHeldStill() {
+        let moving = (0..<4).map { EqualizerMotion.stillHeight($0, isMoving: true) }
+        #expect(moving == (0..<4).map { EqualizerMotion.stillHeight($0, isMoving: true) })
+        #expect(Set(moving).count == 4)
+        #expect((0..<4).map { EqualizerMotion.stillHeight($0, isMoving: false) } == EqualizerMotion.restingHeights)
     }
 }

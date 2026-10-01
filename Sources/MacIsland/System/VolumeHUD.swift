@@ -311,9 +311,9 @@ final class VolumeHUDController {
     @ObservationIgnored private let tap: MediaKeyTapping
     @ObservationIgnored private let volume: SystemVolume
 
-    init(tap: MediaKeyTapping = SystemMediaKeyTap(), volume: SystemVolume = CoreAudioVolume()) {
-        self.tap = tap
-        self.volume = volume
+    init(tap: MediaKeyTapping? = nil, volume: SystemVolume? = nil) {
+        self.tap = tap ?? SystemMediaKeyTap()
+        self.volume = volume ?? CoreAudioVolume()
     }
 
     /// Makes the tap. Safe to call again.

@@ -10,6 +10,8 @@ struct ToolItem: Identifiable {
     let systemImage: String
     var isOn = false
     var isAvailable = true
+    /// Keeps `isOn` current while the button is on screen, for a state with no change notification (Focus).
+    var watch: (() async -> Void)?
     let action: () -> Void
 }
 
@@ -58,7 +60,10 @@ struct ToolCatalog {
                 }
             }
         case .focus:
-            ToolItem(id: id, title: "Focus", systemImage: "moon.fill", isOn: viewModel.focus.isFocused) {
+            ToolItem(
+                id: id, title: "Focus", systemImage: "moon.fill", isOn: viewModel.focus.isFocused,
+                watch: { [focus = viewModel.focus] in await focus.watch() }
+            ) {
                 toggleFocus()
             }
         case .cleanKeyboard:

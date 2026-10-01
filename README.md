@@ -9,7 +9,7 @@ project). One borderless `NSPanel` hosts the whole island.
 ![The Home tab](docs/images/04a-expanded-home.png)
 
 > The pictures in these docs are renders of the real SwiftUI views (`./scripts/docs-images.sh`). They show layout, type, and
-> color, but not Liquid Glass, text fields, or scrolling lists, and the sound bars are frozen mid-rest. See
+> color, but not Liquid Glass, text fields, or scrolling lists, and the sound bars are held still. See
 > [Regenerating the pictures](docs/SCRIPTS.md#docs-imagessh).
 
 ## Contents
@@ -29,7 +29,7 @@ project). One borderless `NSPanel` hosts the whole island.
 Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
-./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
+./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start (the first build makes a signing identity)
 ./scripts/test.sh                                                     # 718 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```

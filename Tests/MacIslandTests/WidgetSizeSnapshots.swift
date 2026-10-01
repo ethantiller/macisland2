@@ -119,7 +119,7 @@ struct WidgetSizeSnapshots {
 
     private func write(_ content: some View, _ name: String, scale: CGFloat = 2) {
         guard let outputDirectory else { return }
-        let renderer = ImageRenderer(content: content)
+        let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = scale
         guard let image = renderer.nsImage,
             let tiff = image.tiffRepresentation,

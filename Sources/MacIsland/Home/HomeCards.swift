@@ -105,6 +105,7 @@ struct QuickToolButton: View {
         .buttonStyle(IslandButtonStyle())
         .disabled(!item.isAvailable)
         .opacity(item.isAvailable ? 1 : 0.4)
+        .task(id: item.id) { await item.watch?() }
         .onHover { isHovering = $0 }
         .help(item.title)
         .accessibilityLabel(item.title)

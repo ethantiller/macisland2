@@ -92,8 +92,8 @@ for tests, and `PreviewFeatures.make(live:scratch:)` is its twin for the Setting
 
 `ShelfModel` keeps when each file was added (`shelf.added`, by path; files from before it count from the first launch after) and
 `sweep(_:)` drops references older than the retention, run on launch and when the Shelf appears, never on a timer. The clipboard
-limit is `ClipboardHistory.setCapacity` (0, 10, 25, 50): 0 stops the 0.7 s poll and clears the history, the one standing timer the app
-had. Add New Screenshots off stops the Spotlight query (`ScreenshotWatcher.stop`), which is also what makes the first minute after
+limit is `ClipboardHistory.setCapacity` (0, 10, 25, 50): 0 stops the 0.7 s poll and clears the history. With the agenda's 30 s refresh it is
+one of the two standing timers; both have a tolerance so macOS can fire them with other wakeups. Add New Screenshots off stops the Spotlight query (`ScreenshotWatcher.stop`), which is also what makes the first minute after
 launch busier. `AppSettings.dragTarget` gates `setFileDragActive`, the drop delegate, and the drop tiles. Show Music Beside the Notch
 off makes `compactActivities` skip `.media`. The Shelf's last mode is stored (`shelfMode`); a drop always shows Files.
 
@@ -347,7 +347,8 @@ damped: never overshoots into the hardware), `resize` (changes inside an open is
 ease and removes the swell.
 
 The compact island's album art and sound bars share a `mediaNamespace` (`matchedGeometryEffect`) with the peek and the Media tab, so
-they travel to their new places when it opens.
+they travel to their new places when it opens. The bars bounce in Core Animation (`EqualizerBarsView`, a looping keyframe animation on
+each bar's height), so playing music costs the app nothing per frame; see the Idle CPU gotcha.
 
 ---
 
@@ -455,8 +456,11 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
 | Screen Recording | Record Screen | (system prompt via `CGRequestScreenCaptureAccess`; no key) |
 
-`LSUIElement` is true (no Dock icon). The app is **ad-hoc signed**, so each rebuild is a new identity to macOS and permissions ask
-again; `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
+`LSUIElement` is true (no Dock icon). The app is signed with a **self-signed "MacIsland Dev" certificate**, which the first build
+on a Mac makes (`scripts/sign.sh`, through `make-signing-cert.sh`), so its identity to macOS (bundle ID plus certificate) stays the
+same across rebuilds and permissions stick. When it can't be made or used, or with `MACISLAND_ADHOC=1`, the build is ad-hoc signed,
+its identity is its hash, and each rebuild asks again: System Settings keeps showing the old build's switch as on while the new
+build is refused (the symptom: "Accessibility Access Needed" with the switch already on). `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
 
 ### Network
 
@@ -480,7 +484,7 @@ Web searches are opened in your default browser. There is no analytics and no ac
 | `/usr/bin/shortcuts run NAME --output-path FILE` | A Shortcut widget's result: no input is passed in, a 30 s limit, 4 KB read |
 | **A file you chose** (`BoundedProcess`) | A command widget: run directly (no shell), no arguments, no input, a minimal environment (`PATH` and `LANG`), a 5 s limit (terminate, then kill), 4 KB of output. It runs as you, like Terminal. Picked with a file panel only; **never exported, imported, or started by `macisland://`**; listed in Settings â Privacy with Remove |
 
-MacIsland is ad-hoc signed and not App-Sandboxed, so a child process has your rights, and `sandbox-exec` is deprecated, so it is not
+MacIsland is not Developer ID signed and not App-Sandboxed, so a child process has your rights, and `sandbox-exec` is deprecated, so it is not
 used. The protection is that only you can create a command widget: nothing outside this Mac can add or trigger one.
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
 | `NSAppleScript` | Music and Spotify control |
@@ -502,7 +506,7 @@ bits 8 to 15 are 0xA), and consumes the event only when the controller says so. 
 is not locked (`isSuspended`), the island can show it (`canShow` → `IslandViewModel.canShowVolumeHUD`: folded, no banner, no alert that stays
 until seen), the default output can be set (`CoreAudioVolume.canSetVolume`), and the write succeeded; otherwise the key passes to the system and its
 HUD. `VolumeStep` is the math (16 steps, a quarter step with Option and Shift, mute toggles, a step unmutes). The HUD is an `IslandAlert` with a
-`volume` (`Announcements.volume`), drawn by `compactTrailing` as a `LevelBar` and the percent, in a compact side of `volumeHUDSide`; `flash` times it
+`volume` (`Announcements.volume`), drawn by `compactTrailing` as a `LevelBar` and the percent, with uneven sides (`volumeHUDLeading`, `volumeHUDTrailing`; `horizontalOffset` shifts the island and `hitRect`); `flash` times it
 out after `Timing.volumeHUD`, and `setHovering` holds it while the pointer is on it. The tap is turned back on after `tapDisabledByTimeout`; after
 `tapDisabledByUserInput` (what revoking Accessibility is expected to produce, unverified) the controller stops, the setting is turned off, and a banner
 says so. At launch and on becoming active it never asks for Accessibility; turning the setting on does, through `AccessCenter`, and leaves it off
@@ -637,8 +641,8 @@ Things that cost time. Read before changing the related code.
 | **Play/pause with two players** | The system's toggle goes to whatever macOS thinks is playing, which is a browser video once one starts. Music and Spotify are told directly by AppleScript. Browser tabs cannot be told apart. |
 | **Hover timing** | A "pointer left" step schedules a close 300 ms later; in tests and snapshots that can land mid-way. Set the state you need right before rendering. |
 | **ImageRenderer** | Draws a drop target as a yellow placeholder (turned off with `acceptsDrops: false` in snapshots), and skips Liquid Glass, text fields, and horizontal scroll views. Check those in the app. |
-| **Idle CPU** | Budget: about 0.1 to 0.3% with nothing live. `top`'s %CPU misleads; measure with `ps -o cputime= -p PID` over 10 s. No timers run while nothing is live, and samplers run only while their view is visible. The first minute after launch is busier (the Spotlight screenshot query gathers). |
-| **Permissions reset** | Ad-hoc signing means every rebuild forgets them. Expect prompts again. |
+| **Idle CPU** | Budget: about 0.1 to 0.3% with nothing live. `top`'s %CPU misleads; measure with `ps -o cputime= -p PID` over 10 s. No timers run while nothing is live, and samplers run only while their view is visible. The first minute after launch is busier (the Spotlight screenshot query gathers). **Nothing loops in SwiftUI:** a `TimelineView(.animation)` (or a repeating SwiftUI animation) runs on the main thread every frame, and one that changes a frame re-lays out the whole island; the sound bars did that at 120 Hz, about 10% CPU while music played (and once for ten minutes after a pause). Anything that moves on its own goes in Core Animation (`EqualizerBarsView`), which runs in the render server. Microphone use is heard through CoreAudio listeners and Focus is read when a decision needs it or while its button shows: neither polls. |
+| **Permissions reset** | An ad-hoc signed build is a new app to macOS, so it is refused even though System Settings shows the switch on. Builds sign as "MacIsland Dev" (the first build makes it), so they keep their permissions; if a build says it signed ad hoc, fix what it names and rebuild. |
 | **The dial's rectangle** | `timerDialRect` is computed from the layout, not measured (like `compactControlRect`). If `TimerSetter`'s rows change, change it too, or the dial stops taking scrolls. |
 | **Panel size** | `panelSize` must be at least the widest presentation (expanded is 520; the panel is 560). Its height is derived: `Theme.Metrics.panelHeight` (276) is built from `homeMaxRows`, so changing the row limit changes the panel. |
 | **Banners** | A banner with no actions is an alert (`IslandBanner.isAlert`): `bannerAlertWidth` wide, content centered with nothing but the glyph and text in its row (an empty actions row would still add spacing and push it off center). Low Battery offers no Low Power Mode button because `pmset` needs an administrator each time, and the Low Power and Lock Screen tools were removed for the same reason: nothing in the island may ask for a password. `RingedGlyph` is the charging bolt and the AirPods ring. |

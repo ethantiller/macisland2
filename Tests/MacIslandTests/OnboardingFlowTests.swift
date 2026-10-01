@@ -216,7 +216,8 @@ struct OnboardingModelTests {
     private final class Ends { var list: [GuideEnding] = [] }
     private final class Counter { var count = 0 }
 
-    private func makeRig(existing: Bool = false, replay: Bool = false, access: StubAccess = StubAccess()) -> Rig {
+    private func makeRig(existing: Bool = false, replay: Bool = false, access: StubAccess? = nil) -> Rig {
+        let access = access ?? StubAccess()
         let suite = "MacIslandOnboardingModel.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)

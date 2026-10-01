@@ -387,6 +387,9 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Hover swell, then peek at 120 ms; leaving closes without dipping into the notch
 - [ ] Two-finger swipes: down opens, up closes, left and right change tabs (direction follows your fingers)
 - [ ] The music art and sound bars **fly** into the peek and the Media tab instead of appearing
+- [ ] Sound bars (now Core Animation): they bounce smoothly beside the notch, in the peek, and in the Media tab; they grow in when
+      music starts and settle to rest when it pauses; they rest under Reduce Motion; idle CPU with music playing and the island
+      compact stays near 0.1 to 0.3% (`ps -o cputime= -p PID` over 10 s), and stays there after a pause
 - [ ] With a timer running, swipe from the Clock tab to any other tab: the big time leaves at once (it used to stay for a moment), the new tab blurs in, and the time shows beside the notch. If it still lingers, say so
 - [ ] Reduce Motion: no swell, everything eases; Reduce Transparency: the glass pill (no-notch display) turns opaque
 - [ ] Idle CPU (see [gotchas](ARCHITECTURE.md#gotchas-and-lessons)) settles near 0.1 to 0.3%
@@ -511,7 +514,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 | Item | Note |
 | --- | --- |
-| `ClipboardHistory` | Polls every 0.7 s while history is on, the one standing timer; **Off** in Settings → Shelf stops it |
+| `ClipboardHistory` | Polls every 0.7 s while history is on (with the agenda's 30 s refresh, the only standing timers); **Off** in Settings → Shelf stops it |
 | `.swift-format` and `format.sh` | Never run over the codebase (~490 findings). Commit first, then format in its own commit |
 | `IslandModule.agents` | Reserved for the Agents idea |
 | Onboarding **Skip** | Temporary: delete `OnboardingModel.showsSkip` and what it guards (the Skip chip in `OnboardingView`, `OnboardingModel.skip()`) before release |
@@ -524,8 +527,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 Not planned, not promised.
 
-- **Automatic updates** need Developer ID signing and a hosted feed (dropped for now). Signing would also stop permissions
-  resetting on each rebuild.
+- **Automatic updates** need Developer ID signing and a hosted feed (dropped for now). (Permissions no longer reset on each
+  rebuild: `make-signing-cert.sh` gives dev builds a stable signature.)
 - **An app icon** (the app has no Dock icon).
 - **Continuous integration**: `./scripts/test.sh` on a macOS runner.
 - **Per-display islands** (currently one, on the notched screen).

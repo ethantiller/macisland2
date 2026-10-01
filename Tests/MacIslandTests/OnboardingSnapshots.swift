@@ -20,7 +20,7 @@ struct OnboardingSnapshots {
 
     private func png<V: View>(_ view: V, _ name: String) {
         guard let outputDirectory else { return }
-        let renderer = ImageRenderer(content: view)
+        let renderer = ImageRenderer(content: view.environment(\.isSnapshot, true))
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
             let data = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
@@ -47,7 +47,8 @@ struct OnboardingSnapshots {
         let island: IslandViewModel
     }
 
-    private func makeGuide(access: StubAccess = StubAccess()) -> Guide {
+    private func makeGuide(access: StubAccess? = nil) -> Guide {
+        let access = access ?? StubAccess()
         let island = TestSupport.makeViewModel()
         let suite = "MacIslandSnapshots.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

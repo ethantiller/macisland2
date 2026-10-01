@@ -212,6 +212,8 @@ final class AgendaMonitor {
         let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
+        // Lets macOS fire it with other wakeups instead of on its own.
+        timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
         NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) {

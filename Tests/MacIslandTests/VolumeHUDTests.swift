@@ -242,7 +242,8 @@ struct VolumeHUDIslandTests {
         let plain = viewModel.size.width
         viewModel.showVolume(VolumeLevel(fraction: 0.4, isMuted: false))
         #expect(viewModel.alert?.volume?.fraction == 0.4)
-        #expect(viewModel.size.width == plain + 2 * (Theme.Metrics.volumeHUDSide - 64))
+        #expect(viewModel.size.width == plain + Theme.Metrics.volumeHUDLeading + Theme.Metrics.volumeHUDTrailing - 2 * 64)
+        #expect(viewModel.horizontalOffset == (Theme.Metrics.volumeHUDTrailing - Theme.Metrics.volumeHUDLeading) / 2)
     }
 
     @Test func itNeverTakesTheStageFromSomethingThatNeedsYouOrWhileOpen() {

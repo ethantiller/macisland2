@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds MacIsland and wraps the binary in build/MacIsland.app (ad-hoc signed).
+# Builds MacIsland and wraps the binary in build/MacIsland.app, signed as "MacIsland Dev" (sign.sh makes that identity on
+# the first build), so permissions survive rebuilds; ad hoc when it can't be made or used.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -25,5 +26,5 @@ done
 cp -R build/adapter/MediaRemoteAdapter.framework "$APP/Contents/Frameworks/"
 cp build/adapter/mediaremote-adapter.pl "$APP/Contents/Resources/"
 
-codesign --force --sign - "$APP" >/dev/null
+./scripts/sign.sh "$APP"
 echo "Built $APP"

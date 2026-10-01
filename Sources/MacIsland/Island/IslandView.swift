@@ -19,7 +19,8 @@ struct IslandView: View {
             presentation: viewModel.presentation,
             size: viewModel.size,
             surface: viewModel.geometry.hasNotch ? .hardware : .glass,
-            isSwelling: viewModel.isSwelling
+            isSwelling: viewModel.isSwelling,
+            horizontalOffset: viewModel.horizontalOffset
         ) {
             ZStack(alignment: .top) {
                 switch viewModel.presentation {

@@ -89,6 +89,7 @@ struct ToolControlButton: View {
         )
         .disabled(!tool.isAvailable)
         .opacity(tool.isAvailable ? 1 : 0.4)
+        .task(id: tool.id) { await tool.watch?() }
     }
 }
 

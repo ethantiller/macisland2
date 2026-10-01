@@ -32,7 +32,7 @@ enum HomeKey: Equatable {
 @Observable
 final class HomeEditor {
     /// The named coordinate space the canvas and the pane share.
-    static let space = "MacIslandHomeEditor"
+    nonisolated static let space = "MacIslandHomeEditor"
 
     let settings: AppSettings
 

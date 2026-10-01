@@ -19,6 +19,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Restart the built app | `make restart` |
 | Build and restart the app | `make build-and-restart` |
 | Build and restart the app | `make build-and-restart` |
+| Build signed ad hoc, leaving the keychain alone | `MACISLAND_ADHOC=1 make bundle` |
 | Build a release bundle | `./scripts/bundle.sh release` |
 | Run the tests | `./scripts/test.sh` |
 | Run some tests | `./scripts/test.sh --filter WidgetTests` |
@@ -59,10 +60,40 @@ Builds the app and wraps the binary in a bundle you can open.
 3. Recreates `build/MacIsland.app/Contents/{MacOS,Resources,Frameworks}`.
 4. Copies in the binary, `Support/Info.plist`, SwiftPM's resource bundle (into `Contents/Resources/`), the adapter framework (into
   `Frameworks/`), and `mediaremote-adapter.pl` (into `Resources/`).
-5. Ad-hoc signs the bundle (`codesign --sign -`).
+5. Signs the bundle with `sign.sh`: as "MacIsland Dev", which the first build on a Mac makes, or ad hoc (`codesign --sign -`) when
+  that identity can't be made or used.
 
-Output: `build/MacIsland.app`. Because signing is ad hoc, macOS treats each build as a new app and asks for permissions again.
+Output: `build/MacIsland.app`. Signed as "MacIsland Dev", its designated requirement is the bundle ID and that certificate, so
+Accessibility and the other permissions carry over from build to build. Ad hoc, the requirement is the build's hash: each build is a
+new app to macOS, and a permission switch that still shows on in System Settings belongs to an old build (remove the entry, or
+`tccutil reset Accessibility com.ethantiller.MacIsland`, and allow it again).
 Launch at Login only works from this bundle.
+
+### `sign.sh`
+
+```sh
+./scripts/sign.sh PATH...
+```
+
+Signs each path as "MacIsland Dev" (`signing-identity.sh` finds it). When there is none, it runs `make-signing-cert.sh` first, so
+the first build on a Mac sets signing up with nothing to do by hand. If the identity can't be made (no login keychain) or used (the
+keychain prompt was denied, or the keychain is locked, as over SSH), it says so and signs ad hoc: a build never fails over signing.
+`MACISLAND_ADHOC=1` signs ad hoc without looking at the keychain (CI, or to keep the certificate off a Mac). `bundle.sh` signs the
+app with it and `build-adapter.sh` the adapter framework.
+
+### `make-signing-cert.sh`
+
+Run by `sign.sh` on the first build; by hand only to make the identity ahead of time. Makes a self-signed code-signing
+certificate, "MacIsland Dev" (ten years, RSA 2048, code signing only), with macOS's own `/usr/bin/openssl` (a Homebrew OpenSSL 3
+writes PKCS#12 that `security import` can't read), and imports it and its key into the login keychain with `/usr/bin/codesign` allowed to use the key. Does nothing if it is
+already there. macOS lists it as untrusted (`CSSMERR_TP_NOT_TRUSTED`), which does not matter: codesign signs with it, and TCC matches
+on the certificate. After the first build signed with it, allow each permission once more; macOS may also ask once whether
+codesign may use the key (choose Always Allow). To undo: delete "MacIsland Dev" in Keychain Access, and build with
+`MACISLAND_ADHOC=1` so it isn't made again.
+
+### `signing-identity.sh`
+
+Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `sign.sh` uses it.
 
 ### `test.sh`
 
@@ -79,7 +110,7 @@ that folder.
 Compiles the vendored `mediaremote-adapter` (Objective-C) into `build/adapter/` without cmake:
 
 - `clang -dynamiclib` for arm64 and x86_64, macOS 14 minimum, linking Foundation, AppKit, and UniformTypeIdentifiers, into a real
-  `MediaRemoteAdapter.framework` (versioned folders, symlinks, an `Info.plist`, ad-hoc signed);
+  `MediaRemoteAdapter.framework` (versioned folders, symlinks, an `Info.plist`, signed like the app);
 - a small test client, `MediaRemoteAdapterTestClient`, for the perl script's `test` command;
 - copies `Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl` next to them.
 
@@ -93,7 +124,7 @@ states into `docs/images/`. Run it after a UI change so the docs still match the
 script; add a name there (and a state in `Tests/MacIslandTests/IslandSnapshots.swift`) to add a picture.
 
 The pictures are `ImageRenderer` output: exact layout, type, and color, but no Liquid Glass, text fields, or horizontal scroll
-views, and the sound bars are frozen at rest.
+views, and the sound bars are held still mid-bounce (`\.isSnapshot`: `ImageRenderer` can't draw their Core Animation layers).
 
 ### `lint.sh`
 
@@ -218,7 +249,8 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `NowPlayingModel.swift` | State, artwork, accent color, transport (direct to Music/Spotify, else the adapter), shuffle, repeat, Favorite, app volume |
 | `NowPlayingState.swift` | The state struct, `RepeatMode`, and the parser for the adapter's JSON lines |
 | `MediaRemoteAdapter.swift` | Runs the perl adapter: the `stream` process (restarted if it exits) and one-shot commands |
-| `NowPlayingView.swift` | The player layout, scrubber, volume, output picker, lyric line, `EqualizerView`, the compact play control, and the shared `mediaNamespace` |
+| `NowPlayingView.swift` | The player layout, scrubber, volume, output picker, lyric line, the compact play control, and the shared `mediaNamespace` |
+| `EqualizerView.swift` | The sound bars: a Core Animation loop (`EqualizerBarsView`), a still SwiftUI stand-in for snapshots, and `\.isSnapshot` |
 | `PlayerScripting.swift` | `ScriptablePlayer` (Music, Spotify), `PlayerCommand`, and AppleScript for volume, Favorite, transport, seek |
 | `Lyrics.swift` | LRC parsing and `LyricsModel` (LRCLIB lookup, per-track cache) |
 | `ArtworkAccent.swift` | Picks the most vivid color in the art and lifts it to read on black |
@@ -290,9 +322,9 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `System/VolumeMonitor.swift` | External drive mounts, and eject |
 | `System/VolumeHUD.swift` | The volume HUD: the keys' math, CoreAudio volume, the media-key event tap, and the controller |
 | `System/AudioAccessoryMonitor.swift` | Bluetooth headphones connecting, and their battery |
-| `System/PrivacyMonitor.swift` | Which app is using the microphone |
+| `System/PrivacyMonitor.swift` | Which app is using the microphone, from CoreAudio property listeners (no polling) |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
-| `System/FocusMode.swift` | Whether a Focus is on; switching through Shortcuts |
+| `System/FocusMode.swift` | Whether a Focus is on, read when needed or while the Focus button shows; switching through Shortcuts |
 | `System/DiskSpace.swift` | `DiskRule` (warn under 10 GB, re-arm above 15 GB) and `DiskSpace`, checked on events |
 | `System/BluetoothDevices.swift` | Paired audio devices, connecting, and `IOBluetoothProvider` behind `BluetoothDeviceProviding` |
 | `System/WorkTracker.swift` | The "in progress" job list |
@@ -407,4 +439,5 @@ These matter to the project but are **not** in git.
 | --- | --- |
 | `~/Library/Application Support/MacIsland/notes.json` | Your notes and snippets (the app's data) |
 | `~/Library/Preferences/com.ethantiller.MacIsland.plist` | Settings (UserDefaults) |
+| "MacIsland Dev" in the login keychain | The self-signed certificate and key builds are signed with (made by the first build: `sign.sh`, `make-signing-cert.sh`) |
 | `~/.claude/projects/-Users-ethantiller-git-mac-island/memory/` | Claude's saved notes about how you like to work (minimal Apple design; rebuild and relaunch after UI changes), the project status, and how you like plans written |

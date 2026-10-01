@@ -65,7 +65,7 @@ struct SettingsSnapshots {
         .padding(20)
         .frame(width: 640, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
-        let renderer = ImageRenderer(content: content)
+        let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
             let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
@@ -119,7 +119,7 @@ struct SettingsSnapshots {
         }
         .padding(24)
         .background(Color(nsColor: .windowBackgroundColor))
-        let renderer = ImageRenderer(content: content)
+        let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
             let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
@@ -148,7 +148,7 @@ struct SettingsSnapshots {
         let content = IslandPreview(model: preview, editor: editor)
             .frame(width: 640)
             .background(Color(nsColor: .windowBackgroundColor))
-        let renderer = ImageRenderer(content: content)
+        let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = 2
         guard let image = renderer.nsImage,
             let tiff = image.tiffRepresentation,

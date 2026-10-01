@@ -334,13 +334,26 @@ final class IslandViewModel {
         return (list[0], list[1])
     }
 
-    /// Width added on each side of the notch. Leading and trailing stay equal so the
-    /// two halves read as one piece.
+    /// Width added on each side of the notch. Equal on both sides, except for the volume HUD.
+    private var compactSideWidths: (leading: CGFloat, trailing: CGFloat) {
+        if presentation == .compact, case .alert(let alert) = compactActivity, alert.volume != nil, compactPair == nil {
+            return (Theme.Metrics.volumeHUDLeading, Theme.Metrics.volumeHUDTrailing)
+        }
+        return (compactSideWidth, compactSideWidth)
+    }
+
+    /// How far the island sits right of the notch's center, so uneven sides still hug the notch.
+    var horizontalOffset: CGFloat {
+        guard presentation == .compact, !showsDragTarget else { return 0 }
+        let sides = compactSideWidths
+        return (sides.trailing - sides.leading) / 2
+    }
+
     private var compactSideWidth: CGFloat {
         if compactPair != nil { return geometry.notchSize.height + 8 }
         switch compactActivity {
         case .banner, .none: return 0
-        case .alert(let alert): return alert.volume == nil ? 64 : Theme.Metrics.volumeHUDSide
+        case .alert: return 64
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .transfer: return 52
         case .working, .recording: return 64
@@ -426,7 +439,8 @@ final class IslandViewModel {
         case .compact:
             if isPillHidden { return .zero }
             var size = geometry.compactSize
-            size.width += 2 * compactSideWidth
+            let sides = compactSideWidths
+            size.width += sides.leading + sides.trailing
             size.height += 1
             if showsDragTarget {
                 size.width = max(size.width, geometry.compactSize.width + 2 * Theme.Metrics.dragTargetInset)
@@ -454,7 +468,7 @@ final class IslandViewModel {
     var hitSize: CGSize { isPillHidden ? geometry.compactSize : size }
 
     /// Area that counts as "over the island", in screen coordinates.
-    var hitRect: CGRect { geometry.islandRect(for: hitSize) }
+    var hitRect: CGRect { geometry.islandRect(for: hitSize).offsetBy(dx: horizontalOffset, dy: 0) }
 
     /// The timer is being set: the dial is on screen and takes horizontal scrolls.
     var isSettingTimer: Bool {
@@ -1098,7 +1112,7 @@ final class IslandViewModel {
     }
 
     /// While a Focus is on and the person asked for quiet, only alerts that stay until seen get through.
-    private var isQuiet: Bool { features.settings.quietDuringFocus && features.focus.isFocused }
+    private var isQuiet: Bool { features.settings.quietDuringFocus && features.focus.readNow() }
 
     /// `respectingFocus: false` is for feedback to something the person just did.
     func flash(

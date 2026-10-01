@@ -12,7 +12,8 @@ struct PermissionStepTests {
         let settings: AppSettings
     }
 
-    private func makeRig(access: StubAccess = StubAccess(), replay: Bool = false) -> Rig {
+    private func makeRig(access: StubAccess? = nil, replay: Bool = false) -> Rig {
+        let access = access ?? StubAccess()
         let suite = "MacIslandPermissionSteps.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)

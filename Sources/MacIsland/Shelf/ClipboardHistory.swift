@@ -62,6 +62,8 @@ final class ClipboardHistory {
         let timer = Timer(timeInterval: 0.7, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
+        // Lets macOS fire it with other wakeups instead of on its own.
+        timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
