@@ -52,6 +52,10 @@ final class AppSettings {
     @ObservationIgnored var onDisplayChange: (() -> Void)?
     @ObservationIgnored var onScreenshotsChange: (() -> Void)?
     @ObservationIgnored var onClipboardChange: (() -> Void)?
+    /// Hide in Full Screen was turned on or off.
+    @ObservationIgnored var onFullScreenSettingChange: (() -> Void)?
+    /// Show Media From changed.
+    @ObservationIgnored var onMediaSourceChange: (() -> Void)?
     /// Calendar or Reminders was turned on or off.
     @ObservationIgnored var onAgendaChange: (() -> Void)?
     /// Quiet in Focus was turned on or off.
@@ -85,6 +89,56 @@ final class AppSettings {
     /// swipe opens it. For accidental peeks while reaching for the menu bar, and for a tremor.
     var peeksOnHover: Bool {
         didSet { defaults.set(peeksOnHover, forKey: Key.peeksOnHover) }
+    }
+
+    /// How long the pointer rests before the peek opens. Matters only while Peek on Hover is on.
+    var peekDelay: PeekDelay {
+        didSet {
+            guard peekDelay != oldValue else { return }
+            defaults.set(peekDelay.rawValue, forKey: Key.peekDelay)
+        }
+    }
+
+    /// The closed island draws nothing until the pointer reaches it. A banner or an alert still shows: they are chosen in Notifications.
+    var hidesUntilPointer: Bool {
+        didSet {
+            guard hidesUntilPointer != oldValue else { return }
+            defaults.set(hidesUntilPointer, forKey: Key.hidesUntilPointer)
+        }
+    }
+
+    /// The closed island draws nothing while the app in front is full screen on its display; a click on the notch still opens it.
+    var hidesInFullScreen: Bool {
+        didSet {
+            guard hidesInFullScreen != oldValue else { return }
+            defaults.set(hidesInFullScreen, forKey: Key.hidesInFullScreen)
+            onFullScreenSettingChange?()
+        }
+    }
+
+    /// The page the island opens on from closed.
+    var openOn: OpenOn {
+        didSet {
+            guard openOn != oldValue else { return }
+            defaults.set(openOn.rawValue, forKey: Key.openOn)
+        }
+    }
+
+    /// Which player the island shows music from.
+    var mediaSource: MediaSource {
+        didSet {
+            guard mediaSource != oldValue else { return }
+            defaults.set(mediaSource.rawValue, forKey: Key.mediaSource)
+            onMediaSourceChange?()
+        }
+    }
+
+    /// Keep Awake's time left, beside the notch, while it is on with an end.
+    var showsKeepAwakeCompact: Bool {
+        didSet {
+            guard showsKeepAwakeCompact != oldValue else { return }
+            defaults.set(showsKeepAwakeCompact, forKey: Key.keepAwakeCompact)
+        }
     }
 
     /// A two-finger swipe over the island opens it, closes it, and changes tabs. The timer dial's own scrubbing works
@@ -499,6 +553,12 @@ final class AppSettings {
         static let agentsThreshold = "agents.limitThreshold"
         static let agentsLeft = "agents.limitsLeft"
         static let mixerLevels = "mixer.levels"
+        static let peekDelay = "peekDelay"
+        static let hidesUntilPointer = "hidesUntilPointer"
+        static let hidesInFullScreen = "hidesInFullScreen"
+        static let openOn = "openOn"
+        static let mediaSource = "media.source"
+        static let keepAwakeCompact = "keepAwake.compact"
         static let mixerOutputs = "mixer.outputs"
         static let hiddenByFeature = "home.hiddenByFeature"
     }
@@ -510,6 +570,12 @@ final class AppSettings {
         shelfShortcut = Self.storedShortcut(defaults, Key.shelfShortcut) ?? .shelfDefault
         peeksOnHover = defaults.object(forKey: Key.peeksOnHover) as? Bool ?? true
         swipesEnabled = defaults.object(forKey: Key.swipesEnabled) as? Bool ?? true
+        peekDelay = defaults.string(forKey: Key.peekDelay).flatMap(PeekDelay.init) ?? .short
+        hidesUntilPointer = defaults.bool(forKey: Key.hidesUntilPointer)
+        hidesInFullScreen = defaults.bool(forKey: Key.hidesInFullScreen)
+        openOn = defaults.string(forKey: Key.openOn).flatMap(OpenOn.init) ?? .lastTab
+        mediaSource = defaults.string(forKey: Key.mediaSource).flatMap(MediaSource.init) ?? .any
+        showsKeepAwakeCompact = defaults.bool(forKey: Key.keepAwakeCompact)
         islandDisplay = defaults.string(forKey: Key.islandDisplay).flatMap(IslandDisplay.init) ?? .builtIn
         dragTarget = defaults.string(forKey: Key.dragTarget).flatMap(DragTarget.init) ?? .shelfAndAirDrop
         addsScreenshots = defaults.object(forKey: Key.addsScreenshots) as? Bool ?? true

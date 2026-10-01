@@ -704,3 +704,20 @@ private struct TimerPeekDetails: View {
         }
     }
 }
+
+/// Keep Awake's time left beside the notch, updated once a minute while it shows. White: it is a state, not a clock being timed.
+struct CompactKeepAwakeText: View {
+    let keepAwake: KeepAwake
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            if let end = keepAwake.endsAt {
+                Text(KeepAwakeTime.text(remaining: end.timeIntervalSince(context.date)))
+                    .font(Theme.Typography.compactNumeral)
+                    .foregroundStyle(Theme.Palette.primary)
+                    .lineLimit(1)
+            }
+        }
+        .accessibilityLabel("Keep Awake")
+    }
+}

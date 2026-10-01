@@ -18,6 +18,15 @@ struct MediaOptions: View {
                 )
             }
             Section {
+                SettingsDropdown(
+                    title: "Show Media From", selection: Bindable(settings).mediaSource,
+                    options: DropdownOption.all(MediaSource.allCases, title: \.rawValue))
+            } footer: {
+                Text(
+                    "Music Apps Only ignores a video playing in a browser. macOS reports one player at a time, so this can\u{2019}t choose between two."
+                )
+            }
+            Section {
                 Toggle("Synced Lyrics", isOn: Bindable(settings).showsLyrics)
             } header: {
                 Text("Lyrics").id(SettingsAnchor.lyrics)

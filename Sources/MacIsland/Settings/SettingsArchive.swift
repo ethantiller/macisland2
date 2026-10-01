@@ -14,6 +14,12 @@ struct SettingsArchive: Codable, Equatable {
     var shelfShortcut: StoredShortcut?
     var peeksOnHover: Bool?
     var swipesEnabled: Bool?
+    var peekDelay: String?
+    var hidesUntilPointer: Bool?
+    var hidesInFullScreen: Bool?
+    var openOn: String?
+    var mediaSource: String?
+    var showsKeepAwakeCompact: Bool?
     var islandDisplay: String?
     var leftTabs: [String]?
     var rightTabs: [String]?
@@ -75,6 +81,12 @@ struct SettingsArchive: Codable, Equatable {
         archive.shelfShortcut = StoredShortcut(combo: settings.shelfShortcut)
         archive.peeksOnHover = settings.peeksOnHover
         archive.swipesEnabled = settings.swipesEnabled
+        archive.peekDelay = settings.peekDelay.rawValue
+        archive.hidesUntilPointer = settings.hidesUntilPointer
+        archive.hidesInFullScreen = settings.hidesInFullScreen
+        archive.openOn = settings.openOn.rawValue
+        archive.mediaSource = settings.mediaSource.rawValue
+        archive.showsKeepAwakeCompact = settings.showsKeepAwakeCompact
         archive.islandDisplay = settings.islandDisplay.rawValue
         archive.leftTabs = settings.leftTabs.map(\.rawValue)
         archive.rightTabs = settings.rightTabs.map(\.rawValue)
@@ -148,6 +160,12 @@ extension AppSettings {
         if let stored = archive.openShortcut { setShortcut(.open, stored.combo) }
         if let stored = archive.shelfShortcut { setShortcut(.shelf, stored.combo) }
         if let value = archive.peeksOnHover { peeksOnHover = value }
+        if let value = archive.peekDelay.flatMap(PeekDelay.init) { peekDelay = value }
+        if let value = archive.hidesUntilPointer { hidesUntilPointer = value }
+        if let value = archive.hidesInFullScreen { hidesInFullScreen = value }
+        if let value = archive.openOn.flatMap(OpenOn.init) { openOn = value }
+        if let value = archive.mediaSource.flatMap(MediaSource.init) { mediaSource = value }
+        if let value = archive.showsKeepAwakeCompact { showsKeepAwakeCompact = value }
         if let value = archive.swipesEnabled { swipesEnabled = value }
         if let value = archive.islandDisplay.flatMap(IslandDisplay.init) { islandDisplay = value }
 

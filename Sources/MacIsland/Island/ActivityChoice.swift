@@ -24,6 +24,7 @@ extension CompactActivity {
         case .agent: "agent"
         case .transfer: "transfer"
         case .media: "media"
+        case .keepAwake: "keepAwake"
         case .none: "none"
         }
     }
@@ -42,6 +43,7 @@ extension CompactActivity {
         case .agent: "Agents"
         case .transfer: "Download"
         case .media: "Music"
+        case .keepAwake: "Keep Awake"
         }
     }
 }

@@ -24,6 +24,11 @@ struct ToolsOptions: View {
                 )
             }
             Section {
+                Toggle("Show Keep Awake\u{2019}s Time Left Beside the Notch", isOn: Bindable(settings).showsKeepAwakeCompact)
+            } footer: {
+                Text("While Keep Awake is on with an end time. Indefinitely shows nothing here.")
+            }
+            Section {
                 ForEach(settings.shortcutTools) { tool in
                     HStack(spacing: 10) {
                         Label(tool.title, systemImage: tool.systemImage)

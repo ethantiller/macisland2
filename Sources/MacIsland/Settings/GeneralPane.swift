@@ -31,15 +31,25 @@ struct GeneralPane: View {
             Section {
                 Toggle("Peek on Hover", isOn: Bindable(settings).peeksOnHover)
                     .tourAnchor(.peekOnHover)
+                SettingsDropdown(
+                    title: "Peek After", selection: Bindable(settings).peekDelay,
+                    options: DropdownOption.all(PeekDelay.allCases, title: \.rawValue)
+                )
+                .disabled(!settings.peeksOnHover)
                 Toggle("Swipe to Open and Switch Tabs", isOn: Bindable(settings).swipesEnabled)
                 SettingsDropdown(
                     title: "Show the Island On", selection: Bindable(settings).islandDisplay,
                     options: DropdownOption.all(IslandDisplay.allCases, title: \.title))
+                Toggle("Hide the Island Until You Point at It", isOn: Bindable(settings).hidesUntilPointer)
+                Toggle("Hide in Full Screen", isOn: Bindable(settings).hidesInFullScreen)
+                SettingsDropdown(
+                    title: "Open On", selection: Bindable(settings).openOn,
+                    options: DropdownOption.all(OpenOn.allCases, title: \.rawValue))
             } header: {
                 Text("Input").id(SettingsAnchor.input)
             } footer: {
                 Text(
-                    "Off, hovering only swells the island, and a click or a swipe opens it. Swiping needs a trackpad or Magic Mouse. The timer dial scrolls either way."
+                    "Off, hovering only swells the island, and a click or a swipe opens it. Swiping needs a trackpad or Magic Mouse. The timer dial scrolls either way. Hidden, the island still opens when you point at the notch, and a banner or an alert still shows. Open On decides the page when the island opens from closed: the last one, Home, or the page of what is live."
                 )
             }
             Section {

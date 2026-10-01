@@ -78,6 +78,21 @@ enum SettingsSearch {
                 pane: .general, title: "Swipe to Open and Switch Tabs",
                 keywords: ["swipe", "trackpad", "gesture", "magic mouse", "scroll"], anchor: SettingsAnchor.input),
             .init(
+                pane: .general, title: "Peek After",
+                keywords: ["hover", "delay", "wait", "slow", "fast", "short", "medium", "long", "dwell"],
+                anchor: SettingsAnchor.input),
+            .init(
+                pane: .general, title: "Hide the Island Until You Point at It",
+                keywords: ["hide", "auto-hide", "top", "reach", "invisible", "pointer", "clean"],
+                anchor: SettingsAnchor.input),
+            .init(
+                pane: .general, title: "Hide in Full Screen",
+                keywords: ["video", "full screen", "fullscreen", "presentation", "keynote", "game", "hide"],
+                anchor: SettingsAnchor.input),
+            .init(
+                pane: .general, title: "Open On",
+                keywords: ["page", "tab", "home", "last", "live", "reopen", "start"], anchor: SettingsAnchor.input),
+            .init(
                 pane: .general, title: "Show the Island On",
                 keywords: ["display", "screen", "monitor", "external", "primary", "notch"], anchor: SettingsAnchor.input
             ),
@@ -176,6 +191,10 @@ enum SettingsSearch {
                 keywords: ["copy", "paste", "items", "pasteboard", "limit", "off"], anchor: SettingsAnchor.clipboard, module: .shelf),
             // Media
             .init(
+                pane: .tabs, title: "Show Media From",
+                keywords: ["player", "source", "browser", "music apps", "spotify", "safari", "video"],
+                anchor: SettingsAnchor.music, module: .media),
+            .init(
                 pane: .tabs, title: "Show Music Beside the Notch",
                 keywords: ["compact", "now playing", "collapsed", "art"],
                 anchor: SettingsAnchor.music, module: .media),
@@ -200,6 +219,10 @@ enum SettingsSearch {
             .init(
                 pane: .tabs, title: "Tools in the Row",
                 keywords: ["pin", "pinned", "4", "6", "8", "count", "how many"],
+                anchor: SettingsAnchor.toolsRow, module: .tools),
+            .init(
+                pane: .tabs, title: "Show Keep Awake\u{2019}s Time Left Beside the Notch",
+                keywords: ["caffeinate", "awake", "sleep", "timer", "compact", "remaining", "minutes"],
                 anchor: SettingsAnchor.toolsRow, module: .tools),
             .init(
                 pane: .tabs, title: "Shortcut Tools",

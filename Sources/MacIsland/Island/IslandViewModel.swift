@@ -146,6 +146,8 @@ enum CompactActivity: Equatable {
     case agent
     case transfer
     case media
+    /// Keep Awake, with the time it has left: a state, not a clock being timed, so it ranks last and stays white.
+    case keepAwake
     case none
 }
 
@@ -329,6 +331,11 @@ final class IslandViewModel {
         if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
             list.append(.media)
         }
+        if features.settings.isOn(.tools), features.settings.showsKeepAwakeCompact, features.keepAwake.isOn,
+            features.keepAwake.endsAt != nil
+        {
+            list.append(.keepAwake)
+        }
         return list
     }
 
@@ -408,7 +415,7 @@ final class IslandViewModel {
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .countdown, .transfer: return 52
         case .working, .recording, .agent: return 64
-        case .media: return geometry.notchSize.height + 8
+        case .media, .keepAwake: return geometry.notchSize.height + 8
         }
     }
 
@@ -422,8 +429,36 @@ final class IslandViewModel {
 
     /// A pill on a display without a notch has no hardware to hide behind, so it is not drawn
     /// while nothing is live. Its hover zone stays.
+    /// It is also not drawn while Hide in Full Screen has the front app on the whole display, nor, with Hide Until You Point at It, while
+    /// the pointer is away (a banner or an alert still shows).
     var isPillHidden: Bool {
-        !geometry.hasNotch && presentation == .compact && compactActivity == .none && !showsDragTarget
+        guard presentation == .compact, !showsDragTarget else { return false }
+        if !geometry.hasNotch, compactActivity == .none { return true }
+        if hidesForFullScreen { return true }
+        return features.settings.hidesUntilPointer && !isHovering && alert == nil
+    }
+
+    // MARK: Full screen
+
+    /// The app in front covers the whole island display. Set by the app while Hide in Full Screen is on.
+    private(set) var isFullScreen = false
+    /// An alert that stays until seen, held back while the display is full screen, shown when it ends.
+    private var waitingAlert: IslandAlert?
+
+    /// Whether the island is keeping out of the way of a full-screen app.
+    var hidesForFullScreen: Bool { isFullScreen && features.settings.hidesInFullScreen }
+
+    func setFullScreen(_ on: Bool) {
+        guard on != isFullScreen else { return }
+        isFullScreen = on
+        if on {
+            hoverTask?.cancel()
+            if isSwelling { isSwelling = false }
+            if state == .peek { state = .compact }
+        } else if let waiting = waitingAlert {
+            waitingAlert = nil
+            flash(waiting, respectingFocus: false)
+        }
     }
 
     /// Clock for a running timer or stopwatch, Now Playing for music, and the day at a glance when idle.
@@ -1125,18 +1160,28 @@ final class IslandViewModel {
         return true
     }
 
-    /// Esc takes back one thing before it closes the island: the clipboard search. True when it did.
+    /// Esc takes back one thing before it closes the island, innermost first: the clipboard search, the Mixer's panel, the Tools grid, a
+    /// day picked in the month, then the month. True when it did.
     func stepBack() -> Bool {
-        if calendarSelectedDay != nil {
-            calendarSelectedDay = nil
-            return true
-        }
         if !clipboardQuery.isEmpty {
             clipboardQuery = ""
             return true
         }
         if showsMediaOutputs, selectedTab == .media, isMixerOn, features.nowPlaying.state.hasMedia {
             withAnimation(Theme.Motion.resize) { showsMediaOutputs = false }
+            return true
+        }
+        // Mirror stays until Done, so the grid behind it is not a step.
+        if toolsExpanded, selectedTab == .tools, !features.mirror.isOn {
+            setToolsExpanded(false)
+            return true
+        }
+        if calendarSelectedDay != nil {
+            calendarSelectedDay = nil
+            return true
+        }
+        if calendarExpanded, selectedTab == .home {
+            setCalendarExpanded(false)
             return true
         }
         return false
@@ -1181,12 +1226,13 @@ final class IslandViewModel {
         if isPinnedOpen || isHeld { return }
 
         if hovering {
-            guard state == .compact else { return }
+            guard state == .compact, !hidesForFullScreen else { return }
             if !isPillHidden { withAnimation(Theme.Motion.track) { isSwelling = true } }
             // With Peek on Hover off, hovering only swells it: a click or a swipe opens it.
             guard features.settings.peeksOnHover else { return }
+            let dwell = features.settings.peekDelay.duration
             hoverTask = Task { [weak self] in
-                try? await Task.sleep(for: Theme.Timing.peekDwell)
+                try? await Task.sleep(for: dwell)
                 guard !Task.isCancelled, let self else { return }
                 if case .stopwatch = self.compactActivity { self.clockMode = .stopwatch }
                 if case .timer = self.compactActivity { self.clockMode = .timer }
@@ -1210,15 +1256,46 @@ final class IslandViewModel {
         self.alert = nil
     }
 
-    /// Click, swipe down, or the shortcut: the full island with tabs.
-    func open() {
+    /// Click, swipe down, or the shortcut: the full island with tabs. Opening from closed goes to the page Open On chose, unless the
+    /// caller already picked one; an alert's own page still wins.
+    func open(applyingOpenOn: Bool = true) {
         hoverTask?.cancel()
         bannerTask?.cancel()
         withAnimation(Theme.Motion.open) {
             isSwelling = false
             banner = nil
+            if applyingOpenOn, state != .expanded { applyOpenOn() }
             revealPendingAlert()
             state = .expanded
+        }
+    }
+
+    /// The page the island opens on from closed: the last one, Home, or the page of what is live.
+    private func applyOpenOn() {
+        switch features.settings.openOn {
+        case .lastTab:
+            return
+        case .home:
+            selectedTab = .home
+        case .live:
+            guard let module = Self.module(for: compactActivity), features.settings.isOn(.shelf) || module != .shelf,
+                module.isAvailable, Feature.module(for: module).map(features.settings.isOn) ?? true
+            else { return }
+            selectedTab = module
+            if module == .shelf, features.settings.isOn(.downloads) { shelfMode = .downloads }
+        }
+    }
+
+    /// Where an activity lives: a clock's is Clock, music's Media, a download's the Shelf, an agent's Agents, a countdown's Home. The
+    /// rest have no page of their own.
+    static func module(for activity: CompactActivity) -> IslandModule? {
+        switch activity {
+        case .timer, .pomodoro, .stopwatch: .clock
+        case .media: .media
+        case .transfer: .shelf
+        case .agent: .agents
+        case .countdown: .home
+        case .banner, .alert, .recording, .microphone, .working, .keepAwake, .none: nil
         }
     }
 
@@ -1247,7 +1324,7 @@ final class IslandViewModel {
         }
         selectedTab = .shelf
         isPinnedOpen = true
-        open()
+        open(applyingOpenOn: false)
     }
 
     /// Esc, the shortcut, a swipe up, or a click outside a pinned island. Mirror is the one thing that refuses: it stays until
@@ -1331,6 +1408,11 @@ final class IslandViewModel {
     ) {
         if let event, features.settings.isMuted(event) { return }
         if respectingFocus, isQuiet, !alert.staysUntilSeen { return }
+        // A full-screen app has the display: what passes is dropped, and what stays until seen waits for it to end.
+        if hidesForFullScreen {
+            if alert.staysUntilSeen { waitingAlert = alert }
+            return
+        }
         alertTask?.cancel()
         withAnimation(Theme.Motion.open) { self.alert = alert }
         guard !alert.staysUntilSeen else { return }
@@ -1368,6 +1450,7 @@ final class IslandViewModel {
         event: AmbientEvent? = nil
     ) {
         if let event, features.settings.isMuted(event) { return }
+        if hidesForFullScreen { return }
         if respectingFocus, isQuiet {
             if let followUp { flash(followUp) }
             return
