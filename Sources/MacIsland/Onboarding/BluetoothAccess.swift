@@ -10,7 +10,7 @@ final class BluetoothAccess: NSObject, CBCentralManagerDelegate {
     private var manager: CBCentralManager?
     private var waiting: [CheckedContinuation<Bool, Never>] = []
 
-    private static var isAllowed: Bool { CBManager.authorization == .allowedAlways }
+    static var isAllowed: Bool { CBManager.authorization == .allowedAlways }
 
     /// Whether access is allowed. Shows the system prompt only when it was never asked; a decided answer returns at once.
     func request() async -> Bool {

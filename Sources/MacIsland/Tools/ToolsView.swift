@@ -28,7 +28,10 @@ struct ToolsView: View {
                 }
             }
         }
-        .onAppear { viewModel.micMute.refresh() }
+        .onAppear {
+            viewModel.micMute.refresh()
+            viewModel.refreshInstalledShortcuts()
+        }
     }
 
     /// The pinned tools, then a chevron for the rest.
@@ -50,7 +53,7 @@ struct ToolsView: View {
     /// Every tool, with Less in the last free slot.
     private var grid: some View {
         LazyVGrid(columns: gridColumns, spacing: 10) {
-            ForEach(ToolID.allCases) { toolButton($0) }
+            ForEach(settings.allTools) { toolButton($0) }
             ControlButton(title: "Less", systemImage: "chevron.up") {
                 viewModel.setToolsExpanded(false)
             }
@@ -64,6 +67,11 @@ struct ToolsView: View {
                     Button(settings.isPinned(id) ? "Unpin from Row" : "Pin to Row") {
                         settings.togglePin(id)
                     }
+                }
+                if let shortcutID = id.shortcutID {
+                    Divider()
+                    Button("Edit Shortcut Tool\u{2026}") { viewModel.editShortcutTool(shortcutID) }
+                    Button("Remove Shortcut Tool", role: .destructive) { settings.removeShortcutTool(shortcutID) }
                 }
             }
     }
@@ -81,6 +89,7 @@ struct ToolControlButton: View {
         )
         .disabled(!tool.isAvailable)
         .opacity(tool.isAvailable ? 1 : 0.4)
+        .task(id: tool.id) { await tool.watch?() }
     }
 }
 
@@ -166,9 +175,15 @@ private struct KeepAwakeChips: View {
             .fixedSize()
             .accessibilityLabel("Keep Awake Until")
             Spacer(minLength: 0)
+            // What it doesn't do, in words: a shut lid can still sleep a Mac that isn't on power with a display.
+            Text("A shut lid can still sleep it")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Palette.secondary)
+                .lineLimit(1)
         }
         .frame(height: Theme.Metrics.hitTarget)
         .frame(maxHeight: .infinity, alignment: .bottom)
+        .help(KeepAwake.limits)
     }
 
     private var isUntil: Bool {

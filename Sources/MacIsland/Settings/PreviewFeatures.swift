@@ -26,7 +26,8 @@ enum PreviewFeatures {
     /// hold listeners that must not be created and dropped every time Settings opens.
     static func make(live: IslandFeatures, scratch: Scratch) -> IslandFeatures {
         let defaults = scratch.defaults
-        let shelf = ShelfModel(defaults: defaults)
+        let shelf = ShelfModel(
+            defaults: defaults, ownedFolder: scratch.directory.appendingPathComponent("Shelf Results"))
         let work = WorkTracker()
         let notes = NotesModel(directory: scratch.directory.appendingPathComponent("Notes"))
         let note = notes.addNote()
@@ -60,12 +61,13 @@ enum PreviewFeatures {
             agenda: agenda,
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            pomodoro: PomodoroModel(defaults: defaults),
+            pomodoro: PomodoroModel(defaults: defaults, plan: { live.settings.pomodoroPlan }),
             work: work,
             weather: weather,
             fileTools: FileTools(
                 shelf: shelf, work: work, recognizer: InertRecognizer(),
-                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+                pasteboard: NSPasteboard(name: NSPasteboard.Name(UUID().uuidString)),
+                stagingRoot: scratch.directory.appendingPathComponent("Staging")
             ),
             notes: notes,
             keyboardCleaner: KeyboardCleaner(),
@@ -82,6 +84,9 @@ enum PreviewFeatures {
 
 /// What the preview shows: a track, a forecast, a meeting.
 enum PreviewSamples {
+    /// The level the volume HUD shows in the preview.
+    static let volume = VolumeLevel(fraction: 0.62, isMuted: false)
+
     static func track() -> NowPlayingState {
         var state = NowPlayingState()
         state.title = "Midnight City"

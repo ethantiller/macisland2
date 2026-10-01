@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (630 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (724 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -35,7 +35,7 @@ app after UI changes before saying to look; the user reviews visually and iterat
   a widget grid with an editor and presets, custom widgets (Shortcut, web, folder, command), recorded shortcuts, per-event
   notifications, Shelf, Media, and Tools choices, and a settings file. Built 2026-09-30 and covered by tests; the hand-test lines
   for each are in the checklist below.
-- **First run:** a ten-step guide (floating glass in the middle of the screen, the real island as its stage, practice checks, Calendars, Reminders, and Bluetooth asked up front) and a fifteen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
+- **First run:** a guide (floating glass in the middle of the screen, the real island as its stage, practice checks, then one step per permission with Grant Permission and Not Now) and a seventeen-stop Settings tour, both replayable from Settings → General → Guide and by `macisland://guide` and `macisland://tour`. Built 2026-09-30 from [docs/plans/onboarding-plan.md](plans/onboarding-plan.md); **written without a Swift toolchain and not yet hand-tested** (see the First run group in the checklist).
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
@@ -68,11 +68,11 @@ Where the app ended up differently from what was first planned, and why. The des
 | `expandedWidth` stays 520; the right side gets one tab | Fits without widening |
 | Agents is an idea, not a module | The user moved to everyday features: see [Next](#next) and [Ideas](#ideas) |
 | **The first-run guide is floating glass, centered on the screen and draggable**, with the real island as its stage; the tour is a black callout with an accent ring | The island is too small, folds when the pointer leaves, and would block the practice steps. A standard window reads as a template. It first hung below the island; it is centered (asked for), and the open island covers its top while it is practised on |
-| **The guide asks for Calendars, Reminders, and Bluetooth** (Skip asks for all three); everything else is still asked on first use | Those power things that arrive on their own, so there is no first use to ask at. The rest send the person to System Settings, which is best next to the feature |
+| **The guide asks for each permission in turn** (ten steps, each optional; Skip asks for all of them), and **nothing asks at launch, on any install** | Those power things that arrive on their own, so there is no first use to ask at. The rest send the person to System Settings, which is best next to the feature |
 | **Existing installs skip both the guide and the tour**; closing the guide with ⊗ counts as seen | An updater knows the app; the state is written once because every clean quit writes `notes.json` |
 | Granting Calendars or Reminders in the guide also turns on its Up Next switch | The permission and the choice it serves are one step |
 | The guide does not teach the palette | It was removed on 2026-09-30 |
-| Launch-time Bluetooth and Downloads monitors wait for the guide on a fresh install | They can show system prompts over the guide. Checkpoint 0 (measuring which prompts appear at launch) was not done, so this is precautionary; if none appear, delete `OnboardingState.holdsLaunchPrompts` and what uses it |
+| Launch-time monitors with a permission start only once it is allowed or asked (`startPermittedMonitors`), on every install | Every rebuild resets permissions, so the prompts used to appear at launch on an existing install too. `OnboardingState.holdsLaunchPrompts` is no longer used by the launch and can be deleted |
 | AirDrop blue (`Tint.airDrop`) is an exception to "one meaning per color" | It marks the AirDrop target, beside `AirDropGlyph`, so it reads as AirDrop and not as storage |
 
 ---
@@ -98,11 +98,11 @@ packages in order, and tick each one when it lands (with its hand checks added t
 ### N1: Shelf and files
 
 **Goal:** everything you'd do to a file on the Shelf, on-device, run like Zip already runs: `FileTools.run`, the blue
-"working" activity, and the result added to the Shelf.
+"working" activity, and the result waiting for a choice (Add to Shelf, Replace, or Save to Folder), no longer added automatically.
 
 | Feature | Where | How |
 | --- | --- | --- |
-| Copy Text | File menu (images, PDFs) → **Copy Text**; Clipboard image card → **Copy Text** chip | Vision `RecognizeTextRequest` (`.accurate`, language correction, automatic language) plus `DetectBarcodesRequest` (QR payloads appended). For a PDF, try `PDFDocument.string` first and OCR only pages with no text, up to 10 pages. The text goes to the pasteboard, then `flash(IslandAlert("doc.on.clipboard.fill", .neutral, "Copied"))`; an empty result flashes "No Text Found" |
+| Copy Text | File menu (images, PDFs) → **Copy Text**; Clipboard image card → right-click → **Copy Text from Image** | Vision `RecognizeTextRequest` (`.accurate`, language correction, automatic language) plus `DetectBarcodesRequest` (QR payloads appended). For a PDF, try `PDFDocument.string` first and OCR only pages with no text, up to 10 pages. The text goes to the pasteboard, then `flash(IslandAlert("doc.on.clipboard.fill", .neutral, "Copied"))`; an empty result flashes "No Text Found" |
 | Quick Look | File menu → **Quick Look**; Space while an item is hovered | SwiftUI `.quickLookPreview($previewURL, in: shelf.items)` on `ShelfView`. The panel is non-activating, so check in the app that Quick Look takes the keyboard. If it doesn't, call `NSApp.activate()` first |
 | Share | File menu → **Share** | `ShareLink(items: [url])` inside the context menu (the system share submenu) |
 | Combine into PDF | `ShelfTextButton` next to **Zip All** when there are 2 or more images or PDFs | PDFKit: each image becomes a page, and PDFs append their pages. Output "Combined.pdf" |
@@ -128,7 +128,7 @@ The converters (all native Swift; `Convert To` never lists the format the file i
   - new `Shelf/Converters.swift`, holding `ConversionTarget`, which replaces `ImageFormat`, and `FileKind`;
   - new `Shelf/TextRecognizer.swift`;
   - `Shelf/FileTools.swift` (the new entry points);
-  - `Shelf/ShelfView.swift` (menus, the Combine button, the Space key, the Copy Text chip);
+  - `Shelf/ShelfView.swift` (menus, the Combine button, the Space key, the Copy Text from Image menu entry);
   - `Island/IslandPanel.swift` (Space).
 
 ```swift
@@ -371,7 +371,7 @@ struct IslandBanner { /* … */ var actions: [Action] = [] }                    
 | --- | --- |
 | Island on the lock screen | Private SkyLight API; still Dropped for good unless the user asks for a test build first |
 | Away summary on unlock, walk-away lock, meeting countdown, world clocks, music sleep timer | Not picked this round (walk-away lock would break the idle budget) |
-| Custom volume and brightness HUDs, camera-in-use pill | Dropped for good: the HUD can't be suppressed; macOS draws its own dots |
+| Custom brightness HUD, camera-in-use pill | Dropped for good: brightness has no public API (private DisplayServices; DDC is private on Apple silicon), and macOS draws its own dots. **The volume HUD is built** (Phase 6, below): the earlier reason, that the HUD can't be suppressed, was wrong, because taking the key with an event tap stops the system drawing it |
 | Hide desktop icons | Needs `defaults write com.apple.finder CreateDesktop` and relaunching Finder |
 | 20-20-20 eye breaks | Needs a standing timer while nothing is live |
 | Microsoft Graph calendar | See N4 |
@@ -387,13 +387,16 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Hover swell, then peek at 120 ms; leaving closes without dipping into the notch
 - [ ] Two-finger swipes: down opens, up closes, left and right change tabs (direction follows your fingers)
 - [ ] The music art and sound bars **fly** into the peek and the Media tab instead of appearing
+- [ ] Sound bars (now Core Animation): they bounce smoothly beside the notch, in the peek, and in the Media tab; they grow in when
+      music starts and settle to rest when it pauses; they rest under Reduce Motion; idle CPU with music playing and the island
+      compact stays near 0.1 to 0.3% (`ps -o cputime= -p PID` over 10 s), and stays there after a pause
 - [ ] With a timer running, swipe from the Clock tab to any other tab: the big time leaves at once (it used to stay for a moment), the new tab blurs in, and the time shows beside the notch. If it still lingers, say so
 - [ ] Reduce Motion: no swell, everything eases; Reduce Transparency: the glass pill (no-notch display) turns opaque
 - [ ] Idle CPU (see [gotchas](ARCHITECTURE.md#gotchas-and-lessons)) settles near 0.1 to 0.3%
 
 **Settings and tabs**
 - [ ] Shortcut: record a new open shortcut; a key another app owns says "In use by another app" and keeps the old one;
-      Delete turns one off. Peek on Hover off (hover swells, click opens), Swipe off (the dial still scrubs), Show the Island On with an external display
+      Delete turns one off. Open the Shelf: ⌃⌥S opens the island on the Shelf from another app (and from another tab), again closes it; recording ⌃⌥Space there says "Already used for Open the Island". Peek on Hover off (hover swells, click opens), Swipe off (the dial still scrubs), Show the Island On with an external display
 - [ ] Settings file: Export, then Import into a reset app restores everything; Reset All asks first; a file with a command widget adds none
 - [ ] Shelf choices: drag a file with each mode (Shelf and AirDrop, Shelf Only, AirDrop Only, Do Nothing); Add New Screenshots off; Remove Files after a day;
       Clipboard History Off stops recording; Show Music Beside the Notch off; the tool Row Order drags
@@ -420,17 +423,53 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Seven Modules: every chip shows its tab at 1:1. Drag a Finder file toward the notch: the drop step turns green. The menu bar step slides to the menu bar and comes back on Back
 - [ ] Access (after `tccutil reset Calendar`, `Reminders`, and `BluetoothAlways` for `com.ethantiller.MacIsland`): each Allow shows its prompt once, above the guide; Allowed and Off draw as specified; granting Calendars turns on Calendar Events in Settings → Home → Up Next. The step is left out when all three are allowed
 - [ ] On a fresh install, no Bluetooth or Downloads prompt appears before the guide; both work after it ends. Note any prompt that does appear at launch
+- [ ] The permission steps (written, not run): run `make bundle && make first-run` (quits the app, resets permissions, writes the fresh-install state, opens it); each of the ten steps shows its reason and **Not Now** and **Grant Permission**; nothing prompts until Grant is pressed; Not Now on all ten completes the guide; Grant shows Allowed (green) or Off with **Open System Settings**; Screen Recording shows what to do and **Reopen MacIsland**; Automation works with Music or Spotify open (and says to open one); a step for something already allowed is skipped
+- [ ] Nothing prompts at launch: after `make first-run`, then a later rebuild with `make build-and-restart` (which resets permissions), no system prompt appears until something is used or **Grant** is pressed in Settings → Privacy, with Calendar Events, Quiet in Focus, and a Shelf with files in Downloads all on. If one still appears, note which and what it was doing
 - [ ] Skip (temporary) on step 1 closes the guide and then shows the pending prompts one after another
 - [ ] Open at Login toggles (from the bundle); Open Settings closes the guide, opens Settings, and starts the tour
-- [ ] The tour: the ring follows the Shortcut row while scrolling General and while resizing the window from 830 × 600 to large (if it doesn't, use the fallback in ARCHITECTURE's gotchas); all 15 stops at the minimum size and a large size, in light and dark; clicking a pane in the sidebar mid-tour jumps; closing the window ends it and it doesn't come back; scrolling the target away docks the callout with Show Me; hiding the sidebar on stop 1 docks it too
+- [ ] The tour: the ring follows the Shortcut row while scrolling General and while resizing the window from 830 × 600 to large (if it doesn't, use the fallback in ARCHITECTURE's gotchas); all 16 stops at the minimum size and a large size, in light and dark; clicking a pane in the sidebar mid-tour jumps; closing the window ends it and it doesn't come back; scrolling the target away docks the callout with Show Me; hiding the sidebar on stop 1 docks it too
 - [ ] The tour never starts over the guide, or when Settings opens for Edit Home…; Return is Next except in a text field or while recording a shortcut
 - [ ] Replay: both buttons in Settings → General → Guide work, search finds "tour" and "onboarding", `open macisland://tour` opens Settings on the tour
 - [ ] Reduce Motion and Reduce Transparency with the guide and the tour open; idle CPU is back to 0.1 to 0.3% after both close
+
+**Keep Awake lid (written, not run)**
+- [ ] Turn Keep Awake on; `pmset -g assertions` lists two MacIsland assertions (display and system sleep); off releases both
+- [ ] The caption "A shut lid can still sleep it" shows beside the chips. Test on your Mac: on power with no external display, shut the lid for 30 s and open it: did it stay awake (`pmset -g log | tail`)? On battery? With an external display? Report the answers and I'll make the caption exact
+- [ ] Sleep the Mac and wake it: if macOS dropped the hold the tool is Off, never a stuck On
+
+**Volume HUD (written, not run)**
+- [ ] Settings → Notifications → Replace the Volume HUD: turning it on without Accessibility leaves it off, shows the prompt and a banner with **Open Settings**; after allowing it, turning it on again works; the preview shows the HUD
+- [ ] On: volume up, down, and mute change the volume and show a speaker, a thin bar, and the percent beside the notch for about 1.5 s; holding a key repeats; Option+Shift is a quarter step; muted or zero shows the slashed speaker in red; pointer on the HUD holds it
+- [ ] Off (or turning Accessibility off while it is on): the system HUD is back at once, and the setting turns itself off with a banner if access was taken away
+- [ ] With the island open, with an alert that needs you showing, with Clean Keys locked, and on an HDMI or DisplayPort output: the system handles the key and draws its own HUD
+- [ ] Idle CPU is unchanged with it on and off (`ps -o cputime= -p PID` over 10 s); nothing is asked at launch
+
+**Shortcut tools (written, not run)**
+- [ ] Settings → Tools → **Add Shortcut Tool…**: the list shows your Shortcuts, choosing one names the tool, the symbol preview and the sixteen buttons work, **Test** runs it, **Save** adds it; a third is refused with the button dimmed; Edit and Remove work
+- [ ] In the Tools tab it is in the grid, can be pinned to the row, and is in Quick Tools (6 by 2 shows it); pressing it shows the blue working activity, then a green *Done*; a Shortcut that fails shows a red banner; right-click → Edit or Remove works
+- [ ] Rename or delete the Shortcut in the Shortcuts app, reopen the Tools tab: the tool is dimmed and the banner offers **Edit Tool**
+- [ ] Export and Import carry the tools; Reset All removes them. The icon note: confirm you are happy to pick the symbol, or see docs/plans/shortcut-icons.md for what to check on a real Mac
+
+**The Shelf's files (written, not run)**
+- [ ] Previews: images, PDFs, movies, and documents show their own thumbnail (the icon until it arrives); a file with no preview keeps its icon; scrolling a long Shelf stays smooth and idle CPU is unchanged
+- [x] A file on the Shelf draws at all (fixed 2026-09-30: `containerRelativeFrame` sized the row to the panel and pushed it below the island's edge; `ShelfRow` now takes its height from a `GeometryReader`, checked in the app and by `ShelfRowTests`)
+- [ ] The row is centered under the header for one file and for many, and the empty state and the Clipboard row agree
+- [ ] The ✕ on a hovered file is a clean disc, easy to click, and labelled for VoiceOver; it never shows the gray glyph
+- [ ] Dragging out (*cause unconfirmed: my guess is that the NSURL provider let Finder move the file and that the double-click gesture delayed the drag*): drag a file to the Desktop, Finder, Mail, and a browser upload; the original stays where it was (copy, never move); the item stays on the Shelf; the island doesn't fold mid-drag and closes shortly after; the drop target doesn't get stuck. If it is still glitchy, replace `onDrag` with an AppKit `NSDraggingSource`
+- [ ] Zip, Convert To, Resize, Compress, Combine, Unzip: a strip with **Add to Shelf**, **Replace**, **Save to Folder…** and ✕ appears, with nothing written beside the original; each outcome works; Save to Folder opens the save panel and the island stays open behind it; cancelling the panel leaves the choice; folding the island first leaves it waiting and a green alert; quitting leaves no `MacIsland Results` in the temp folder
+- [ ] Removing or clearing a result added to the Shelf moves that file to the Trash; a file saved to a folder, or an original, is never touched
+
+**The island stays open (written, not run)**
+- [ ] Right-click a Shelf file and move into the menu, then into **Convert To** and **Resize**: the island stays open; when the menu closes with the pointer outside, it folds after a moment. The same for the clipboard card, the tab strip, Home's widget menu, the Tools pin menu, the Media output chip's menu, and Notes' Delete
+- [ ] Quick Look (Space, or the menu): clicking in its panel does not fold the island; closing it lets the island fold once the pointer is away
+- [ ] A menu open while Esc or ⌃⌥Space is pressed still closes the island (a hold never traps it)
+- [ ] Mirror on: the pointer leaving, a click outside, Esc, ⌃⌥Space, and a swipe up do nothing; tab swipes and ←/→ do nothing; **Done** turns it off and the island folds normally; a meeting banner's **Check Camera** works; a banner arriving while it is on waits as an alert; with Camera denied, nothing is held
 
 **Media**
 - [ ] Music playing, then a video: the play/pause button controls the **music**; first use asks for Automation permission
 - [ ] Shuffle, repeat, Favorite (Apple Music), app volume, and lyrics on a real track
 - [ ] The Automation prompt for Spotify
+- [ ] The peek and the Media tab size themselves to the song (written, not run): a track with no lyrics (or an instrumental) has no lyric row, 24 pt shorter than one with lyrics; the next track with lyrics grows the island when they arrive and the next without shrinks it again; hover peek and Media tab agree; Home's Music widget never shows the row. If there is still extra height, note which surface, which track, and whether the lyric row is blank (a line not yet started) or absent
 
 **Home, Clock, Reminders**
 - [ ] Reminder field: typing works in the panel (focus), Return saves, access prompt appears once
@@ -443,6 +482,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Widget sizes (Settings, Size in a widget's options): every widget at every size draws without clipping; Today 3 × 3 is the month; Music 3 × 2 plays, pauses, and scrubs; Quick Tools 6 × 1 and 6 × 2 run tools; Weather 6 × 1 and 3 × 2 show the forecast; a size that won't fit is dimmed; ⌘Z undoes a size change; the Listening and Dashboard presets open without clipping; idle CPU with Home closed is unchanged (`ps -o cputime= -p PID` over 10 s)
 - [ ] Weather from a real city; changing it updates after a pause in typing
 - [ ] Pomodoro chains and stops after the long break; the streak and chart update
+- [ ] Settings → Clock (written, not run): the preview shows the Clock tab on Pomodoro; changing Focus Length while idle changes the ring's time at once; changing it while a session runs leaves that session as it was and the next focus session takes it; Short Break, Long Break, and Sessions Before Long Break do the same ("n of m" and when the long break comes); quit and reopen keeps them; Export and Import carry them; Reset All Settings puts back 25, 5, 15, 4; search finds "pomodoro"; the tour stop "Set Your Pomodoro" rings Focus Length
 - [ ] The timer dial: a two-finger horizontal swipe over it scrubs (and coasts), the same swipe elsewhere changes tabs, swipe up
       over it closes, a mouse wheel steps a minute, a drag follows the pointer 1:1, a tap glides, the ruler stretches at 1 minute,
       and haptics tap at the ends; the same in a torn-off Clock window
@@ -456,7 +496,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] **Clean Keys**: asks for Accessibility, swallows keys for 30 s, the banner and status glyph, Unlock works
 - [ ] Keep Awake durations; Ring Light; Mute Mic; Focus with and without the shortcuts
 - [ ] Right-click a file: Quick Look opens and takes Space and Esc (Space while hovering also opens it); Share shows the system menu
-- [ ] Copy Text on a screenshot, a scanned PDF, and a QR code; a picture without text says *No Text Found*; a Clipboard image card has a **Copy Text** chip
+- [ ] Copy Text on a screenshot, a scanned PDF, and a QR code; a picture without text says *No Text Found*; a Clipboard image card has no chip over it, and its right-click menu has **Copy Text from Image** (written, not run); the Shelf file menu says *Copy Text from Image* for an image and *Copy Text from PDF* for a PDF
 - [ ] Convert To on a DOCX (to PDF), a Markdown file (to HTML), a PDF (to TXT and to PNG pages), a MOV (to MP4, M4A, GIF), and a WAV or MP3 (to M4A)
 - [ ] Resize and Compress an image; Combine into PDF appears with two or more images or PDFs
 - [ ] Right-click a text Clipboard card: Copy as Plain Text and Save as Snippet (the snippet appears in Notes)
@@ -480,7 +520,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 | Item | Note |
 | --- | --- |
-| `ClipboardHistory` | Polls every 0.7 s while history is on, the one standing timer; **Off** in Settings → Shelf stops it |
+| `ClipboardHistory` | Polls every 0.7 s while history is on (with the agenda's 30 s refresh, the only standing timers); **Off** in Settings → Shelf stops it |
 | `.swift-format` and `format.sh` | Never run over the codebase (~490 findings). Commit first, then format in its own commit |
 | `IslandModule.agents` | Reserved for the Agents idea |
 | Onboarding **Skip** | Temporary: delete `OnboardingModel.showsSkip` and what it guards (the Skip chip in `OnboardingView`, `OnboardingModel.skip()`) before release |
@@ -493,8 +533,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 Not planned, not promised.
 
-- **Automatic updates** need Developer ID signing and a hosted feed (dropped for now). Signing would also stop permissions
-  resetting on each rebuild.
+- **Automatic updates** need Developer ID signing and a hosted feed (dropped for now). (Permissions no longer reset on each
+  rebuild: `make-signing-cert.sh` gives dev builds a stable signature.)
 - **An app icon** (the app has no Dock icon).
 - **Continuous integration**: `./scripts/test.sh` on a macOS runner.
 - **Per-display islands** (currently one, on the notched screen).
@@ -503,6 +543,8 @@ Not planned, not promised.
 - **Microsoft Graph sign-in (MSAL)** for organizations that block Exchange sync. It needs an Azure app registration, often admin
   consent, and tokens in the Keychain. The new Outlook for Mac keeps its own store, which EventKit can't read.
 - Features already **dropped for good**, with the reasons, are [listed below](#dropped-for-good); check there before proposing one.
+
+> **Open questions for the owner (Phase 7, research only, nothing built):** Keep Awake with the lid shut ([plans/keep-awake-lid.md](plans/keep-awake-lid.md)) and Copilot approvals in VS Code ([plans/copilot-approvals.md](plans/copilot-approvals.md)). Each ends in a question.
 
 ### Agents module (unscheduled)
 
@@ -554,7 +596,7 @@ Considered during planning and ruled out, each for a concrete reason. Check here
 | Keyboard Backlight | Private CoreBrightness |
 | External Display Control | DDC/CI is private on Apple silicon |
 | Sound Mixer, EQ, Live Audio Spectrum | Audio process taps; breaks the idle budget |
-| System HUDs, Alt HUD Styles, Caps Lock HUD | The system HUD can't be suppressed |
+| Alt HUD Styles, Caps Lock HUD, a brightness HUD | Brightness: no public API. The system volume HUD **can** be replaced by taking the key (see [plans/volume-hud.md](plans/volume-hud.md) and Replace the Volume HUD in Settings → Notifications), so the old reason no longer stands for volume |
 | Keystroke HUD | Input Monitoring for a niche use |
 | Window Snapping | A separate product |
 | Menu Bar Icon Hiding | Fragile on macOS 26 and later |

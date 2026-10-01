@@ -36,6 +36,17 @@ struct ShelfView: View {
     }
 
     var body: some View {
+        content
+            // On the whole view, not on the files branch: the drop tiles leaving swaps branches, and the checks (which can show a
+            // folder prompt) must not run in the middle of a drop.
+            .onAppear {
+                viewModel.sweepShelf()
+                shelf.verify()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if let dropZone, Self.showsDropTiles(zone: dropZone, isFileDragActive: viewModel.isFileDragActive) {
             HStack(spacing: 8) {
                 switch viewModel.settings.dragTarget {
@@ -54,13 +65,22 @@ struct ShelfView: View {
         } else {
             VStack(spacing: 6) {
                 header
-                switch viewModel.shelfMode {
-                case .files: files
-                case .clipboard: clipboardList
+                // A result waiting for a choice takes the row, in either mode, until it is answered.
+                if let result = viewModel.fileTools.pending.first {
+                    ShelfResultStrip(
+                        result: result, more: viewModel.fileTools.pending.count - 1,
+                        onAdd: { viewModel.addResultToShelf(result) },
+                        onReplace: { viewModel.replaceWithResult(result) },
+                        onSave: { viewModel.saveResultToFolder(result) },
+                        onDiscard: { viewModel.discardResult(result) })
+                } else {
+                    switch viewModel.shelfMode {
+                    case .files: files
+                    case .clipboard: clipboardList
+                    }
                 }
             }
             .quickLookPreview(quickLook, in: shelf.items)
-            .onAppear { viewModel.sweepShelf() }
         }
     }
 
@@ -98,11 +118,9 @@ struct ShelfView: View {
         if shelf.items.isEmpty {
             emptyState("Drop files here to keep them handy", systemImage: "tray.and.arrow.down")
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(shelf.items, id: \.self) { url in
-                        ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
-                    }
+            ShelfRow {
+                ForEach(shelf.items, id: \.self) { url in
+                    ShelfItemView(url: url, viewModel: viewModel) { shelf.remove(url) }
                 }
             }
         }
@@ -113,19 +131,17 @@ struct ShelfView: View {
         if clipboard.entries.isEmpty {
             emptyState("Things you copy show up here", systemImage: "doc.on.clipboard")
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(clipboard.entries) { entry in
-                        ClipboardCard(
-                            entry: entry, onAction: viewModel.perform,
-                            onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
-                            onPlain: { viewModel.copyPlainText(entry) },
-                            onSnippet: { viewModel.saveAsSnippet(entry) }
-                        ) {
-                            viewModel.copyFromClipboardHistory(entry)
-                        } onRemove: {
-                            clipboard.remove(entry)
-                        }
+            ShelfRow {
+                ForEach(clipboard.entries) { entry in
+                    ClipboardCard(
+                        entry: entry, onAction: viewModel.perform,
+                        onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
+                        onPlain: { viewModel.copyPlainText(entry) },
+                        onSnippet: { viewModel.saveAsSnippet(entry) }
+                    ) {
+                        viewModel.copyFromClipboardHistory(entry)
+                    } onRemove: {
+                        clipboard.remove(entry)
                     }
                 }
             }
@@ -144,8 +160,24 @@ struct ShelfView: View {
     }
 }
 
+/// The Shelf's scrolling row of files or clipboard cards, as tall as the space under the header, so the items are centered in it
+/// whether there is one or many. The height comes from a `GeometryReader`: `containerRelativeFrame(.vertical)` on the row inside the
+/// horizontal `ScrollView` collapsed it to nothing in the app, so a dropped file never showed (`ShelfRowTests` checks for that).
+struct ShelfRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) { content }
+                    .frame(height: proxy.size.height)
+            }
+        }
+    }
+}
+
 /// A copied text or image. Click to copy it again, drag it out to use it. Text that is a link, an
-/// address, or a color adds one action along the bottom.
+/// address, or a color adds one action along the bottom. An image has nothing over it: reading its text is in the right-click menu.
 private struct ClipboardCard: View {
     let entry: ClipboardEntry
     let onAction: (SmartAction) -> Void
@@ -179,9 +211,13 @@ private struct ClipboardCard: View {
             .onHover { isHovering = $0 }
             .onDrag { provider }
             .contextMenu {
-                if case .text = entry.content {
+                switch entry.content {
+                case .text:
                     Button("Copy as Plain Text", action: onPlain)
                     Button("Save as Snippet", action: onSnippet)
+                    Divider()
+                case .image(let image):
+                    Button("Copy Text from Image") { onCopyText(image) }
                     Divider()
                 }
                 Button("Remove", action: onRemove)
@@ -192,9 +228,6 @@ private struct ClipboardCard: View {
 
             if let action {
                 ChipButton(title: action.title) { onAction(action) }
-                    .padding(6)
-            } else if case .image(let image) = entry.content {
-                ChipButton(title: "Copy Text") { onCopyText(image) }
                     .padding(6)
             }
         }
@@ -331,20 +364,94 @@ private struct ShelfTextButton: View {
     }
 }
 
+/// The ✕ on a hovered file: a disc in the island's own inks (an inverse glyph on a primary disc, as a selected `IconButton`), with a larger
+/// area that takes the click.
+private struct ShelfRemoveButton: View {
+    let name: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Theme.Palette.inverse)
+                .frame(width: Theme.Metrics.shelfRemove, height: Theme.Metrics.shelfRemove)
+                .background(Theme.Palette.primary, in: Circle())
+                .frame(width: Theme.Metrics.shelfRemoveHit, height: Theme.Metrics.shelfRemoveHit)
+                .contentShape(Circle())
+        }
+        .buttonStyle(IslandButtonStyle())
+        .help("Remove from the Shelf")
+        .accessibilityLabel("Remove \(name)")
+    }
+}
+
+/// A result of Zip, Convert, and the rest, waiting for the person to say where it goes. It takes the Shelf's row until it is
+/// answered, in either mode; with several waiting, the oldest shows first.
+private struct ShelfResultStrip: View {
+    let result: ShelfResult
+    let more: Int
+    let onAdd: () -> Void
+    let onReplace: () -> Void
+    let onSave: () -> Void
+    let onDiscard: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: result.staged.path))
+                .resizable()
+                .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.name)
+                    .font(Theme.Typography.bodyEmphasized)
+                    .foregroundStyle(Theme.Palette.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(more > 0 ? "\(result.verb) \u{00B7} \(more) more waiting" : result.verb)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            ChipButton(title: "Add to Shelf", isProminent: true, action: onAdd)
+            ChipButton(title: "Replace", accessibilityLabel: "Replace the original on the Shelf", action: onReplace)
+            ChipButton(title: "Save to Folder\u{2026}", action: onSave)
+            IconButton(systemName: "xmark", label: "Discard \(result.name)", size: 11, action: onDiscard)
+        }
+        .frame(maxHeight: .infinity)
+        .transition(.opacity)
+    }
+}
+
 private struct ShelfItemView: View {
     let url: URL
     let viewModel: IslandViewModel
     let onRemove: () -> Void
 
     @State private var isHovering = false
+    @State private var thumbnail: NSImage?
 
     private var tools: FileTools { viewModel.fileTools }
 
-    var body: some View {
-        VStack(spacing: 3) {
+    /// The file's own thumbnail once it arrives, its icon until then and when the system has none.
+    @ViewBuilder
+    private var preview: some View {
+        if let thumbnail {
+            Image(nsImage: thumbnail)
+                .resizable()
+                .scaledToFit()
+        } else {
             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                 .resizable()
-                .frame(width: 36, height: 36)
+                .scaledToFit()
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            preview
+                .frame(width: Theme.Metrics.shelfThumbnail, height: Theme.Metrics.shelfThumbnail)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.nestedRadius, style: .continuous))
             Text(url.lastPathComponent)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Palette.secondary)
@@ -354,16 +461,8 @@ private struct ShelfItemView: View {
         .frame(width: 64)
         .overlay(alignment: .topTrailing) {
             if isHovering {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.Palette.primary, Color.gray)
-                        .frame(width: 20, height: 20)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(IslandButtonStyle())
-                .offset(x: -2, y: -4)
-                .accessibilityLabel("Remove \(url.lastPathComponent)")
+                ShelfRemoveButton(name: url.lastPathComponent, action: onRemove)
+                    .offset(x: Theme.Metrics.shelfRemoveHit / 4, y: -Theme.Metrics.shelfRemoveHit / 4)
             }
         }
         .contentShape(Rectangle())
@@ -371,15 +470,27 @@ private struct ShelfItemView: View {
             isHovering = $0
             viewModel.setHoveredShelfItem($0 ? url : nil)
         }
-        .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
-        .onDrag { NSItemProvider(object: url as NSURL) }
+        // A separate gesture, so waiting to see whether a click is a double click can't hold back the start of a drag.
+        .simultaneousGesture(TapGesture(count: 2).onEnded { NSWorkspace.shared.open(url) })
+        // A file provider copies the file where it is dropped, so dragging out never moves the original. The preview is the
+        // file's own thumbnail instead of a snapshot of the whole item.
+        .onDrag {
+            NSItemProvider(contentsOf: url) ?? NSItemProvider(object: url as NSURL)
+        } preview: {
+            preview.frame(width: Theme.Metrics.shelfThumbnail, height: Theme.Metrics.shelfThumbnail)
+        }
+        .task(id: ShelfThumbnails.key(for: url, size: Theme.Metrics.shelfThumbnail)) {
+            thumbnail = await ShelfThumbnails.shared.image(for: url, size: Theme.Metrics.shelfThumbnail)
+        }
         .contextMenu {
             Button("Quick Look") { viewModel.showQuickLook(url) }
             ShareLink("Share", item: url)
             Divider()
             let kind = FileKind.of(url)
             if kind == .image || kind == .pdf {
-                Button("Copy Text") { Task { await tools.copyText(from: url) } }
+                Button(kind == .image ? "Copy Text from Image" : "Copy Text from PDF") {
+                    Task { await tools.copyText(from: url) }
+                }
             }
             Button("Zip") { tools.zip([url]) }
             if FileTools.isZip(url) {

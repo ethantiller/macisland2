@@ -9,7 +9,7 @@ project). One borderless `NSPanel` hosts the whole island.
 ![The Home tab](docs/images/04a-expanded-home.png)
 
 > The pictures in these docs are renders of the real SwiftUI views (`./scripts/docs-images.sh`). They show layout, type, and
-> color, but not Liquid Glass, text fields, or scrolling lists, and the sound bars are frozen mid-rest. See
+> color, but not Liquid Glass, text fields, or scrolling lists, and the sound bars are held still. See
 > [Regenerating the pictures](docs/SCRIPTS.md#docs-imagessh).
 
 ## Contents
@@ -29,8 +29,8 @@ project). One borderless `NSPanel` hosts the whole island.
 Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
 
 ```sh
-./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start
-./scripts/test.sh                                                     # 630 tests, under a second
+./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start (the first build makes a signing identity)
+./scripts/test.sh                                                     # 718 tests, under a second
 ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
 ```
 
@@ -44,10 +44,11 @@ menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
 | Something is live | The **compact** island: one activity split around the notch, or two as a pair |
 | Rest the pointer on it | A brief swell, then the **peek** (after 120 ms): the top activity at full size |
 | Click, swipe two fingers down, or press **⌃⌥Space** | The **expanded** island: a tab strip and the selected module |
+| Press **⌃⌥S** | The expanded island on the **Shelf** |
 | ← / → , or a two-finger horizontal swipe | Previous or next tab |
 | Esc, or move the pointer away for 300 ms | Fold back in |
 | Drag a file onto it | Drop targets: keep it on the Shelf, or AirDrop it |
-| First launch | A short **guide** shows the gestures and modules with the real island, and asks for Calendars, Reminders, and Bluetooth (each optional). Replay it, or the Settings tour, from Settings → General → Guide |
+| First launch | A short **guide** shows the gestures and modules with the real island, and asks for each permission in turn, one step at a time (each optional: **Grant Permission** or **Not Now**). Replay it, or the Settings tour, from Settings → General → Guide |
 
 ## A tour
 
@@ -144,8 +145,7 @@ Web searches open in your browser. **Widgets you make** can also send one HTTPS 
 widget), or run a Shortcut or a program you chose (a command widget); both run only while Home is showing, and Settings → Privacy
 lists every host and everything MacIsland runs.
 
-The first-run guide asks for **Calendars, Reminders, and Bluetooth** up front (each optional, and it can be skipped), because they power things that arrive on their own. macOS asks for everything else only when a feature first needs it: Focus status, the Downloads
-folder (and Desktop or Documents, for a folder widget there), Automation (Music and Spotify volume, Favorite, and play/pause), and Accessibility (Clean Keys), Camera (Mirror), Microphone (Voice Notes), and Screen Recording (Record Screen). The app is signed
+**Nothing asks at launch.** The first-run guide walks through Calendars, Reminders, Bluetooth, Downloads, Camera, Microphone (with Speech), Screen Recording, Accessibility, Focus, and Automation, one step each with a reason and **Grant Permission** or **Not Now** (each optional); Settings → Privacy has a **Grant** for anything not yet asked; and otherwise macOS asks when a feature first needs it (and for a folder widget in Desktop or Documents). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
 Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 

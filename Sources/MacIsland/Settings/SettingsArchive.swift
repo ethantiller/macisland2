@@ -11,6 +11,7 @@ struct SettingsArchive: Codable, Equatable {
     var version = SettingsArchive.currentVersion
 
     var openShortcut: StoredShortcut?
+    var shelfShortcut: StoredShortcut?
     var peeksOnHover: Bool?
     var swipesEnabled: Bool?
     var islandDisplay: String?
@@ -28,12 +29,19 @@ struct SettingsArchive: Codable, Equatable {
     var clipboardLimit: Int?
     var shelfMode: String?
     var showsLyrics: Bool?
+    var replacesVolumeHUD: Bool?
     var showsMusicCompact: Bool?
     var pinLimit: Int?
     var pinnedTools: [String]?
+    /// Tools made from Shortcuts. A Shortcut's name is fine to export; the Shortcut itself is not.
+    var shortcutTools: [ShortcutTool]?
     var quietDuringFocus: Bool?
     var fullChargeLevel: Int?
     var mutedEvents: [String]?
+    var pomodoroFocus: Int?
+    var pomodoroShortBreak: Int?
+    var pomodoroLongBreak: Int?
+    var pomodoroSessions: Int?
 
     enum ReadError: LocalizedError, Equatable {
         case notAnArchive, tooNew
@@ -52,6 +60,7 @@ struct SettingsArchive: Codable, Equatable {
     static func make(from settings: AppSettings) -> SettingsArchive {
         var archive = SettingsArchive()
         archive.openShortcut = StoredShortcut(combo: settings.openShortcut)
+        archive.shelfShortcut = StoredShortcut(combo: settings.shelfShortcut)
         archive.peeksOnHover = settings.peeksOnHover
         archive.swipesEnabled = settings.swipesEnabled
         archive.islandDisplay = settings.islandDisplay.rawValue
@@ -68,12 +77,18 @@ struct SettingsArchive: Codable, Equatable {
         archive.clipboardLimit = settings.clipboardLimit
         archive.shelfMode = settings.shelfMode.rawValue
         archive.showsLyrics = settings.showsLyrics
+        archive.replacesVolumeHUD = settings.replacesVolumeHUD
         archive.showsMusicCompact = settings.showsMusicCompact
         archive.pinLimit = settings.pinLimit.rawValue
         archive.pinnedTools = settings.pinnedTools.map(\.rawValue)
+        archive.shortcutTools = settings.shortcutTools
         archive.quietDuringFocus = settings.quietDuringFocus
         archive.fullChargeLevel = settings.fullChargeLevel
         archive.mutedEvents = settings.mutedEvents.map(\.rawValue).sorted()
+        archive.pomodoroFocus = settings.pomodoroFocus
+        archive.pomodoroShortBreak = settings.pomodoroShortBreak
+        archive.pomodoroLongBreak = settings.pomodoroLongBreak
+        archive.pomodoroSessions = settings.pomodoroSessions
         return archive
     }
 
@@ -109,6 +124,7 @@ extension AppSettings {
     /// Launch at Login is the system\u{2019}s, so it is not in the file.
     func restore(_ archive: SettingsArchive) {
         if let stored = archive.openShortcut { setShortcut(.open, stored.combo) }
+        if let stored = archive.shelfShortcut { setShortcut(.shelf, stored.combo) }
         if let value = archive.peeksOnHover { peeksOnHover = value }
         if let value = archive.swipesEnabled { swipesEnabled = value }
         if let value = archive.islandDisplay.flatMap(IslandDisplay.init) { islandDisplay = value }
@@ -132,14 +148,27 @@ extension AppSettings {
         if let value = archive.clipboardLimit, ClipboardHistory.limits.contains(value) { clipboardLimit = value }
         if let value = archive.shelfMode.flatMap(ShelfMode.init) { shelfMode = value }
         if let value = archive.showsLyrics { showsLyrics = value }
+        if let value = archive.replacesVolumeHUD, value != replacesVolumeHUD { replacesVolumeHUD = value }
         if let value = archive.showsMusicCompact { showsMusicCompact = value }
         if let value = archive.pinLimit.flatMap(PinLimit.init) { pinLimit = value }
+        // Before the row, which may name them.
+        if let tools = archive.shortcutTools { replaceShortcutTools(tools) }
         if let names = archive.pinnedTools {
             var seen = Set<ToolID>()
             replacePinned(names.compactMap(ToolID.init).filter { seen.insert($0).inserted })
         }
         if let value = archive.quietDuringFocus { quietDuringFocus = value }
         if let value = archive.fullChargeLevel, Self.fullChargeRange.contains(value) { fullChargeLevel = value }
+        if let value = archive.pomodoroFocus, PomodoroPlan.focusRange.contains(value) { pomodoroFocus = value }
+        if let value = archive.pomodoroShortBreak, PomodoroPlan.shortBreakRange.contains(value) {
+            pomodoroShortBreak = value
+        }
+        if let value = archive.pomodoroLongBreak, PomodoroPlan.longBreakRange.contains(value) {
+            pomodoroLongBreak = value
+        }
+        if let value = archive.pomodoroSessions, PomodoroPlan.sessionsRange.contains(value) {
+            pomodoroSessions = value
+        }
         if let names = archive.mutedEvents {
             let muted = Set(names.compactMap(AmbientEvent.init))
             for event in AmbientEvent.allCases { setMuted(event, muted.contains(event)) }

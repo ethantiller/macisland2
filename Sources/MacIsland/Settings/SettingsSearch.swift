@@ -27,9 +27,12 @@ enum SettingsAnchor {
     static let clipboard = "shelf.clipboard"
     static let music = "media.music"
     static let lyrics = "media.lyrics"
+    static let pomodoro = "clock.pomodoro"
     static let toolsRow = "tools.row"
     static let rowOrder = "tools.roworder"
+    static let shortcutTools = "tools.shortcuts"
     static let interruptions = "notifications.interruptions"
+    static let volumeHUD = "notifications.volume"
     static let power = "notifications.power"
     static let devices = "notifications.devices"
     static let yourDay = "notifications.day"
@@ -48,8 +51,12 @@ enum SettingsSearch {
             // General
             .init(pane: .general, title: "Launch at Login", keywords: ["startup", "start", "open at login", "boot"]),
             .init(
-                pane: .general, title: "Shortcut",
-                keywords: ["hotkey", "keyboard", "keys", "open the island", "record"],
+                pane: .general, title: "Open the Island",
+                keywords: ["shortcut", "hotkey", "keyboard", "keys", "record"],
+                anchor: SettingsAnchor.shortcut),
+            .init(
+                pane: .general, title: "Open the Shelf",
+                keywords: ["shortcut", "hotkey", "keyboard", "keys", "files", "storage", "clipboard", "record"],
                 anchor: SettingsAnchor.shortcut),
             .init(
                 pane: .general, title: "Peek on Hover", keywords: ["hover", "mouse", "swell", "preview"],
@@ -149,15 +156,36 @@ enum SettingsSearch {
             .init(
                 pane: .media, title: "Synced Lyrics", keywords: ["lrc", "lrclib", "words", "song", "karaoke"],
                 anchor: SettingsAnchor.lyrics),
+            // Clock
+            .init(
+                pane: .clock, title: "Focus Length",
+                keywords: ["pomodoro", "work", "session", "minutes", "25", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Short Break",
+                keywords: ["pomodoro", "rest", "minutes", "5", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Long Break",
+                keywords: ["pomodoro", "rest", "minutes", "15", "timer"], anchor: SettingsAnchor.pomodoro),
+            .init(
+                pane: .clock, title: "Sessions Before Long Break",
+                keywords: ["pomodoro", "cycle", "rounds", "focus", "four", "4"], anchor: SettingsAnchor.pomodoro),
             // Tools
             .init(
                 pane: .tools, title: "Tools in the Row",
                 keywords: ["pin", "pinned", "4", "6", "8", "count", "how many"],
                 anchor: SettingsAnchor.toolsRow),
             .init(
+                pane: .tools, title: "Shortcut Tools",
+                keywords: ["shortcuts", "automation", "run", "custom", "tool", "icon", "symbol", "add"],
+                anchor: SettingsAnchor.shortcutTools),
+            .init(
                 pane: .tools, title: "Row Order", keywords: ["reorder", "drag", "move", "pin", "unpin"],
                 anchor: SettingsAnchor.rowOrder),
             // Notifications
+            .init(
+                pane: .notifications, title: "Replace the Volume HUD",
+                keywords: ["volume", "sound", "keys", "hud", "speaker", "mute", "accessibility"],
+                anchor: SettingsAnchor.volumeHUD),
             .init(
                 pane: .notifications, title: "Quiet in Focus", keywords: ["do not disturb", "dnd", "silence", "mute"],
                 anchor: SettingsAnchor.interruptions),

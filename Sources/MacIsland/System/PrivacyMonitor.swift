@@ -11,18 +11,27 @@ final class PrivacyMonitor {
     private(set) var microphoneSince: Date?
     private(set) var microphoneAppBundleID: String?
 
-    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?
+    /// The devices and processes that have the listener, so each new one gets it once.
+    @ObservationIgnored private var watched: Set<AudioObjectID> = []
 
+    /// Listens rather than polls (a poll was a standing timer while nothing is live): to the device and process lists,
+    /// to whether each device is running somewhere, and to whether each process is taking input.
     func start() {
-        refresh()
-        let timer = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in
+        guard listener == nil else { return }
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        self.listener = listener
+        for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyProcessObjectList] {
+            var address = Self.address(selector)
+            AudioObjectAddPropertyListenerBlock(Self.system, &address, .main, listener)
+        }
+        refresh()
     }
 
     private func refresh() {
+        watchNewObjects()
         let microphone = Self.microphoneInUse()
         if microphone != isMicrophoneInUse {
             withAnimation(Theme.Motion.open) {
@@ -32,6 +41,24 @@ final class PrivacyMonitor {
         }
         let app = microphone ? Self.microphoneApp() : nil
         if app != microphoneAppBundleID { microphoneAppBundleID = app }
+    }
+
+    /// Devices and processes come and go. An id that is gone is forgotten, so if CoreAudio reuses it, the new object is
+    /// watched.
+    private func watchNewObjects() {
+        guard let listener else { return }
+        let devices = Self.objectList(kAudioHardwarePropertyDevices)
+        let processes = Self.objectList(kAudioHardwarePropertyProcessObjectList)
+        watched.formIntersection(devices + processes)
+        for (objects, selector) in [
+            (devices, kAudioDevicePropertyDeviceIsRunningSomewhere),
+            (processes, kAudioProcessPropertyIsRunningInput),
+        ] {
+            for object in objects where watched.insert(object).inserted {
+                var address = Self.address(selector)
+                AudioObjectAddPropertyListenerBlock(object, &address, .main, listener)
+            }
+        }
     }
 
     // MARK: Microphone (CoreAudio)

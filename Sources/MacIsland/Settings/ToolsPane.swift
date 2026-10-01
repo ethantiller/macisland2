@@ -4,6 +4,8 @@ struct ToolsPane: View {
     let settings: AppSettings
     let preview: IslandPreviewModel?
 
+    @State private var editing: ShortcutTool?
+
     var body: some View {
         Form {
             Section {
@@ -21,6 +23,30 @@ struct ToolsPane: View {
                 )
             }
             Section {
+                ForEach(settings.shortcutTools) { tool in
+                    HStack(spacing: 10) {
+                        Label(tool.title, systemImage: tool.systemImage)
+                        Text(tool.shortcut)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer()
+                        Button("Edit") { editing = tool }
+                            .buttonStyle(.borderless)
+                        Button("Remove", role: .destructive) { settings.removeShortcutTool(tool.id) }
+                            .buttonStyle(.borderless)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                Button("Add Shortcut Tool\u{2026}") { editing = ShortcutTool(shortcut: "", title: "") }
+                    .disabled(!settings.canAddShortcutTool)
+            } header: {
+                Text("Shortcut Tools").id(SettingsAnchor.shortcutTools)
+            } footer: {
+                Text(
+                    "Make a tool from one of your Shortcuts: pressing it runs the Shortcut. Up to \(AppSettings.maxShortcutTools), which with the nine built in and Less fill the Tools tab. Its icon is one you choose here; MacIsland can\u{2019}t read the one Shortcuts shows."
+                )
+            }
+            Section {
                 ForEach(settings.visiblePinned) { tool in
                     ToolOrderRow(settings: settings, tool: tool, preview: preview)
                 }
@@ -32,6 +58,15 @@ struct ToolsPane: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(item: $editing) { tool in
+            ShortcutToolSheet(tool: tool) { settings.saveShortcutTool($0) }
+        }
+        // The Tools tab's right-click menu asks for a tool's sheet.
+        .task(id: settings.requestedShortcutToolEdit) {
+            guard let id = settings.requestedShortcutToolEdit else { return }
+            settings.requestedShortcutToolEdit = nil
+            editing = settings.shortcutTool(id: id)
+        }
     }
 }
 

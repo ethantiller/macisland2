@@ -92,8 +92,8 @@ for tests, and `PreviewFeatures.make(live:scratch:)` is its twin for the Setting
 
 `ShelfModel` keeps when each file was added (`shelf.added`, by path; files from before it count from the first launch after) and
 `sweep(_:)` drops references older than the retention, run on launch and when the Shelf appears, never on a timer. The clipboard
-limit is `ClipboardHistory.setCapacity` (0, 10, 25, 50): 0 stops the 0.7 s poll and clears the history, the one standing timer the app
-had. Add New Screenshots off stops the Spotlight query (`ScreenshotWatcher.stop`), which is also what makes the first minute after
+limit is `ClipboardHistory.setCapacity` (0, 10, 25, 50): 0 stops the 0.7 s poll and clears the history. With the agenda's 30 s refresh it is
+one of the two standing timers; both have a tolerance so macOS can fire them with other wakeups. Add New Screenshots off stops the Spotlight query (`ScreenshotWatcher.stop`), which is also what makes the first minute after
 launch busier. `AppSettings.dragTarget` gates `setFileDragActive`, the drop delegate, and the drop tiles. Show Music Beside the Notch
 off makes `compactActivities` skip `.media`. The Shelf's last mode is stored (`shelfMode`); a drop always shows Files.
 
@@ -347,7 +347,8 @@ damped: never overshoots into the hardware), `resize` (changes inside an open is
 ease and removes the swell.
 
 The compact island's album art and sound bars share a `mediaNamespace` (`matchedGeometryEffect`) with the peek and the Media tab, so
-they travel to their new places when it opens.
+they travel to their new places when it opens. The bars bounce in Core Animation (`EqualizerBarsView`, a looping keyframe animation on
+each bar's height), so playing music costs the app nothing per frame; see the Idle CPU gotcha.
 
 ---
 
@@ -425,6 +426,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Shelf files | UserDefaults | `shelf.paths` (paths only; the files stay where they are) |
 | First-run state | UserDefaults | `onboarding.install` (`fresh` or `existing`, written once), `onboarding.guide`, `onboarding.settingsTour` (the version last seen). Not in `AppSettings`, so never in the settings file and untouched by Reset All |
 | Pomodoro history | UserDefaults | `pomodoro.history` (JSON: sessions per day) |
+| Pomodoro lengths | UserDefaults | `pomodoroFocus`, `pomodoroShortBreak`, `pomodoroLongBreak`, `pomodoroSessions` (minutes, and a count; clamped to `PomodoroPlan`'s ranges) |
 | Notes and snippets | JSON file | `~/Library/Application Support/MacIsland/notes.json` |
 | Voice Notes | .m4a files | `~/Library/Application Support/MacIsland/Voice Notes/` (kept; the text goes in a note) |
 | Screen recordings | .mov files | `~/Movies/Screen Recording <date>.mov` (kept; also on the Shelf) |
@@ -437,7 +439,7 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 
 ### Permissions
 
-macOS asks when a feature first needs access, except that **the first-run guide also asks for Calendars and Reminders (through `AgendaMonitor.requestAccess(to:)`, the request its switches already make) and Bluetooth (through `BluetoothAccess`, a `CBCentralManager` that hears the answer; IOBluetooth's implicit prompt does not give one)**. A denied permission can't be asked again, so the guide offers System Settings instead. `Support/Info.plist` holds the reasons.
+**Nothing asks at launch, on any install.** What asks is the first-run guide (one step per permission, `AccessKind`, in order: Calendars, Reminders, Bluetooth, Downloads, Camera, Microphone with Speech, Screen Recording, Accessibility, Focus, Automation), Settings → Privacy (**Grant**), and first use. Requests live in `LiveAccess` (`AccessRequests.swift`): Calendars and Reminders through `AgendaMonitor.requestAccess(to:)`, Bluetooth through `BluetoothAccess` (a `CBCentralManager` that hears the answer), Downloads by listing the folder, Camera and Microphone through `AVCaptureDevice`, Speech through `SFSpeechRecognizer`, Screen Recording through `CGRequestScreenCaptureAccess`, Accessibility through `AXIsProcessTrustedWithOptions`, Focus through `INFocusStatusCenter`, and Automation through `AEDeterminePermissionToAutomateTarget` for a running Music or Spotify. States come from `PrivacyAccess.current()`; the ones the system won't say (Downloads and Automation, and "never asked" versus "off" for Screen Recording and Accessibility) are remembered in `AccessAsked` (`access.asked`). **The launch audit** found these could prompt, and each is now gated: the headphones monitor (Bluetooth) starts only if `BluetoothAccess.isAllowed`; the download monitor only if Downloads was asked (`startPermittedMonitors`); `AgendaMonitor.configure(mayAsk:)` is false at launch, so a reset Calendars or Reminders is only read, and a setting turned on asks; Focus starts at launch only if `FocusMode.isAuthorized`; and `ShelfModel` takes stored paths in Desktop, Documents, and Downloads on trust at launch and checks them in `verify()` when the Shelf is shown (looking for a file there is what asks for that folder). Not found to prompt at launch: the battery, network, volume, and microphone-in-use monitors, the screenshot watcher's Spotlight query (metadata only; `fileExists` on a new screenshot in Desktop could ask, but only when one arrives), and Now Playing (its Automation prompt comes when the Media view first shows). The permission reset that every rebuild causes still makes a permission asked earlier prompt again the first time it is used, and Downloads once more at launch if it was asked before the rebuild. A denied permission can't be asked again, so the guide offers System Settings instead. `Support/Info.plist` holds the reasons.
 
 | Access | Asked for by | `Info.plist` key |
 | --- | --- | --- |
@@ -454,8 +456,11 @@ macOS asks when a feature first needs access, except that **the first-run guide 
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
 | Screen Recording | Record Screen | (system prompt via `CGRequestScreenCaptureAccess`; no key) |
 
-`LSUIElement` is true (no Dock icon). The app is **ad-hoc signed**, so each rebuild is a new identity to macOS and permissions ask
-again; `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
+`LSUIElement` is true (no Dock icon). The app is signed with a **self-signed "MacIsland Dev" certificate**, which the first build
+on a Mac makes (`scripts/sign.sh`, through `make-signing-cert.sh`), so its identity to macOS (bundle ID plus certificate) stays the
+same across rebuilds and permissions stick. When it can't be made or used, or with `MACISLAND_ADHOC=1`, the build is ad-hoc signed,
+its identity is its hash, and each rebuild asks again: System Settings keeps showing the old build's switch as on while the new
+build is refused (the symptom: "Accessibility Access Needed" with the switch already on). `tccutil reset All com.ethantiller.MacIsland` clears them on purpose.
 
 ### Network
 
@@ -479,10 +484,84 @@ Web searches are opened in your default browser. There is no analytics and no ac
 | `/usr/bin/shortcuts run NAME --output-path FILE` | A Shortcut widget's result: no input is passed in, a 30 s limit, 4 KB read |
 | **A file you chose** (`BoundedProcess`) | A command widget: run directly (no shell), no arguments, no input, a minimal environment (`PATH` and `LANG`), a 5 s limit (terminate, then kill), 4 KB of output. It runs as you, like Terminal. Picked with a file panel only; **never exported, imported, or started by `macisland://`**; listed in Settings â Privacy with Remove |
 
-MacIsland is ad-hoc signed and not App-Sandboxed, so a child process has your rights, and `sandbox-exec` is deprecated, so it is not
+MacIsland is not Developer ID signed and not App-Sandboxed, so a child process has your rights, and `sandbox-exec` is deprecated, so it is not
 used. The protection is that only you can create a command widget: nothing outside this Mac can add or trigger one.
 | `system_profiler SPBluetoothDataType -json` | Headphone battery levels |
 | `NSAppleScript` | Music and Spotify control |
+
+### The Pomodoro's lengths
+
+`PomodoroPlan` (in `PomodoroModel.swift`) holds the four numbers. `PomodoroModel` takes a `plan:` closure, not `UserDefaults`, and
+reads it whenever it needs a length: the app hands it `{ settings.pomodoroPlan }`, the Settings preview hands it the live settings too, and
+a test hands it a scratch `AppSettings`. Because `AppSettings` is observable, a view reading `pomodoro.plan` or `remaining(at:)` follows a
+change with nothing wired. A phase that is running, or paused, keeps `startedLength`, frozen when it started (resuming doesn't restart
+it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
+against the new number.
+
+### The volume HUD
+
+`VolumeHUDController` (`System/VolumeHUD.swift`) owns an event tap only while Replace the Volume HUD is on (`applyVolumeHUD` in `AppDelegate`).
+`SystemMediaKeyTap` taps `NX_SYSDEFINED` (type 14) at the head of the session, reads the key from `data1` (sound up 0, down 1, mute 7; down when
+bits 8 to 15 are 0xA), and consumes the event only when the controller says so. `handle(_:)` consumes a press when the tap is active, Clean Keys
+is not locked (`isSuspended`), the island can show it (`canShow` → `IslandViewModel.canShowVolumeHUD`: folded, no banner, no alert that stays
+until seen), the default output can be set (`CoreAudioVolume.canSetVolume`), and the write succeeded; otherwise the key passes to the system and its
+HUD. `VolumeStep` is the math (16 steps, a quarter step with Option and Shift, mute toggles, a step unmutes). The HUD is an `IslandAlert` with a
+`volume` (`Announcements.volume`), drawn by `compactTrailing` as a `LevelBar` and the percent, with uneven sides (`volumeHUDLeading`, `volumeHUDTrailing`; `horizontalOffset` shifts the island and `hitRect`); `flash` times it
+out after `Timing.volumeHUD`, and `setHovering` holds it while the pointer is on it. The tap is turned back on after `tapDisabledByTimeout`; after
+`tapDisabledByUserInput` (what revoking Accessibility is expected to produce, unverified) the controller stops, the setting is turned off, and a banner
+says so. At launch and on becoming active it never asks for Accessibility; turning the setting on does, through `AccessCenter`, and leaves it off
+until granted. Not done: the feedback sound, a side-of-screen HUD, brightness. See [plans/volume-hud.md](plans/volume-hud.md).
+
+### Shortcut tools
+
+`ToolID` is a struct over a string, not an enum: a built-in's own name (`keepAwake`, stored exactly as before, so nothing already saved
+breaks) or `shortcut:<uuid>`. The built-ins are static members (so `.keepAwake` still reads as it did), `ToolID.allCases` is the nine, and
+`AppSettings.allTools` adds the person's `ShortcutTool`s (`tools.shortcuts`, JSON, at most `maxShortcutTools` = 2 so nine, two, and Less
+fill the grid's 12 slots; beyond that would need a third row and a taller Tools tab). `pinnedTools` may name a tool since removed; `isKnown` and
+`visiblePinned` leave it out, and launch drops it. `ToolCatalog.item(for:)` builds a Shortcut tool's item: dimmed when `installedShortcuts`
+(`shortcuts list`, read when the Tools tab appears, and only if there is a Shortcut tool; an empty answer counts as unknown) lacks its Shortcut.
+`IslandViewModel.runShortcutTool` runs it through `shortcutRunner` (replaced in tests): the blue working activity, a green alert, or a red
+banner; a double press is ignored while it runs. Saving, replacing, removing, and the file import all go through `AppSettings` and do
+nothing unless they change something. The icon can't be read from the Shortcuts app: see [plans/shortcut-icons.md](plans/shortcut-icons.md).
+
+### The Shelf's results
+
+A job that makes a file (`FileTools.zip`, `unzip`, `convert`, `combinePDF`, `resize`, `compress`) writes into its own folder under
+`$TMPDIR/MacIsland Results/<uuid>/` and ends as a `ShelfResult` in `FileTools.pending` (which is `@Observable`; the Shelf shows the first in
+`ShelfResultStrip`). Nothing else is written until a choice: `addToShelf` moves the file into `ShelfModel.ownedFolder`
+(`~/Library/Application Support/MacIsland/Shelf Results`) and adds the entry; `replaceInShelf` does the same and swaps the entry for
+the sources' (`ShelfModel.replace`); `saveToFolder` asks `chooseDestination` (the system save panel, replaced in tests) and moves the
+file there, and a cancelled panel leaves it pending; `discard` removes the staging folder. `cleanUpStaging()` removes the whole root at
+launch and on quit. **A file is only ever trashed from `ownedFolder`**: when an entry whose file is in it leaves the Shelf (removed,
+cleared, swept, or replaced) it goes to the Trash; files anywhere else, including the originals and anything saved to a folder, are
+never touched. The save panel runs under `IslandViewModel.holding(.panel)`. Screenshots, recordings, and voice notes bypass all this
+and go straight to the Shelf. A result that nobody answers stays pending for the life of the app only (it is not persisted).
+
+**Dragging out** uses `.onDrag` with `NSItemProvider(contentsOf:)` (a file provider, so a drop copies and never moves the original) and the
+thumbnail as the preview; the double click is a `simultaneousGesture` so it can't hold back the start of a drag. The cause of the earlier
+glitches was not confirmed by running; fall back to an `NSDraggingSource` if they persist. **Thumbnails** are `ShelfThumbnails`: QuickLook
+Thumbnailing, in an `NSCache` of 64, keyed by path, modification date, and size, asked from `.task(id:)` so a departing item cancels its work.
+
+### Holds: what keeps the island open
+
+`IslandHold` names the reasons the island stays open while the pointer is elsewhere: `.menu`, `.quickLook`, `.panel`, `.textFocus`, and `.mirror`.
+They are a set on the view model (`hold(_:)`, `release(_:)`, and `holding(_:during:)` for a panel that is shown and answered), so two
+reasons can't cancel each other. The keyboard pin (`isPinnedOpen`) is separate.
+- **Menus.** `MenuHoldObserver` listens for `NSMenu.didBeginTrackingNotification` and `didEndTrackingNotification`, which cover SwiftUI's
+  `.contextMenu`, `Menu`, and `ShareLink`, for every menu in the island at once. It counts, because a submenu nests.
+- **Mirror** is not taken by name: `activeHolds` adds it for exactly as long as the camera is on, not `isUnavailable`, and not denied.
+- **What a hold does.** The pointer leaving doesn't fold the island (`setHovering`). A click outside doesn't close it
+  (`closesOnClickOutside`, read by `MouseTracker`) while a menu, Quick Look, a panel, or Mirror holds. `.textFocus` is soft: the
+  pointer coming back or a close ends it, as the keyboard pin. Esc, the shortcut, and a swipe up (`closePinned()`) refuse only for
+  Mirror, which stays until **Done**; a menu or panel never traps them, so a stuck hold can't trap the island open. With Mirror on, tab
+  swipes and the arrow keys are ignored (changing tab would turn the camera off; clicking a tab still does), and a banner waits as an
+  alert that stays until seen instead of folding the island (any hard hold does this).
+- **When the last hold ends** (`resumeAfterHold`), an island the pointer is not over folds after the usual 300 ms, counted from then.
+  The pointer is read through `pointerLocation`, which tests replace.
+- **Where menus and panels are opened in the island** (checked by grep): the Shelf item menu (Convert To, Resize, Share), the clipboard
+  card menu, the tab strip's menu, Home's widget menu, the Tools pin menu, the Media output chip's Disconnect menu, Notes' Delete, and
+  Quick Look. There is no `NSSavePanel`, `NSOpenPanel`, or `NSAlert` in the island yet; Phase 3's save panel uses `holding(.panel)`.
+  A window another app or the system opens from the share menu (Mail's compose window) is not seen by any of this.
 
 ### Now Playing
 
@@ -490,6 +569,13 @@ Apple restricts MediaRemote to its own binaries since macOS 15.4, so the vendore
 loaded by `/usr/bin/perl`, which Apple *does* entitle. `MediaRemoteAdapter` runs its `stream` command and parses JSON lines (full
 snapshots, then diffs) into `NowPlayingState`; commands go through `send`, `seek`, `shuffle`, and `repeat`. For Music and Spotify,
 transport goes through AppleScript instead, addressed to the app itself. See [SCRIPTS.md](SCRIPTS.md#build-adaptersh).
+
+**The lyric row.** The peek and the Media tab are 24 pt (`lyricsRowHeight`) taller while `LyricsModel.lines` is not empty, and only
+then: `mediaContentHeight(peek:)` and `NowPlayingView` both read that one value, so the height and the row can't disagree. *Has
+lyrics* means a lookup came back with at least one line that has words (an all-empty response is treated as none). Lines that have not
+started yet still count, so the row is blank through an intro and instrumental gaps rather than the island jumping with every line. A
+lookup in flight has no row; it lands with `Theme.Motion.resize`, and the next track clears it the same way. Home's Music widget never
+has the row.
 
 ---
 
@@ -503,7 +589,7 @@ a fresh user who quits mid-guide leaves `notes.json` behind (every clean quit wr
 stored under a key that isn't in it. An existing install gets the guide and the tour marked seen. A version number on each (`guideVersion`,
 `tourVersion`) and a `since` on each step or stop let a later release show only what is new.
 
-**The guide.** `OnboardingFlow` holds the ten steps as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
+**The guide.** `OnboardingFlow` holds the steps (eight of the island, ten of permissions, then the last; a permission that is `settled` is left out) as data and `GuideCopy` every sentence as a pure function of `GuideSetup` (the open
 shortcut, the notch, the tabs, the drag target), all tested. `OnboardingModel` walks them, keeps the practice checks, and runs each way
 out. The window is an `OnboardingPanel`, a borderless `FloatingGlassPanel` (no title bar, so nothing of the window's own sits over its ⊗; the base class takes a style mask, and the torn-off windows keep theirs), centered on the island's screen. It is dragged by its rim and its header (`OnboardingPanel.sendEvent` calls AppKit's `performDrag`; neither `isMovableByWindowBackground` nor a `WindowDragGesture` moved it). A window with a clear background passes clicks through its clear pixels, and the glass may count as clear, which left the ⊗ clickable only on its stroke: the glass has a 2% black fill under it (`Theme.Palette.hitSurface`). Its hosting view is a `FirstMouseHostingView`, so the first click acts even when the guide is not the window in front. The real island, the higher window, can draw over the top of the guide. Its stage is `PreviewBand`, extracted from `IslandPreview`, over a fresh
 `IslandPreviewModel`, which stops when the guide closes. **The stage is an island you can use.** It stays look-only (its own controls would act on this Mac: the microphone, the audio output, the
@@ -529,7 +615,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **630 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **724 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less
@@ -555,20 +641,21 @@ Things that cost time. Read before changing the related code.
 | **Play/pause with two players** | The system's toggle goes to whatever macOS thinks is playing, which is a browser video once one starts. Music and Spotify are told directly by AppleScript. Browser tabs cannot be told apart. |
 | **Hover timing** | A "pointer left" step schedules a close 300 ms later; in tests and snapshots that can land mid-way. Set the state you need right before rendering. |
 | **ImageRenderer** | Draws a drop target as a yellow placeholder (turned off with `acceptsDrops: false` in snapshots), and skips Liquid Glass, text fields, and horizontal scroll views. Check those in the app. |
-| **Idle CPU** | Budget: about 0.1 to 0.3% with nothing live. `top`'s %CPU misleads; measure with `ps -o cputime= -p PID` over 10 s. No timers run while nothing is live, and samplers run only while their view is visible. The first minute after launch is busier (the Spotlight screenshot query gathers). |
-| **Permissions reset** | Ad-hoc signing means every rebuild forgets them. Expect prompts again. |
+| **Idle CPU** | Budget: about 0.1 to 0.3% with nothing live. `top`'s %CPU misleads; measure with `ps -o cputime= -p PID` over 10 s. No timers run while nothing is live, and samplers run only while their view is visible. The first minute after launch is busier (the Spotlight screenshot query gathers). **Nothing loops in SwiftUI:** a `TimelineView(.animation)` (or a repeating SwiftUI animation) runs on the main thread every frame, and one that changes a frame re-lays out the whole island; the sound bars did that at 120 Hz, about 10% CPU while music played (and once for ten minutes after a pause). Anything that moves on its own goes in Core Animation (`EqualizerBarsView`), which runs in the render server. Microphone use is heard through CoreAudio listeners and Focus is read when a decision needs it or while its button shows: neither polls. |
+| **Permissions reset** | An ad-hoc signed build is a new app to macOS, so it is refused even though System Settings shows the switch on. Builds sign as "MacIsland Dev" (the first build makes it), so they keep their permissions; if a build says it signed ad hoc, fix what it names and rebuild. |
 | **The dial's rectangle** | `timerDialRect` is computed from the layout, not measured (like `compactControlRect`). If `TimerSetter`'s rows change, change it too, or the dial stops taking scrolls. |
 | **Panel size** | `panelSize` must be at least the widest presentation (expanded is 520; the panel is 560). Its height is derived: `Theme.Metrics.panelHeight` (276) is built from `homeMaxRows`, so changing the row limit changes the panel. |
 | **Banners** | A banner with no actions is an alert (`IslandBanner.isAlert`): `bannerAlertWidth` wide, content centered with nothing but the glyph and text in its row (an empty actions row would still add spacing and push it off center). Low Battery offers no Low Power Mode button because `pmset` needs an administrator each time, and the Low Power and Lock Screen tools were removed for the same reason: nothing in the island may ask for a password. `RingedGlyph` is the charging bolt and the AirPods ring. |
 | **Home's grid geometry** | It is computed once, in `HomeGridSpec`, and used by the renderer (`HomeGrid`) and the editor. Don't measure widgets or hard-code a column or row size elsewhere. A torn-off Home window keeps the size it opened at if the layout grows later. |
 | **Tab order** | Tab order is the order the person arranged, not module order; `normalized` keeps it. |
 | **Right side of the strip** | Widths are worst-case constants in `TrailingStrip`; if a new item goes there, add it to `TrailingStrip.plan` and its test, or it can reach the notch. |
-| **Blur while pinning** | Focusing a text field calls `holdOpen()`; floating windows must not (`\.isFloatingWindow`). |
+| **Blur while pinning** | Focusing a text field calls `hold(.textFocus)`; floating windows must not (`\.isFloatingWindow`). |
 | **File drags from other apps** | The source app runs its own drag loop, so the island stops getting mouse events; `MouseTracker` polls the cursor at 30 Hz from mouse-down until release. A drag counts as a file drag only if the drag pasteboard's change count moved since mouse-down **and** it holds a file URL. (An early version used `canReadObject(forClasses:)`, which also matched links and URL-like text, and grew the island with no file.) Not checked against every source app; if it misfires, note what was being dragged. |
 | **Hover during a drag** | While a file is dragged, hovering must not open the island (only the drop target does), but hovering may keep it open. `setDropTargeted` sets `isHovering` so it still closes when the pointer leaves. Drop halves are decided from the drop location (`x > width / 2` is AirDrop), which keeps working while the island resizes. |
 | **AirDrop** | Incoming can't be intercepted (the Accept/Decline notification belongs to `sharingd`; nothing is observable until the file starts arriving in Downloads, where `TransferMonitor` shows it). Sending is picker-only. See [ROADMAP.md](ROADMAP.md#dropped-for-good). |
+| **`containerRelativeFrame` in the Shelf row** | Inside the Shelf's horizontal `ScrollView` it sized the row to the window (the panel), not the space under the header, which put a dropped file below the island's clipped edge: it was on the Shelf but never drew. `ShelfRow` takes the height from a `GeometryReader`. `ImageRenderer` can't see this; `ShelfRowTests` draws through an `NSHostingView` with `cacheDisplay`, which does draw scroll views. |
 | **Snapshots and drags** | Drag and drop states can't be simulated in `ImageRenderer`; check them in the running app. |
-| **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()` and `holdOpen()`; hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
+| **Quick Look** | `quickLookPreview` hangs off `ShelfView` and is driven by `IslandViewModel.quickLookURL`, so the menu and Space share it. The panel is non-activating, so `showQuickLook` calls `NSApp.activate()`, and setting `quickLookURL` takes the `.quickLook` hold (clearing it releases it); hovering an item asks the app to make the panel key so Space arrives. Not checked by hand yet. |
 | **First-run evidence** | A new setting stored in `UserDefaults` needs its key in `InstallEvidence.keys`, or an updater who only ever changed it looks like a fresh install and is shown the guide. `evidenceKeysCoverEverySetting` guards it. |
 | **No `.defaultAction` in Settings** | A default button takes Return from the focused search field and the weather field, so the tour's Return is a key monitor. Esc is not bound either: Settings already uses it to clear search, cancel the recorder, and call off a drag. |
 | **Esc and arrows in the guide** | They are the stage island's: the panel takes them (`keyHandler`) and Esc never reaches its close. A titled `NSPanel` answers Esc by closing itself (the guide closed on Esc), so `cancelOperation` is overridden. Don't bind them in SwiftUI: they need focus. |

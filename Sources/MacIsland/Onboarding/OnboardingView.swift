@@ -94,8 +94,9 @@ struct OnboardingView: View {
             practiceDetail
         case .modules:
             modulesDetail
-        case .access:
-            accessDetail
+        case .calendars, .reminders, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility,
+            .focus, .automation:
+            permissionDetail
         case .finish:
             ChipButton(
                 title: "Open at Login", systemImage: "power", isSelected: model.launchAtLogin
@@ -107,23 +108,27 @@ struct OnboardingView: View {
         }
     }
 
-    /// One row for each permission the guide asks for, and a note on the rest.
-    private var accessDetail: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(AccessKind.allCases, id: \.self) { kind in
-                AccessRow(
-                    kind: kind, state: model.access.state(of: kind), isAsking: model.access.asking == kind
-                ) {
-                    Task { await model.access.allow(kind) }
+    /// The permission this step is about: its glyph and state, what that means, and what to do when it is off. The buttons that ask
+    /// are in the footer, so every step has the same layout.
+    private var permissionDetail: some View {
+        VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
+            if let kind = model.accessKind, let state = model.accessState {
+                PermissionStatus(kind: kind, state: state, isAsking: model.access.asking == kind)
+                Text(GuideCopy.outcome(kind, state: state))
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Theme.Metrics.rowSpacing) {
+                    if state == .denied || state == .asked {
+                        ChipButton(title: "Open System Settings", accessibilityLabel: "Open \(kind.title) in System Settings") {
+                            if let url = kind.settingsURL { NSWorkspace.shared.open(url) }
+                        }
+                    }
+                    if kind == .screenRecording, state == .denied {
+                        ChipButton(title: "Reopen MacIsland") { AppRelaunch.relaunch() }
+                    }
                 }
-                .frame(height: Theme.Metrics.guideRowHeight, alignment: .top)
             }
-            Text(
-                "Camera, Microphone, Screen Recording, and Accessibility are asked for the first time you use Mirror, Voice Note, Record Screen, or Clean Keys."
-            )
-            .font(Theme.Typography.caption)
-            .foregroundStyle(Theme.Palette.secondary)
-            .fixedSize(horizontal: false, vertical: true)
         }
         // A system prompt closing, or coming back from System Settings, may have changed an answer.
         .onReceive(
@@ -191,10 +196,18 @@ struct OnboardingView: View {
             if model.flow.isLast {
                 ChipButton(title: "Open Settings") { model.openSettings() }
             }
-            ChipButton(title: model.primaryTitle, isProminent: true) {
-                withAnimation(Theme.Motion.resize) { model.advance() }
+            if model.isAskingPermission {
+                // The prompt appears only when this is pressed; Not Now asks nothing and goes on.
+                ChipButton(title: "Not Now") { withAnimation(Theme.Motion.resize) { model.notNow() } }
+                ChipButton(title: "Grant Permission", isProminent: true) { Task { await model.grant() } }
+                    .disabled(model.access.asking != nil)
+                    .keyboardShortcut(.defaultAction)
+            } else {
+                ChipButton(title: model.primaryTitle, isProminent: true) {
+                    withAnimation(Theme.Motion.resize) { model.advance() }
+                }
+                .keyboardShortcut(.defaultAction)
             }
-            .keyboardShortcut(.defaultAction)
         }
     }
 
@@ -205,38 +218,32 @@ struct OnboardingView: View {
     }
 }
 
-/// One permission: what it gives, and its state. `notAsked` offers Allow; `allowed` and `denied` say so (a denied permission can't
-/// be asked again, so it offers System Settings instead).
-private struct AccessRow: View {
+/// A permission's glyph and name, and how it stands: a green check beside its glyph when allowed, red when off, and nothing but the
+/// name while it is waiting for an answer.
+private struct PermissionStatus: View {
     let kind: AccessKind
     let state: PrivacyAccess.State
     let isAsking: Bool
-    let allow: () -> Void
 
     var body: some View {
         HStack(spacing: Theme.Metrics.rowSpacing) {
             Glyph(systemName: kind.symbol)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(kind.title)
-                    .font(Theme.Typography.bodyEmphasized)
-                    .foregroundStyle(Theme.Palette.primary)
-                Text(kind.reason)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Palette.secondary)
-            }
+            Text(kind.title)
+                .font(Theme.Typography.bodyEmphasized)
+                .foregroundStyle(Theme.Palette.primary)
             Spacer(minLength: Theme.Metrics.rowSpacing)
             trailing
         }
         .frame(height: Theme.Metrics.hitTarget)
-        .accessibilityElement(children: .contain)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder private var trailing: some View {
         switch state {
         case .notAsked:
-            ChipButton(title: "Allow", accessibilityLabel: "Allow \(kind.title)", action: allow)
-                .disabled(isAsking)
-                .opacity(isAsking ? 0.5 : 1)
+            Text(isAsking ? "Waiting for macOS\u{2026}" : "Not asked yet")
+                .font(Theme.Typography.body)
+                .foregroundStyle(Theme.Palette.secondary)
         case .allowed:
             HStack(spacing: 4) {
                 Glyph(systemName: "checkmark.circle.fill", tint: Theme.Tint.positive)
@@ -244,13 +251,19 @@ private struct AccessRow: View {
                     .font(Theme.Typography.body)
                     .foregroundStyle(Theme.Palette.secondary)
             }
-            .accessibilityElement(children: .combine)
+        case .asked:
+            HStack(spacing: 4) {
+                Glyph(systemName: "checkmark.circle")
+                Text("Asked")
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
         case .denied:
-            HStack(spacing: Theme.Metrics.rowSpacing) {
+            HStack(spacing: 4) {
                 Glyph(systemName: "exclamationmark.circle.fill", tint: Theme.Tint.attention)
-                ChipButton(title: "Open Settings", accessibilityLabel: "Open \(kind.title) in System Settings") {
-                    if let url = kind.settingsURL { NSWorkspace.shared.open(url) }
-                }
+                Text("Off")
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Palette.secondary)
             }
         }
     }

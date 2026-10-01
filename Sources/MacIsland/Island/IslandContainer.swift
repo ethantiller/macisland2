@@ -30,6 +30,7 @@ struct IslandContainer<Content: View>: View {
     let surface: IslandSurface
     /// The pointer is resting on the compact island; it swells slightly until the peek opens.
     let isSwelling: Bool
+    var horizontalOffset: CGFloat = 0
     @ViewBuilder let content: Content
 
     @Environment(\.displayScale) private var displayScale
@@ -50,6 +51,7 @@ struct IslandContainer<Content: View>: View {
             )
             .modifier(IslandSurfaceStyle(surface: surface, shape: shape))
             .contentShape(shape)
+            .offset(x: horizontalOffset)
             .environment(\.colorScheme, .dark)
             .environment(\.islandSurface, surface)
     }

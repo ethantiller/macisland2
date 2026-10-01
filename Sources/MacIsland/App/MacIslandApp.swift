@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shelf = ShelfModel()
         let work = WorkTracker()
         let notes = NotesModel()
+        let settings = AppSettings()
         return IslandFeatures(
             nowPlaying: NowPlayingModel(),
             outputs: AudioOutputs(),
@@ -40,11 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             privacy: PrivacyMonitor(),
             transfers: TransferMonitor(),
             network: NetworkMonitor(),
-            settings: AppSettings(),
+            settings: settings,
             agenda: AgendaMonitor(),
             focus: FocusMode(),
             clipboard: ClipboardHistory(),
-            pomodoro: PomodoroModel(),
+            pomodoro: PomodoroModel(plan: { settings.pomodoroPlan }),
             work: work,
             weather: WeatherModel(),
             fileTools: FileTools(shelf: shelf, work: work),
@@ -68,8 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bluetoothAccess = BluetoothAccess()
     private let diskSpace = DiskSpace()
     private let hotkey = GlobalHotkey()
+    private let shelfHotkey = GlobalHotkey(id: 2)
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
+    private var menuHold: MenuHoldObserver?
+    private let volumeHUD = VolumeHUDController()
     private var sigtermSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -93,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
 
         mouseTracker = MouseTracker(panel: panel, viewModel: viewModel)
+        menuHold = MenuHoldObserver(viewModel: viewModel)
         connectKeyboard(panel: panel)
         connectReach()
         connectOnboarding()
@@ -111,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        features.fileTools.cleanUpStaging()
         features.notes.save()
         features.nowPlaying.stop()
     }
@@ -186,17 +192,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connectAgenda()
         connectWeather()
         connectLyrics()
+        connectVolumeHUD()
         connectStorage()
         connectDevices()
         connectCapture()
 
-        // A fresh install's first launches hold back what would prompt on its own (Bluetooth, Downloads): the guide asks at a
-        // moment of its own, and starts them when it ends.
-        let holdsPrompts = onboarding.holdsLaunchPrompts
+        // Nothing prompts at launch, on any install. What has a permission starts only once the person has allowed it (Bluetooth) or
+        // been asked (Downloads, which the system won't say): the guide, Settings \u{2192} Privacy, or first use asks.
         batteryMonitor.start()
-        if !holdsPrompts { accessoryMonitor.start() }
         features.privacy.start()
-        if !holdsPrompts { features.transfers.start() }
+        startPermittedMonitors()
         features.network.start()
         volumeMonitor.start()
         connectShelfChoices()
@@ -313,6 +318,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         apply()
     }
 
+    /// The island's own volume HUD, while Replace the Volume HUD is on. The tap exists only then.
+    private func connectVolumeHUD() {
+        let hud = volumeHUD
+        let features = features
+        let viewModel = viewModel
+        hud.canShow = { viewModel.canShowVolumeHUD }
+        // Clean Keys holds its own tap, and has the keys to itself while it does.
+        hud.isSuspended = { features.keyboardCleaner.isLocked }
+        hud.onShow = { viewModel.showVolume($0) }
+        hud.onLostAccess = { [weak self] in
+            // The permission was taken away: the tap is gone and the system's HUD is back. The setting follows, and says so.
+            self?.features.settings.replacesVolumeHUD = false
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "speaker.wave.2.fill", tint: Theme.Tint.attention, title: "Volume HUD Turned Off",
+                    detail: "Accessibility access was turned off"),
+                for: .seconds(6), respectingFocus: false)
+        }
+        features.settings.onVolumeHUDChange = { [weak self] in self?.applyVolumeHUD(userInitiated: true) }
+        // Back from System Settings, it tries again without asking.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyVolumeHUD(userInitiated: false) }
+        }
+        applyVolumeHUD(userInitiated: false)
+    }
+
+    /// Starts or stops the tap to match the setting. At launch, and on coming back to the app, it never asks for anything: without
+    /// Accessibility it waits, and the system's HUD stays. Turning the setting on is the person's choice to be asked, so then it asks, leaves
+    /// the setting off, and says what to do.
+    private func applyVolumeHUD(userInitiated: Bool) {
+        let settings = features.settings
+        guard settings.replacesVolumeHUD else {
+            volumeHUD.stop()
+            return
+        }
+        switch volumeHUD.start() {
+        case .started:
+            break
+        case .needsAccess:
+            guard userInitiated else { return }
+            settings.replacesVolumeHUD = false
+            Task { await AccessCenter.model?.allow(.accessibility) }
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "hand.raised.fill", tint: Theme.Tint.attention, title: "Accessibility Access Needed",
+                    detail: "Allow MacIsland in Accessibility, then turn this on again",
+                    actions: [.init(title: "Open Settings") { KeyboardCleaner.openAccessibilitySettings() }]),
+                for: .seconds(8), respectingFocus: false)
+        case .failed:
+            guard userInitiated else { return }
+            settings.replacesVolumeHUD = false
+            viewModel.showBanner(
+                IslandBanner(
+                    systemImage: "speaker.wave.2.fill", tint: Theme.Tint.attention,
+                    title: "Couldn\u{2019}t Take the Volume Keys", detail: "The system HUD is still in use"),
+                for: .seconds(6), respectingFocus: false)
+        }
+    }
+
     /// Drives offer Eject when they mount; new screenshots land on the Shelf.
     private func connectStorage() {
         let viewModel = viewModel
@@ -331,6 +397,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         features.fileTools.onDone = { [diskSpace] word in
             viewModel.flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: word))
+            diskSpace.check()
+        }
+        // A stale staging folder from a run that didn't quit cleanly goes now; nothing pending survives a launch.
+        features.fileTools.cleanUpStaging()
+        // A result waits in the Shelf for a choice; the alert stays until the island is opened, on the Shelf.
+        features.fileTools.onResult = { [diskSpace] result in
+            viewModel.flash(
+                IslandAlert(
+                    systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: result.verb,
+                    staysUntilSeen: true, opensTab: .shelf),
+                respectingFocus: false)
             diskSpace.check()
         }
         features.fileTools.onNote = { note in viewModel.flash(note, respectingFocus: false) }
@@ -385,20 +462,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        let applyAgenda = {
+        // Turning a setting on is the choice to be asked, so its prompt may show. The launch only reads what macOS has decided.
+        let applyAgenda = { (mayAsk: Bool) in
             features.agenda.configure(
-                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders)
+                calendar: features.settings.showsCalendar, reminders: features.settings.showsReminders, mayAsk: mayAsk)
         }
-        features.settings.onAgendaChange = applyAgenda
-        applyAgenda()
+        features.settings.onAgendaChange = { applyAgenda(true) }
+        applyAgenda(false)
         features.agenda.start()
 
-        // Focus is only read once something needs it, so macOS asks at a moment that makes sense.
-        let applyQuiet = {
-            if features.settings.quietDuringFocus { features.focus.start() }
+        // Focus is only read once something needs it, so macOS asks at a moment that makes sense: when Quiet in Focus is turned on.
+        // At launch it starts only if it was already allowed.
+        let applyQuiet = { (atLaunch: Bool) in
+            guard features.settings.quietDuringFocus, !atLaunch || FocusMode.isAuthorized else { return }
+            features.focus.start()
         }
-        features.settings.onQuietChange = applyQuiet
-        applyQuiet()
+        features.settings.onQuietChange = { applyQuiet(false) }
+        applyQuiet(true)
     }
 
     /// The first-run guide: what it needs from the app, its links, and showing it at the end of launch when this install hasn't
@@ -406,10 +486,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectOnboarding() {
         let onboarding = onboarding
         SettingsWindowController.shared.onboarding = onboarding
+        let access = LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess, transfers: features.transfers)
+        // Settings \u{2192} Privacy asks through this one, so a grant there does what a grant in the guide does.
+        AccessCenter.model = AccessModel(
+            provider: access, settings: features.settings,
+            onBluetoothAllowed: { [weak self] in self?.accessoryMonitor.start() })
         OnboardingWindowController.shared.context = OnboardingContext(
             features: features, island: viewModel, state: onboarding,
-            access: LiveAccess(agenda: features.agenda, bluetooth: bluetoothAccess),
-            startDeferredMonitors: { [weak self] in self?.startDeferredMonitors() },
+            access: access,
+            startDeferredMonitors: { [weak self] in self?.startPermittedMonitors() },
             startAccessoryMonitor: { [weak self] in self?.accessoryMonitor.start() },
             openSettings: { SettingsWindowController.shared.show() })
         urlCommands.onGuide = { reset in
@@ -425,10 +510,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if onboarding.needsGuide { OnboardingWindowController.shared.show(replay: false) }
     }
 
-    /// Starts what `connectEvents` starts, for anything it held back. Safe to call again.
-    private func startDeferredMonitors() {
-        accessoryMonitor.start()
-        features.transfers.start()
+    /// Starts the monitors that have a permission, for the ones whose permission is already settled, and never prompts: Bluetooth
+    /// when it is allowed, Downloads once it has been asked. Run at launch and again when the guide ends. Safe to call again.
+    private func startPermittedMonitors() {
+        if BluetoothAccess.isAllowed { accessoryMonitor.start() }
+        if AccessAsked.contains(.downloads) { features.transfers.start() }
     }
 
     /// Windows torn off the island, and opening Settings from it.
@@ -445,7 +531,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// and the old one stays.
     private func registerShortcuts() {
         let settings = features.settings
-        let keys: [ShortcutSlot: GlobalHotkey] = [.open: hotkey]
+        let keys: [ShortcutSlot: GlobalHotkey] = [.open: hotkey, .shelf: shelfHotkey]
         func apply(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
             guard let key = keys[slot] else { return false }
             guard let combo else {
@@ -468,6 +554,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // While the first-run guide is up, the shortcut is practised on the island in its window, not on this one.
             if OnboardingWindowController.shared.handleOpenShortcut() { return }
             viewModel.toggleFromKeyboard()
+            if viewModel.isPinnedOpen { panel?.makeKey() }
+        }
+        shelfHotkey.onPress = { [weak panel] in
+            viewModel.toggleShelfFromKeyboard()
             if viewModel.isPinnedOpen { panel?.makeKey() }
         }
         registerShortcuts()

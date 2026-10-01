@@ -66,6 +66,26 @@ enum ClockMode: String, CaseIterable, Identifiable {
 }
 
 /// A short message beside the notch (charging, color copied, timer done).
+/// A reason the island stays open while the pointer is somewhere else. Reasons are named so two of them can't cancel each other:
+/// ending a menu never lets go of Quick Look, and stopping Mirror never unpins the keyboard. The keyboard pin
+/// (`IslandViewModel.isPinnedOpen`) is its own thing.
+enum IslandHold: CaseIterable, Hashable {
+    /// An AppKit menu is tracking: a context menu, a submenu, the share menu.
+    case menu
+    /// Quick Look is showing a Shelf file.
+    case quickLook
+    /// A panel or alert the island opened (a save panel, for example). Take it with `holding(_:during:)`.
+    case panel
+    /// A text field in the island has the keyboard.
+    case textFocus
+    /// The camera is on in Mirror. Never taken by name: it lasts exactly as long as the camera is on and working.
+    case mirror
+
+    /// Ends when the person closes the island or brings the pointer back, as the keyboard pin does. The others end only
+    /// when what took them does, and a click outside does not close the island under them.
+    var endsWithPointer: Bool { self == .textFocus }
+}
+
 struct IslandAlert: Equatable {
     let id = UUID()
     var systemImage: String
@@ -79,6 +99,8 @@ struct IslandAlert: Equatable {
     var opensTab: IslandModule?
     /// The glyph is drawn as a `ChargingBadge`, with a ring circling the bolt.
     var isCharging = false
+    /// The volume HUD: a level bar and its percent take the place of the text.
+    var volume: VolumeLevel?
 }
 
 /// A wider, momentary announcement below the notch, with at most two actions. With two, the first is the main one.
@@ -199,7 +221,11 @@ final class IslandViewModel {
     private(set) var calendarExpanded = false
     var shelfMode: ShelfMode
     /// The Shelf file being previewed with Quick Look.
-    var quickLookURL: URL?
+    var quickLookURL: URL? {
+        didSet {
+            if quickLookURL != nil { hold(.quickLook) } else { release(.quickLook) }
+        }
+    }
     /// The Shelf file under the pointer, which Space previews.
     @ObservationIgnored private(set) var hoveredShelfItem: URL?
     /// Asks the app to give the island the keyboard (set by the app, which owns the panel).
@@ -233,6 +259,10 @@ final class IslandViewModel {
     @ObservationIgnored private var isHovering = false
     /// Opened from the keyboard: stays open with the pointer elsewhere until Esc, the hotkey, or a click outside.
     @ObservationIgnored private(set) var isPinnedOpen = false
+    /// What is holding the island open (see `IslandHold`), apart from the keyboard pin and Mirror, which is derived.
+    @ObservationIgnored private(set) var holds: Set<IslandHold> = []
+    /// Where the pointer is, in screen coordinates. Tests replace it.
+    @ObservationIgnored var pointerLocation: () -> CGPoint = { NSEvent.mouseLocation }
 
     init(features: IslandFeatures) {
         self.features = features
@@ -304,8 +334,21 @@ final class IslandViewModel {
         return (list[0], list[1])
     }
 
-    /// Width added on each side of the notch. Leading and trailing stay equal so the
-    /// two halves read as one piece.
+    /// Width added on each side of the notch. Equal on both sides, except for the volume HUD.
+    private var compactSideWidths: (leading: CGFloat, trailing: CGFloat) {
+        if presentation == .compact, case .alert(let alert) = compactActivity, alert.volume != nil, compactPair == nil {
+            return (Theme.Metrics.volumeHUDLeading, Theme.Metrics.volumeHUDTrailing)
+        }
+        return (compactSideWidth, compactSideWidth)
+    }
+
+    /// How far the island sits right of the notch's center, so uneven sides still hug the notch.
+    var horizontalOffset: CGFloat {
+        guard presentation == .compact, !showsDragTarget else { return 0 }
+        let sides = compactSideWidths
+        return (sides.trailing - sides.leading) / 2
+    }
+
     private var compactSideWidth: CGFloat {
         if compactPair != nil { return geometry.notchSize.height + 8 }
         switch compactActivity {
@@ -396,7 +439,8 @@ final class IslandViewModel {
         case .compact:
             if isPillHidden { return .zero }
             var size = geometry.compactSize
-            size.width += 2 * compactSideWidth
+            let sides = compactSideWidths
+            size.width += sides.leading + sides.trailing
             size.height += 1
             if showsDragTarget {
                 size.width = max(size.width, geometry.compactSize.width + 2 * Theme.Metrics.dragTargetInset)
@@ -424,7 +468,7 @@ final class IslandViewModel {
     var hitSize: CGSize { isPillHidden ? geometry.compactSize : size }
 
     /// Area that counts as "over the island", in screen coordinates.
-    var hitRect: CGRect { geometry.islandRect(for: hitSize) }
+    var hitRect: CGRect { geometry.islandRect(for: hitSize).offsetBy(dx: horizontalOffset, dy: 0) }
 
     /// The timer is being set: the dial is on screen and takes horizontal scrolls.
     var isSettingTimer: Bool {
@@ -560,11 +604,72 @@ final class IslandViewModel {
         open()
     }
 
+    /// The names of the Shortcuts that exist, or nil until they have been listed. A Shortcut tool whose Shortcut isn't in it is dimmed.
+    private(set) var installedShortcuts: Set<String>?
+    /// The Shortcut tools that are running now.
+    private(set) var runningShortcutTools: Set<UUID> = []
+    /// Runs a Shortcut by name and says whether it finished, and lists them. Tests replace them.
+    @ObservationIgnored var shortcutRunner: (String) async -> Bool = { await ShortcutsCLI.run(shortcut: $0) }
+    @ObservationIgnored var shortcutLister: () async -> [String] = { await ShortcutsCLI.list() }
+
+    /// Lists the Shortcuts again: when the Tools tab appears, and after a Shortcut tool is saved.
+    func refreshInstalledShortcuts() {
+        guard !features.settings.shortcutTools.isEmpty else { return }
+        Task {
+            let names = await shortcutLister()
+            // An empty list is `shortcuts` failing to answer as often as it is a person with none; say nothing then.
+            installedShortcuts = names.isEmpty ? nil : Set(names)
+        }
+    }
+
+    /// Runs a tool made from a Shortcut: the blue working activity while it runs, a green alert when it finishes, and a red banner
+    /// with the reason when it doesn't. A Shortcut that is no longer there says so, and offers to edit the tool.
+    func runShortcutTool(_ tool: ShortcutTool) {
+        guard !runningShortcutTools.contains(tool.id) else { return }
+        if let installed = installedShortcuts, !installed.contains(tool.shortcut) {
+            showBanner(
+                IslandBanner(
+                    systemImage: "questionmark.square.dashed", tint: Theme.Tint.attention,
+                    title: "\u{201C}\(tool.shortcut)\u{201D} Isn\u{2019}t There",
+                    detail: "It may have been renamed or deleted",
+                    actions: [
+                        .init(title: "Edit Tool") { [weak self] in self?.editShortcutTool(tool.id) }
+                    ]),
+                for: .seconds(8), respectingFocus: false)
+            return
+        }
+        runningShortcutTools.insert(tool.id)
+        let job = features.work.begin("Running")
+        Task {
+            let finished = await shortcutRunner(tool.shortcut)
+            features.work.end(job)
+            runningShortcutTools.remove(tool.id)
+            if finished {
+                flash(
+                    IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: "Done"),
+                    respectingFocus: false)
+            } else {
+                showBanner(
+                    IslandBanner(
+                        systemImage: "square.2.layers.3d", tint: Theme.Tint.attention,
+                        title: "\u{201C}\(tool.shortcut)\u{201D} Didn\u{2019}t Finish",
+                        detail: "Open it in Shortcuts to see why"),
+                    for: .seconds(6), respectingFocus: false)
+            }
+        }
+    }
+
+    /// Opens Settings on the Tools pane with this tool's sheet showing.
+    func editShortcutTool(_ id: UUID) {
+        features.settings.requestedShortcutToolEdit = id
+        onOpenSettings?(.tools, nil)
+    }
+
     /// Runs one of the person's Shortcuts. It shows as work in progress while it runs.
     func runShortcut(_ name: String) {
         let job = features.work.begin("Running")
         Task {
-            let finished = await ShortcutsCLI.run(shortcut: name)
+            let finished = await shortcutRunner(name)
             features.work.end(job)
             if finished {
                 flash(
@@ -591,18 +696,21 @@ final class IslandViewModel {
 
     // MARK: Capture
 
-    /// Shows the camera in the Tools tab, and keeps the island open while it is there.
+    /// Shows the camera in the Tools tab. The island stays open for as long as the camera is on and working (the `.mirror` hold).
     func startMirror() {
         guard !features.mirror.isOn else { return }
         selectedTab = .tools
-        holdOpen()
         open()
-        Task { await features.mirror.toggle() }
+        Task {
+            await self.features.mirror.toggle()
+            // A camera that failed or was denied holds nothing: the normal rules return.
+            self.resumeAfterHold()
+        }
     }
 
     func stopMirror() {
         features.mirror.stop()
-        isPinnedOpen = false
+        resumeAfterHold()
     }
 
     func toggleMirror() {
@@ -668,9 +776,62 @@ final class IslandViewModel {
         }
     }
 
-    func holdOpen() {
+    // MARK: Holds
+
+    /// The holds in force: the ones taken by name, and `.mirror` for as long as the camera is on and working. A camera that
+    /// failed (`isUnavailable`) or was denied holds nothing.
+    var activeHolds: Set<IslandHold> {
+        var all = holds
+        let mirror = features.mirror
+        if mirror.isOn, !mirror.isUnavailable, mirror.access != .denied { all.insert(.mirror) }
+        return all
+    }
+
+    /// Something keeps the island open, so the pointer leaving does not fold it.
+    var isHeld: Bool { !activeHolds.isEmpty }
+
+    /// A hold that only its owner ends: a menu, Quick Look, a panel, Mirror.
+    var isHeldHard: Bool { activeHolds.contains { !$0.endsWithPointer } }
+
+    /// Whether a click outside the island closes it: it is pinned (by the keyboard or a text field), and nothing holds it open.
+    var closesOnClickOutside: Bool {
+        (isPinnedOpen || holds.contains(.textFocus)) && !isHeldHard
+    }
+
+    func hold(_ hold: IslandHold) {
+        guard hold != .mirror else { return }
         hoverTask?.cancel()
-        isPinnedOpen = true
+        holds.insert(hold)
+    }
+
+    /// Lets go of a hold. When it was the last, the normal rules return.
+    func release(_ hold: IslandHold) {
+        guard holds.remove(hold) != nil else { return }
+        resumeAfterHold()
+    }
+
+    /// Holds the island open while `body` runs, for a panel that is shown and answered (a save panel).
+    func holding<T>(_ hold: IslandHold, during body: () async -> T) async -> T {
+        self.hold(hold)
+        defer { release(hold) }
+        return await body()
+    }
+
+    /// With the last hold gone, an island the pointer is not over folds after the usual delay, from now, not never.
+    private func resumeAfterHold() {
+        guard !isHeld, !isPinnedOpen, state != .compact, banner == nil else { return }
+        let inside = hitRect.contains(pointerLocation())
+        isHovering = inside
+        hoverTask?.cancel()
+        if !inside { scheduleClose() }
+    }
+
+    private func scheduleClose() {
+        hoverTask = Task { [weak self] in
+            try? await Task.sleep(for: Theme.Timing.closeDelay)
+            guard !Task.isCancelled, let self, self.state != .compact, !self.isHeld else { return }
+            withAnimation(Theme.Motion.close) { self.state = .compact }
+        }
     }
 
     func copySnippet(_ snippet: Snippet) {
@@ -724,9 +885,27 @@ final class IslandViewModel {
 
     /// Quick Look for a Shelf file. The island stays open while the preview is up.
     func showQuickLook(_ url: URL) {
-        holdOpen()
         NSApp.activate()
         quickLookURL = url
+    }
+
+    // MARK: Shelf results
+
+    func addResultToShelf(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { _ = features.fileTools.addToShelf(result) }
+    }
+
+    func replaceWithResult(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { _ = features.fileTools.replaceInShelf(result) }
+    }
+
+    /// The save panel is the island's own: it stays open behind it (the `.panel` hold), and the choice waits if the panel is cancelled.
+    func saveResultToFolder(_ result: ShelfResult) {
+        Task { _ = await holding(.panel) { await features.fileTools.saveToFolder(result) } }
+    }
+
+    func discardResult(_ result: ShelfResult) {
+        withAnimation(Theme.Motion.resize) { features.fileTools.discard(result) }
     }
 
     /// Space over a Shelf file. Returns `false` when there is nothing to preview, so the key passes on.
@@ -787,6 +966,11 @@ final class IslandViewModel {
         isHovering = hovering
         hoverTask?.cancel()
 
+        // The volume HUD holds still while the pointer is on it, then leaves as it would have.
+        if alert?.volume != nil {
+            if hovering { alertTask?.cancel() } else { scheduleAlertDismissal(after: Theme.Timing.volumeHUD) }
+        }
+
         // A banner holds still while the pointer is on it, then leaves shortly after.
         if banner != nil {
             if hovering {
@@ -797,9 +981,12 @@ final class IslandViewModel {
             return
         }
 
-        // The pointer takes over from the keyboard; leaving doesn't close a pinned island.
-        if hovering { isPinnedOpen = false }
-        if isPinnedOpen { return }
+        // The pointer takes over from the keyboard and a text field; leaving doesn't close a pinned or held island.
+        if hovering {
+            isPinnedOpen = false
+            holds.remove(.textFocus)
+        }
+        if isPinnedOpen || isHeld { return }
 
         if hovering {
             guard state == .compact else { return }
@@ -820,11 +1007,7 @@ final class IslandViewModel {
             }
         } else {
             if isSwelling { withAnimation(Theme.Motion.track) { isSwelling = false } }
-            hoverTask = Task { [weak self] in
-                try? await Task.sleep(for: Theme.Timing.closeDelay)
-                guard !Task.isCancelled, let self, self.state != .compact else { return }
-                withAnimation(Theme.Motion.close) { self.state = .compact }
-            }
+            scheduleClose()
         }
     }
 
@@ -857,8 +1040,30 @@ final class IslandViewModel {
         open()
     }
 
+    /// The Shelf's shortcut: open and pin the island on the Shelf, even when the Shelf isn't in the tab strip. Open on another tab, it
+    /// moves to the Shelf; already on the Shelf, it closes.
+    func toggleShelfFromKeyboard() {
+        if state == .expanded {
+            if selectedTab == .shelf {
+                closePinned()
+            } else {
+                isPinnedOpen = true
+                select(.shelf)
+            }
+            return
+        }
+        selectedTab = .shelf
+        isPinnedOpen = true
+        open()
+    }
+
+    /// Esc, the shortcut, a swipe up, or a click outside a pinned island. Mirror is the one thing that refuses: it stays until
+    /// Done. A menu or panel does not refuse Esc or the shortcut (a stuck hold must never trap the island open); a click outside
+    /// is held off by them in `closesOnClickOutside`.
     func closePinned() {
+        guard !activeHolds.contains(.mirror) else { return }
         isPinnedOpen = false
+        holds.remove(.textFocus)
         hoverTask?.cancel()
         withAnimation(Theme.Motion.close) { state = .compact }
     }
@@ -888,11 +1093,14 @@ final class IslandViewModel {
         hoverTask?.cancel()
         hoverTask = nil
         isPinnedOpen = false
+        holds.removeAll()
         isSwelling = false
     }
 
     /// Left/right arrow: move to the neighboring tab, without wrapping.
     func selectAdjacentTab(_ step: Int) {
+        // Changing tab would switch the camera off: with Mirror on, swiping and the arrow keys are ignored. Clicking a tab still works.
+        guard !activeHolds.contains(.mirror) else { return }
         let tabs = visibleTabs()
         guard let index = tabs.firstIndex(of: selectedTab) else { return }
         let next = index + step
@@ -921,7 +1129,7 @@ final class IslandViewModel {
     }
 
     /// While a Focus is on and the person asked for quiet, only alerts that stay until seen get through.
-    private var isQuiet: Bool { features.settings.quietDuringFocus && features.focus.isFocused }
+    private var isQuiet: Bool { features.settings.quietDuringFocus && features.focus.readNow() }
 
     /// `respectingFocus: false` is for feedback to something the person just did.
     func flash(
@@ -933,11 +1141,29 @@ final class IslandViewModel {
         alertTask?.cancel()
         withAnimation(Theme.Motion.open) { self.alert = alert }
         guard !alert.staysUntilSeen else { return }
+        scheduleAlertDismissal(after: duration)
+    }
+
+    private func scheduleAlertDismissal(after duration: Duration) {
+        alertTask?.cancel()
         alertTask = Task { [weak self] in
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled, let self else { return }
             withAnimation(Theme.Motion.close) { self.alert = nil }
         }
+    }
+
+    // MARK: Volume HUD
+
+    /// Whether the volume HUD may take the stage: the island is folded, and nothing that needs the person is showing. It is never queued
+    /// behind one: the key goes to the system's own HUD instead.
+    var canShowVolumeHUD: Bool {
+        state == .compact && banner == nil && alert?.staysUntilSeen != true
+    }
+
+    /// Shows the volume in the island for a moment. Each press shows it again, and the pointer on it holds it.
+    func showVolume(_ level: VolumeLevel) {
+        flash(Announcements.volume(level), for: Theme.Timing.volumeHUD, respectingFocus: false)
     }
 
     /// Shows a banner, then optionally leaves `followUp` as a compact alert.
@@ -951,6 +1177,13 @@ final class IslandViewModel {
         if let event, features.settings.isMuted(event) { return }
         if respectingFocus, isQuiet {
             if let followUp { flash(followUp) }
+            return
+        }
+        // A banner folds the island, which Mirror, a menu, or a panel must not lose: it waits as an alert until it is seen.
+        if state != .compact, isHeldHard {
+            flash(
+                IslandAlert(systemImage: banner.systemImage, tint: banner.tint, text: banner.title, staysUntilSeen: true),
+                respectingFocus: false)
             return
         }
         bannerTask?.cancel()

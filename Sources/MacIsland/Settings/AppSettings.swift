@@ -60,6 +60,8 @@ final class AppSettings {
     @ObservationIgnored var onWeatherChange: (() -> Void)?
     /// Synced Lyrics was turned on or off.
     @ObservationIgnored var onLyricsChange: (() -> Void)?
+    /// Replace the Volume HUD was turned on or off.
+    @ObservationIgnored var onVolumeHUDChange: (() -> Void)?
 
     private(set) var launchAtLogin: Bool
 
@@ -67,6 +69,13 @@ final class AppSettings {
     private(set) var openShortcut: KeyCombo? {
         didSet {
             defaults.set(try? JSONEncoder().encode(StoredShortcut(combo: openShortcut)), forKey: Key.openShortcut)
+        }
+    }
+
+    /// The keys that open the island on the Shelf from anywhere. Nil is off.
+    private(set) var shelfShortcut: KeyCombo? {
+        didSet {
+            defaults.set(try? JSONEncoder().encode(StoredShortcut(combo: shelfShortcut)), forKey: Key.shelfShortcut)
         }
     }
 
@@ -164,6 +173,55 @@ final class AppSettings {
 
     static let fullChargeRange = 80...100
 
+    /// The Pomodoro's lengths, in minutes. A value outside its range is pulled back in.
+    var pomodoroFocus: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroFocus, to: PomodoroPlan.focusRange)
+            if clamped != pomodoroFocus { pomodoroFocus = clamped }
+            defaults.set(pomodoroFocus, forKey: Key.pomodoroFocus)
+        }
+    }
+
+    var pomodoroShortBreak: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroShortBreak, to: PomodoroPlan.shortBreakRange)
+            if clamped != pomodoroShortBreak { pomodoroShortBreak = clamped }
+            defaults.set(pomodoroShortBreak, forKey: Key.pomodoroShortBreak)
+        }
+    }
+
+    var pomodoroLongBreak: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroLongBreak, to: PomodoroPlan.longBreakRange)
+            if clamped != pomodoroLongBreak { pomodoroLongBreak = clamped }
+            defaults.set(pomodoroLongBreak, forKey: Key.pomodoroLongBreak)
+        }
+    }
+
+    /// Focus sessions before the long break.
+    var pomodoroSessions: Int {
+        didSet {
+            // Assigning inside its own didSet doesn't run it again, so the pulled-in value is stored here.
+            let clamped = Self.clamped(pomodoroSessions, to: PomodoroPlan.sessionsRange)
+            if clamped != pomodoroSessions { pomodoroSessions = clamped }
+            defaults.set(pomodoroSessions, forKey: Key.pomodoroSessions)
+        }
+    }
+
+    /// The four Pomodoro settings as the model reads them.
+    var pomodoroPlan: PomodoroPlan {
+        PomodoroPlan(
+            focus: pomodoroFocus, shortBreak: pomodoroShortBreak, longBreak: pomodoroLongBreak,
+            sessions: pomodoroSessions)
+    }
+
+    private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
     /// The city whose weather Home shows. Empty means no weather. Only the name is sent, to Open-Meteo.
     var weatherCity: String {
         didSet {
@@ -180,14 +238,35 @@ final class AppSettings {
         }
     }
 
+    /// The island's volume HUD instead of the system's: MacIsland takes the volume keys, which needs Accessibility access, so it is off
+    /// until turned on and stays off until that is granted.
+    var replacesVolumeHUD: Bool {
+        didSet {
+            defaults.set(replacesVolumeHUD, forKey: Key.volumeHUD)
+            onVolumeHUDChange?()
+        }
+    }
+
     var pinLimit: PinLimit {
         didSet { defaults.set(pinLimit.rawValue, forKey: Key.pinLimit) }
     }
 
-    /// Tools in row order. Only the first `pinLimit` show; the rest wait behind More.
+    /// Tools in row order. Only the first `pinLimit` show; the rest wait behind More. May name a Shortcut tool that was since removed;
+    /// `visiblePinned` leaves those out.
     private(set) var pinnedTools: [ToolID] {
         didSet { defaults.set(pinnedTools.map(\.rawValue), forKey: Key.pinned) }
     }
+
+    /// Tools the person made from their Shortcuts, in the order they made them.
+    private(set) var shortcutTools: [ShortcutTool] {
+        didSet { defaults.set(try? JSONEncoder().encode(shortcutTools), forKey: Key.shortcutTools) }
+    }
+
+    /// The Tools tab has room for nine built-in tools, this many of the person's own, and Less: two rows of six.
+    static let maxShortcutTools = 2
+
+    /// A Shortcut tool the Tools tab's Settings asked to edit (its right-click menu). Not stored: the pane takes it.
+    var requestedShortcutToolEdit: UUID?
 
     /// The tabs left of the notch, in order: up to `Theme.Metrics.maxTabs`.
     private(set) var leftTabs: [IslandModule] {
@@ -231,6 +310,7 @@ final class AppSettings {
         static let rightTabs = "tabsRight"
         static let hotkey = "hotkey"
         static let openShortcut = "shortcut.open"
+        static let shelfShortcut = "shortcut.shelf"
         static let peeksOnHover = "peeksOnHover"
         static let swipesEnabled = "swipesEnabled"
         static let islandDisplay = "islandDisplay"
@@ -247,8 +327,14 @@ final class AppSettings {
         static let pinLimit = "pinLimit"
         static let fullCharge = "fullChargeLevel"
         static let lyrics = "showsLyrics"
+        static let volumeHUD = "replacesVolumeHUD"
+        static let pomodoroFocus = "pomodoroFocus"
+        static let pomodoroShortBreak = "pomodoroShortBreak"
+        static let pomodoroLongBreak = "pomodoroLongBreak"
+        static let pomodoroSessions = "pomodoroSessions"
         static let weatherCity = "weatherCity"
         static let pinned = "pinnedTools"
+        static let shortcutTools = "tools.shortcuts"
         static let homeLayout = "home.layout"
         static let savedHomePresets = "home.savedPresets"
         static let customWidgets = "widgets.custom"
@@ -258,6 +344,7 @@ final class AppSettings {
         self.defaults = defaults
         launchAtLogin = LaunchAtLogin.isEnabled
         openShortcut = Self.storedShortcut(defaults, Key.openShortcut) ?? Self.legacyOpenShortcut(defaults)
+        shelfShortcut = Self.storedShortcut(defaults, Key.shelfShortcut) ?? .shelfDefault
         peeksOnHover = defaults.object(forKey: Key.peeksOnHover) as? Bool ?? true
         swipesEnabled = defaults.object(forKey: Key.swipesEnabled) as? Bool ?? true
         islandDisplay = defaults.string(forKey: Key.islandDisplay).flatMap(IslandDisplay.init) ?? .builtIn
@@ -274,10 +361,28 @@ final class AppSettings {
         showsReminders = defaults.bool(forKey: Key.reminders)
         weatherCity = defaults.string(forKey: Key.weatherCity) ?? ""
         showsLyrics = defaults.object(forKey: Key.lyrics) as? Bool ?? true
+        replacesVolumeHUD = defaults.bool(forKey: Key.volumeHUD)
         let storedFull = defaults.integer(forKey: Key.fullCharge)
         fullChargeLevel = Self.fullChargeRange.contains(storedFull) ? storedFull : 100
+        // Absent (or 0) is never chosen: the default. A stored value outside its range is pulled in.
+        func minutes(_ key: String, _ range: ClosedRange<Int>, default fallback: Int) -> Int {
+            defaults.object(forKey: key) == nil ? fallback : Self.clamped(defaults.integer(forKey: key), to: range)
+        }
+        let plan = PomodoroPlan.default
+        pomodoroFocus = minutes(Key.pomodoroFocus, PomodoroPlan.focusRange, default: plan.focus)
+        pomodoroShortBreak = minutes(Key.pomodoroShortBreak, PomodoroPlan.shortBreakRange, default: plan.shortBreak)
+        pomodoroLongBreak = minutes(Key.pomodoroLongBreak, PomodoroPlan.longBreakRange, default: plan.longBreak)
+        pomodoroSessions = minutes(Key.pomodoroSessions, PomodoroPlan.sessionsRange, default: plan.sessions)
         pinLimit = PinLimit(rawValue: defaults.integer(forKey: Key.pinLimit)) ?? .six
-        pinnedTools = defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init) ?? ToolID.defaultPins
+        let shortcuts =
+            defaults.data(forKey: Key.shortcutTools).flatMap { try? JSONDecoder().decode([ShortcutTool].self, from: $0) }
+            ?? []
+        shortcutTools = Array(shortcuts.filter(\.isValid).prefix(Self.maxShortcutTools))
+        // A pinned Shortcut tool whose record is gone is dropped.
+        pinnedTools =
+            defaults.stringArray(forKey: Key.pinned)?.compactMap(ToolID.init)
+            .filter { tool in tool.shortcutID.map { id in shortcuts.contains { $0.id == id } } ?? true }
+            ?? ToolID.defaultPins
         menuBarModules = (defaults.stringArray(forKey: Key.menuBar) ?? []).compactMap(IslandModule.init).filter(
             \.isAvailable)
         let customs =
@@ -330,19 +435,26 @@ final class AppSettings {
     func shortcut(_ slot: ShortcutSlot) -> KeyCombo? {
         switch slot {
         case .open: openShortcut
+        case .shelf: shelfShortcut
         }
     }
 
-    /// Records a shortcut, or turns it off with nil. Refuses (false) one without Control, Option, or Command, and one
-    /// the system won't give this app because another app holds it. A refused shortcut leaves the old one in place.
-    /// Does nothing unless it changes something.
+    /// The other slot that already has `combo`, if one does.
+    func slot(holding combo: KeyCombo, besides slot: ShortcutSlot) -> ShortcutSlot? {
+        ShortcutSlot.allCases.first { $0 != slot && shortcut($0) == combo }
+    }
+
+    /// Records a shortcut, or turns it off with nil. Refuses (false) one without Control, Option, or Command, one another
+    /// slot already has, and one the system won't give this app because another app holds it. A refused shortcut leaves
+    /// the old one in place. Does nothing unless it changes something.
     @discardableResult
     func setShortcut(_ slot: ShortcutSlot, _ combo: KeyCombo?) -> Bool {
-        if let combo, !combo.isValid { return false }
+        if let combo, !combo.isValid || self.slot(holding: combo, besides: slot) != nil { return false }
         guard combo != shortcut(slot) else { return true }
         guard shortcutRegistrar?(slot, combo) ?? true else { return false }
         switch slot {
         case .open: openShortcut = combo
+        case .shelf: shelfShortcut = combo
         }
         return true
     }
@@ -656,7 +768,61 @@ final class AppSettings {
     /// The row is always full: what the person pinned, then the remaining tools in their usual order,
     /// up to the row length (or every tool, if there are fewer).
     var visiblePinned: [ToolID] {
-        Self.filled(Array(pinnedTools.prefix(pinLimit.rawValue)), to: pinLimit.rawValue)
+        Self.filled(
+            Array(pinnedTools.filter(isKnown).prefix(pinLimit.rawValue)), to: pinLimit.rawValue, from: allTools)
+    }
+
+    // MARK: Shortcut tools
+
+    /// Every tool: the built-in ones, then the person's own.
+    var allTools: [ToolID] { ToolID.allCases + shortcutTools.map(\.toolID) }
+
+    /// Whether `tool` exists: a built-in, or a Shortcut tool that is still there.
+    func isKnown(_ tool: ToolID) -> Bool {
+        tool.shortcutID.map { id in shortcutTools.contains { $0.id == id } } ?? true
+    }
+
+    func shortcutTool(for tool: ToolID) -> ShortcutTool? {
+        tool.shortcutID.flatMap { id in shortcutTools.first { $0.id == id } }
+    }
+
+    func shortcutTool(id: UUID) -> ShortcutTool? { shortcutTools.first { $0.id == id } }
+
+    var canAddShortcutTool: Bool { shortcutTools.count < Self.maxShortcutTools }
+
+    /// Adds a Shortcut tool, or replaces the one with the same id. Refuses (false) one that isn't valid, or a new one when the
+    /// Tools tab is full. Does nothing unless it changes something.
+    @discardableResult
+    func saveShortcutTool(_ tool: ShortcutTool) -> Bool {
+        let tool = tool.cleaned
+        guard tool.isValid else { return false }
+        if let index = shortcutTools.firstIndex(where: { $0.id == tool.id }) {
+            guard shortcutTools[index] != tool else { return true }
+            shortcutTools[index] = tool
+            return true
+        }
+        guard canAddShortcutTool else { return false }
+        shortcutTools.append(tool)
+        return true
+    }
+
+    /// Takes a Shortcut tool away, and off the row. The Shortcut itself is not touched.
+    func removeShortcutTool(_ id: UUID) {
+        guard shortcutTools.contains(where: { $0.id == id }) else { return }
+        shortcutTools.removeAll { $0.id == id }
+        let tool = ToolID(shortcut: id)
+        if pinnedTools.contains(tool) { pinnedTools.removeAll { $0 == tool } }
+    }
+
+    /// For restoring: the valid ones, up to the room there is.
+    func replaceShortcutTools(_ tools: [ShortcutTool]) {
+        var kept: [ShortcutTool] = []
+        for tool in tools.map(\.cleaned) where tool.isValid && kept.count < Self.maxShortcutTools {
+            if !kept.contains(where: { $0.id == tool.id }) { kept.append(tool) }
+        }
+        guard kept != shortcutTools else { return }
+        shortcutTools = kept
+        pinnedTools.removeAll { !isKnown($0) }
     }
 
     /// Puts a pinned tool before another in the row, or last when `other` is nil. The row is what the Tools tab and
@@ -673,7 +839,7 @@ final class AppSettings {
     func isPinned(_ tool: ToolID) -> Bool { visiblePinned.contains(tool) }
 
     /// Whether every tool already fits in the row, so pinning changes nothing.
-    var rowShowsEveryTool: Bool { pinLimit.rawValue >= ToolID.allCases.count }
+    var rowShowsEveryTool: Bool { pinLimit.rawValue >= allTools.count }
 
     /// Pinning into a full row pushes out the tool that has been pinned longest. Unpinning leaves a gap
     /// that another tool fills, so the row never gets shorter.
@@ -681,7 +847,7 @@ final class AppSettings {
         var row = visiblePinned
         if let index = row.firstIndex(of: tool) {
             row.remove(at: index)
-            row = Self.filled(row, to: pinLimit.rawValue, avoiding: tool)
+            row = Self.filled(row, to: pinLimit.rawValue, avoiding: tool, from: allTools)
         } else {
             if row.count >= pinLimit.rawValue { row.removeFirst() }
             row.append(tool)
@@ -689,10 +855,12 @@ final class AppSettings {
         pinnedTools = row
     }
 
-    /// `row` topped up from `ToolID.allCases` to `count` tools. `avoiding` is used only if nothing else is left.
-    static func filled(_ row: [ToolID], to count: Int, avoiding: ToolID? = nil) -> [ToolID] {
+    /// `row` topped up from `pool` to `count` tools. `avoiding` is used only if nothing else is left.
+    static func filled(
+        _ row: [ToolID], to count: Int, avoiding: ToolID? = nil, from pool: [ToolID] = ToolID.allCases
+    ) -> [ToolID] {
         var row = row
-        for tool in ToolID.allCases where row.count < count && !row.contains(tool) && tool != avoiding {
+        for tool in pool where row.count < count && !row.contains(tool) && tool != avoiding {
             row.append(tool)
         }
         if row.count < count, let avoiding, !row.contains(avoiding) { row.append(avoiding) }

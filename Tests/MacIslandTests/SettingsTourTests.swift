@@ -21,7 +21,7 @@ struct SettingsTourTests {
         for pane in SettingsPane.allCases {
             #expect(TourStop.all.contains { $0.pane == pane }, "\(pane)")
         }
-        #expect(TourStop.all.count == 15)
+        #expect(TourStop.all.count == 17)
     }
 
     @Test func stopsAreGroupedByPane() {
@@ -243,9 +243,9 @@ struct SettingsTourTests {
     @Test func arrowAvoidsCorners() {
         // The callout is held inside the window, so a target at its far edge would put the arrow on a rounded corner.
         let right = place(CGRect(x: 780, y: 200, width: 10, height: 30), .below)
-        #expect(right.arrowOffset == 280 - 10 - 8)
+        #expect(abs(right.arrowOffset - (280 - 10 - 8)) < 0.001)
         let left = place(CGRect(x: 0, y: 200, width: 10, height: 30), .below)
-        #expect(left.arrowOffset == 10 + 8)
+        #expect(abs(left.arrowOffset - (10 + 8)) < 0.001)
     }
 
     @Test func theArrowOfASideCalloutFollowsTheTargetVertically() {

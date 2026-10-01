@@ -108,7 +108,9 @@ final class LyricsModel {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let synced = object["syncedLyrics"] as? String
         else { return [] }
-        return LRC.parse(synced)
+        // Stamps with no words are not lyrics: keeping them would hold open a blank row under the scrubber.
+        let parsed = LRC.parse(synced)
+        return parsed.contains { !$0.text.isEmpty } ? parsed : []
     }
 
     private nonisolated static func fetchFromNetwork(_ url: URL) async -> Data? {

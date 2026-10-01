@@ -20,6 +20,29 @@ struct ShortcutSettingsTests {
         #expect(settings.openShortcut?.display == "\u{2303}\u{2325}Space")
     }
 
+    @Test func theShelfHasItsOwnShortcutOnByDefault() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.shortcut(.shelf) == .shelfDefault)
+        #expect(settings.shortcut(.shelf)?.display == "\u{2303}\u{2325}S")
+        #expect(settings.setShortcut(.shelf, nil))
+        #expect(AppSettings(defaults: defaults).shortcut(.shelf) == nil, "off is remembered")
+        #expect(AppSettings(defaults: defaults).shortcut(.open) == .openDefault, "the island's own is untouched")
+    }
+
+    @Test func oneKeyCantOpenBothTheIslandAndTheShelf() {
+        let settings = AppSettings(defaults: makeDefaults())
+        var asked: [ShortcutSlot] = []
+        settings.shortcutRegistrar = { slot, _ in
+            asked.append(slot)
+            return true
+        }
+        #expect(!settings.setShortcut(.shelf, .openDefault))
+        #expect(settings.slot(holding: .openDefault, besides: .shelf) == .open)
+        #expect(settings.shortcut(.shelf) == .shelfDefault)
+        #expect(asked.isEmpty, "refused before the system is asked")
+    }
+
     @Test func theOldPickerIsReadOnce() {
         let ctrlI = makeDefaults()
         ctrlI.set("controlOptionI", forKey: "hotkey")

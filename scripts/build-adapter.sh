@@ -36,7 +36,7 @@ PLIST
 ln -s A "$FW/Versions/Current"
 ln -s Versions/Current/MediaRemoteAdapter "$FW/MediaRemoteAdapter"
 ln -s Versions/Current/Resources "$FW/Resources"
-codesign --force --sign - "$FW" >/dev/null
+./scripts/sign.sh "$FW"
 
 # Test client: lets `mediaremote-adapter.pl ... test` check the adapter still works.
 clang -fobjc-arc -Wno-gnu-folding-constant -arch arm64 -arch x86_64 -mmacosx-version-min=14.0 \

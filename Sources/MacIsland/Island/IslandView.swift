@@ -19,7 +19,8 @@ struct IslandView: View {
             presentation: viewModel.presentation,
             size: viewModel.size,
             surface: viewModel.geometry.hasNotch ? .hardware : .glass,
-            isSwelling: viewModel.isSwelling
+            isSwelling: viewModel.isSwelling,
+            horizontalOffset: viewModel.horizontalOffset
         ) {
             ZStack(alignment: .top) {
                 switch viewModel.presentation {
@@ -140,8 +141,10 @@ struct IslandView: View {
             // A tab change swaps the whole module. The old one leaves at once and the new one blurs in. Before, the swap had no
             // transition of its own, and a running time stayed on screen for a moment after swiping away from the Clock tab (found
             // by hand; a clock's digits sit in a `TimelineView`, which can hold a removed view for the whole animation).
+            // `.identity` was not enough for the Shelf: its scrolling row (AppKit-backed) could stay drawn over the next tab for the
+            // length of the resize. So the old content is faded out in a hundredth of a second, which hides it whatever backs it.
             .id(viewModel.selectedTab)
-            .transition(.asymmetric(insertion: Theme.Motion.content, removal: .identity))
+            .transition(.asymmetric(insertion: Theme.Motion.content, removal: .opacity.animation(.linear(duration: 0.01))))
     }
 
     // MARK: Compact
@@ -239,11 +242,28 @@ struct IslandView: View {
     private var compactTrailing: some View {
         switch viewModel.compactActivity {
         case .alert(let alert):
-            Text(alert.text)
-                .font(Theme.Typography.compactNumeral)
-                .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            if let level = alert.volume {
+                HStack(spacing: 6) {
+                    LevelBar(fraction: level.shown, tint: level.isSilent ? Theme.Tint.attention : nil)
+                        .frame(width: Theme.Metrics.levelBarWidth)
+                    Text(alert.text)
+                        .font(Theme.Typography.compactNumeral)
+                        .foregroundStyle(
+                            level.isSilent ? AnyShapeStyle(Theme.Tint.attention) : AnyShapeStyle(Theme.Palette.primary)
+                        )
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                }
+                .animation(Theme.Motion.track, value: level)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(level.isMuted ? "Volume muted" : "Volume \(level.percent) percent")
+            } else {
+                Text(alert.text)
+                    .font(Theme.Typography.compactNumeral)
+                    .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         case .recording(let kind):
             if let since = kind == .screen ? viewModel.screenRecorder.startedAt : viewModel.voice.startedAt {
                 ElapsedText(since: since, tint: Theme.Tint.working)
@@ -337,7 +357,8 @@ private struct IslandDropDelegate: DropDelegate {
                 let url = await withCheckedContinuation { continuation in
                     _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
                 }
-                if let url { urls.append(url) }
+                // A file reference (`/.file/id=...`) would be kept under a name that means nothing: keep the real path.
+                if let url { urls.append((url as NSURL).filePathURL ?? url) }
             }
             switch target {
             case .shelf: shelf.add(urls)

@@ -24,12 +24,14 @@ struct SettingsSearchTests {
         #expect(titles("hover").first == "Peek on Hover")
         #expect(titles("lyr").first == "Synced Lyrics")
         #expect(titles("screenshots").first == "Add New Screenshots to the Shelf")
+        #expect(titles("long break").first == "Long Break")
+        #expect(Set(titles("pomodoro")) == ["Focus Length", "Short Break", "Long Break", "Sessions Before Long Break"])
     }
 
     @Test func anotherNameForASettingFindsIt() {
         #expect(titles("airpods").first == "Headphones")
         #expect(titles("startup").first == "Launch at Login")
-        #expect(titles("hotkey").first == "Shortcut")
+        #expect(titles("hotkey").first == "Open the Island")
         #expect(titles("do not disturb").first == "Quiet in Focus")
         #expect(titles("umbrella").first == "Rain Soon")
     }

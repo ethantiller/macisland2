@@ -18,6 +18,7 @@ struct SettingsArchiveTests {
         let settings = makeSettings()
         settings.setShortcut(
             .open, KeyCombo(keyCode: UInt32(kVK_ANSI_J), modifiers: UInt32(cmdKey | optionKey), label: "J"))
+        settings.setShortcut(.shelf, nil)
         settings.peeksOnHover = false
         settings.swipesEnabled = false
         settings.islandDisplay = .primary
@@ -37,6 +38,10 @@ struct SettingsArchiveTests {
         settings.movePinned(settings.visiblePinned[4], before: settings.visiblePinned[0])
         settings.quietDuringFocus = true
         settings.fullChargeLevel = 90
+        settings.pomodoroFocus = 50
+        settings.pomodoroShortBreak = 10
+        settings.pomodoroLongBreak = 30
+        settings.pomodoroSessions = 6
         settings.setMuted(.hotspot, true)
         settings.setMuted(.lowDisk, true)
         settings.saveCustomWidget(
@@ -56,6 +61,7 @@ struct SettingsArchiveTests {
         target.restore(try SettingsArchive.read(data))
 
         #expect(target.openShortcut == original.openShortcut)
+        #expect(target.shelfShortcut == nil)
         #expect(!target.peeksOnHover && !target.swipesEnabled && target.islandDisplay == .primary)
         #expect(target.leftTabs == original.leftTabs && target.rightTabs == original.rightTabs)
         #expect(target.menuBarModules == original.menuBarModules)
@@ -65,6 +71,7 @@ struct SettingsArchiveTests {
         #expect(!target.showsLyrics && !target.showsMusicCompact)
         #expect(target.pinLimit == .eight && target.visiblePinned == original.visiblePinned)
         #expect(target.quietDuringFocus && target.fullChargeLevel == 90)
+        #expect(target.pomodoroPlan == PomodoroPlan(focus: 50, shortBreak: 10, longBreak: 30, sessions: 6))
         #expect(target.mutedEvents == [.hotspot, .lowDisk])
         #expect(target.customWidgets.map(\.title) == ["Stocks"])
         #expect(target.homeLayout.widgets[1].widget == .custom(target.customWidgets[0].id))
@@ -93,6 +100,8 @@ struct SettingsArchiveTests {
         var archive = SettingsArchive()
         archive.clipboardLimit = 7
         archive.fullChargeLevel = 12
+        archive.pomodoroFocus = 500
+        archive.pomodoroSessions = 1
         archive.islandDisplay = "moon"
         archive.dragTarget = "explode"
         archive.pinLimit = 5
@@ -102,6 +111,7 @@ struct SettingsArchiveTests {
             combo: KeyCombo(keyCode: UInt32(kVK_ANSI_J), modifiers: 0, label: "J"))
         settings.restore(archive)
         #expect(settings.clipboardLimit == 10 && settings.fullChargeLevel == 100)
+        #expect(settings.pomodoroPlan == PomodoroPlan.default, "out-of-range lengths are skipped")
         #expect(settings.islandDisplay == .builtIn && settings.dragTarget == .shelfAndAirDrop)
         #expect(settings.pinLimit == .six)
         #expect(settings.leftTabs == [.home, .media])

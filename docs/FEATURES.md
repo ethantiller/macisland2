@@ -211,14 +211,15 @@ Outlook SafeLinks and Google redirect links are unwrapped to the real address fi
 
 ![Shelf](images/05-expanded-shelf-empty.png)
 
-A **Files / Clipboard** choice.
+A **Files / Clipboard** choice. **⌃⌥S** (Settings → General → Shortcuts → Open the Shelf) opens the island straight on the Shelf
+from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab strip; pressing it again on the Shelf closes it.
 
 - **Files.** Drag files onto the island (the left half is *Add to Shelf*, the right half is *AirDrop*, drawn in AirDrop blue while a file is dragged). Only references are
-  kept; files stay where they are. Double-click opens, drag out to use, hover for an ✕. **Space** over an item previews it with
-  Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text* (images and PDFs), *Zip*, *Unzip*,
+  kept; files stay where they are. Each file shows its own preview (QuickLook thumbnails, kept in memory only; the file's icon until one arrives), centered in the row. Double-click opens, drag out to copy it where you drop it (the original never moves), hover for an ✕ that takes it off the Shelf. **Space** over an item previews it with
+  Quick Look. **Right-click** an item for *Quick Look*, *Share* (the system menu), *Copy Text from Image* or *Copy Text from PDF*, *Zip*, *Unzip*,
   *Convert To*, *Resize* and *Compress* (images), or *Show in Finder*. **Zip All** zips everything; **Combine into PDF** joins
-  two or more images and PDFs. Results land on the Shelf. New screenshots are added automatically.
-  - **Copy Text** reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
+  two or more images and PDFs. **A result asks where it goes.** Zip, Unzip, Convert To, Resize, Compress, and Combine make their file in a temporary staging folder, and the Shelf shows it with three choices: **Add to Shelf** (the file moves into `~/Library/Application Support/MacIsland/Shelf Results`, and goes to the Trash if you later take it off the Shelf), **Replace** (it takes the original's place on the Shelf; the original file on disk is never touched), or **Save to Folder…** (the system save panel; cancelling it leaves the choice waiting). The ✕ throws it away. If the island folds first, the result keeps waiting, and a green alert stays until you open the island on the Shelf. New screenshots, recordings, and voice notes still go straight to the Shelf.
+  - **Copy Text from Image** (and from a PDF) reads the text in an image (and any QR code) with Vision, on this Mac, and copies it. A PDF's own text is used
     first; only pages without text are read as images, up to 10. It says *Copied*, or *No Text Found*.
   - **Convert To** is offered for every kind, and never lists the format the file already is:
 
@@ -237,7 +238,7 @@ A **Files / Clipboard** choice.
 - **Clipboard.** The last ten things you copied, text and images, in memory only (never written to disk). Copies that
   password managers mark as concealed are skipped. Click a card to copy it again; drag it out. Text that is *entirely* a
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
-  image card gets **Copy Text**. Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
+  image card shows the picture and nothing over it; right-click it for *Copy Text from Image* (Vision, on this Mac). Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
   Snippet* (kept in Notes, and written to disk because you chose to). History itself stays in memory.
 
 ### Clock
@@ -255,7 +256,10 @@ Timer, Stopwatch, and Pomodoro share one tab.
 
 ![Setting a timer](images/06c-expanded-timer-setter.png)
 - **Stopwatch**: start, stop, laps (the lap in progress and the last lap), reset. Drift-free.
-- **Pomodoro**: 25-minute focus sessions, 5-minute breaks, and a 15-minute break after the fourth. Sessions **chain**
+- **Pomodoro**: 25-minute focus sessions, 5-minute breaks, and a 15-minute break after the fourth, unless you set other
+  lengths in Settings → Clock (focus 1 to 90 minutes, short break 1 to 30, long break 5 to 60, 2 to 8 sessions before the
+  long break). A phase that is running keeps its length and a change applies from the next one; the ring follows a change
+  at once while nothing runs. Sessions **chain**
   automatically and stop after the long break. A **streak** counts consecutive days with a finished session, and a
   **7-day bar chart** shows sessions per day.
 
@@ -272,19 +276,21 @@ undated ones. Tap the circle to check one off. Asks for Reminders access the fir
 
 ![Tools](images/08c-expanded-tools-eight.png)
 
-Nine tools. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of six.
+Nine tools, and up to two **Shortcut tools** of your own. The row shows **4, 6, or 8** of them (Settings); the rest are behind a chevron, in a grid of two rows of six.
+
+**Shortcut tools.** Settings → Tools → **Add Shortcut Tool…** makes a tool from one of your Shortcuts: choose the Shortcut from the list (`shortcuts list`), a label of up to 14 characters, and an icon (an SF Symbol: a name, a preview, sixteen common ones, `bolt.fill` to start). **Test** runs it once. Pressing the tool runs the Shortcut with no input: the blue working activity while it runs, a green *Done* alert, or a red banner with the reason if it fails. It can be pinned to the row and shows in Quick Tools and the grid like any tool; right-click it in the Tools tab to edit or remove it (removing never touches the Shortcut). If the Shortcut was renamed or deleted the tool is dimmed, and its banner offers **Edit Tool**. The icon the Shortcuts app shows can't be read honestly, so you choose one ([docs/plans/shortcut-icons.md](plans/shortcut-icons.md)). Shortcut tools are in the settings file (their names, not the Shortcuts).
 Right-click a tool to pin it. The row is always full: unpinning fills the gap with another tool.
 
 | Tool | Does |
 | --- | --- |
-| **Keep Awake** | Stops the display sleeping. Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick |
+| **Keep Awake** | Stops the display sleeping (and also asks macOS not to sleep the system). Chips choose *Indefinitely*, *1 Hour*, or *Until* an hour you pick, and say "A shut lid can still sleep it": closing the lid of a Mac that isn't on power with an external display sleeps it whatever is asked, and MacIsland asks for no password to change that. After a wake, if macOS dropped the hold, the tool shows Off |
 | **Ring Light** | A soft white glow around the screen edge, for video calls; brightness and width sliders |
 | **Mute Mic** | Mutes the default input device |
 | **Pick Color** | The system eyedropper; copies the hex code |
 | **Screenshot** | Area capture to the clipboard |
 | **Focus** | Turns a Focus on or off through *your* Shortcuts named `Focus On` and `Focus Off` (a banner explains if missing) |
 | **Clean Keys** | Swallows every key for 30 seconds so the keyboard can be wiped; the mouse still works. Needs Accessibility |
-| **Mirror** | Replaces the tools with your camera (16:9, mirrored, no frames kept), Ring Light and its brightness beside it, and **Done**. The island stays open; folding it, changing tab, or Done turns the camera off. Asks for Camera access the first time, and says so, with **Open Settings**, if it is off |
+| **Mirror** | Replaces the tools with your camera (16:9, mirrored, no frames kept), Ring Light and its brightness beside it, and **Done**. The island stays open for as long as the camera is on: it does not fold when the pointer leaves, on a click outside, Esc, the shortcut, or a swipe up, and a banner waits as an alert; tab swipes and the arrow keys are ignored. Done, clicking another tab, or the camera failing turns it off. Asks for Camera access the first time, and says so, with **Open Settings**, if it is off |
 | **Record** (*Record Screen*) | Folds the island and lets you drag a region (click for the whole display, Esc to cancel), then records it, without MacIsland's own windows, to a movie in your Movies folder (30 minutes at most). The blue record dot and time sit beside the notch; click it to stop. The movie lands on the Shelf. Asks for Screen Recording access, with a red banner and **Open Settings** if it is off |
 
 ### Notes
@@ -339,17 +345,18 @@ shows and where is a setting, how it looks is not.
 
 | Pane | Preview | Choices |
 | --- | --- | --- |
-| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcut** (Open the Island, ⌃⌥Space by default, recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
+| General | Compact | Launch at Login; **Guide** (Show the Welcome Guide, Take the Settings Tour); **Your Settings** (Export, Import, and Reset All Settings, each asking first; a file holds every choice including Home, and never a command widget); **Shortcuts** (Open the Island, ⌃⌥Space by default, and Open the Shelf, ⌃⌥S by default; recorded by pressing keys, with ⌃, ⌥, or ⌘; a key another app owns, or the other shortcut's key, is refused and the old one stays); **Peek on Hover**; **Swipe to Open and Switch Tabs**; **Show the Island On** (Built-in or Primary Display) |
 | Tabs | Expanded (the tab you select), or Menu Bar | The tabs, dragged and switched (Left of the Notch, Right of the Notch, and the Not Shown tray); or, in the **Menu Bar** view, only a switch per module for the menu bar (the view is a menu-bar strip with an icon for each module that has one, and clicking an icon, or a module in the list (on or off), shows its window, with a dashed ghost icon and a note when it isn't in the menu bar yet; going between Expanded and Menu Bar is one continuous motion: the island shrinks toward the notch and slides out to the left while the menu bar slides in from the right and its window opens from the strip, and the reverse coming back; the tab settings are hidden there, and the menu bar settings are hidden in every other view). **Click a row, or a tab in the preview, to see that tab.** The tabs that are not shown sit in a **Not Shown tray directly under the preview**, so you can see them and the tab strip together. **Drag a tab from the tray onto a tab in the strip to replace it** (the replaced tab lands in the tray); **drag a tab onto another tab to swap them**; **drag a tab onto the tray to hide it**; or **click a tab in the tray to add it**. The hint under the preview names both tabs while you hold one over another ("Release to swap Media and Reminders."). A tab can only replace a tab: there is no dropping into the side of the notch. The list rows below also reorder by dragging |
 | Home | Expanded Home, in edit mode | The widget editor (below); Up Next (Calendar Events, Due Reminders, a button that opens Internet Accounts); Weather city (only the name is sent to Open-Meteo) |
 | Shelf | Compact, with the drop target | **When You Drag a File** (Show Shelf and AirDrop, Show Shelf Only, Show AirDrop Only, or Do Nothing); Add New Screenshots to the Shelf; Remove Files from the Shelf (Never, After a Day, After a Week; only the reference goes, never the file); Clipboard History (Off, 10, 25, or 50 items) |
 | Media | Compact | Show Music Beside the Notch (off: music stays in Home and the Media tab); Synced Lyrics |
+| Clock | Expanded Clock, on Pomodoro | **Pomodoro**: Focus Length, Short Break, Long Break, and Sessions Before Long Break (defaults 25, 5, 15, and 4; a phase that is running keeps its length) |
 | Tools | Expanded Tools | How many tools in the row: 4, 6, or 8; **Row Order** (drag, or right-click Move Up and Move Down) |
-| Notifications | Banner or alert (the selected event's real one) | Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
+| Notifications | Banner or alert (the selected event's real one) | **Replace the Volume HUD** (off by default: the island shows the volume when you use the volume or mute keys, instead of the system's square; needs Accessibility, asked when you turn it on; Option+Shift is a quarter step; only while the island is folded and nothing needs you, and on an output that has a volume); Quiet in Focus; each interruption on or off: Charging, Full Charge (with its level, 80 to 100%), Low Battery; Headphones, Drives, Personal Hotspot, Unlocked; Meetings, Due Reminders, Rain Soon; Downloads, Low Disk Space. What you just did yourself (Copied, Zipped, Saved, a timer finishing) always shows |
 | Privacy | none | What leaves this Mac (Open-Meteo, lrclib, each web widget's host) with Turn Off or Remove; what MacIsland runs (the Now Playing adapter, Shortcut and command widgets); each permission's state (Calendars, Reminders, Camera, Microphone, Speech Recognition, Screen Recording, Accessibility, Bluetooth), read without asking, with Open System Settings |
 
 **The Settings tour.** The first time Settings opens, a black callout with an arrow points at a real control, with a ring in the system accent
-color around it, and walks through all eight panes in fifteen stops (Find Any Setting, Your Island Live, Open It From Anywhere, and so on).
+color around it, and walks through all nine panes in seventeen stops (Find Any Setting, Your Island Live, Open It From Anywhere, Straight to the Shelf, and so on).
 It follows the control when the window resizes or the pane scrolls; Next, Back, End Tour, and Return move through it, choosing a pane in
 the sidebar jumps to that pane's first stop, and closing the window ends it. It never starts over the guide or when Settings was opened
 for **Edit Home…**. Picture: `docs/images/43-tour-03-shortcut.png`.
@@ -371,7 +378,7 @@ Note picks a note. Right-click any widget on the real island and choose **Edit H
 ## First run
 
 The first launch of a fresh install shows the **guide**: a floating glass window in the middle of the screen (drag it by its header or its edge), with an island you can
-use as its stage (drawn from sample data, as in Settings). It has ten steps, and the window never changes height:
+use as its stage (drawn from sample data, as in Settings). It has nineteen steps (a permission step is left out when that permission is already allowed), and the window never changes height:
 
 | # | Step | What it shows |
 | --- | --- | --- |
@@ -381,10 +388,10 @@ use as its stage (drawn from sample data, as in Settings). It has ten steps, and
 | 4 | Change Tabs | An open island on Home, the arrows as key caps, and a practice line |
 | 5 | Fold It Away | An open island on Home, Esc, and a practice line |
 | 6 | Seven Modules | A chip per module; the stage shows the one you choose |
-| 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line |
+| 7 | Drop Files on It | A closed island that shows the drop target your setting chose while you drag a file over it, and a practice line; the copy ends with your Shelf shortcut when it is on |
 | 8 | Keep a Module Close | The menu bar sliding in |
-| 9 | Allow What You'll Use | Calendars, Reminders, and Bluetooth rows (Allow, Allowed, or Open Settings), and a note on what is asked later. Left out when all three are already allowed |
-| 10 | Make It Yours | Open at Login, Open Settings, Done |
+| 9 to 18 | One step per permission: See Your Next Meeting (Calendars), See What's Due (Reminders), Know When Headphones Connect (Bluetooth), Watch Your Downloads (Downloads), Check Yourself in Mirror (Camera), Record Voice Notes (Microphone and Speech), Record Your Screen (Screen Recording), Clean Your Keyboard (Accessibility), Stay Quiet in Focus (Focus), Control Music and Spotify (Automation) | What it gives and what you lose without it, in a banner or tab picture on the stage, and its state: Not asked yet, Allowed (green check), Asked, or Off (red) with **Open System Settings**. While it is waiting, the footer offers **Not Now** (goes on, asks nothing) and **Grant Permission** (the system prompt appears only now); after an answer it is Continue. Screen Recording also offers **Reopen MacIsland**. Left out when already allowed |
+| 19 | Make It Yours | Open at Login, Open Settings, Done |
 
 The **practice lines** ("Try it: ...") watch the island in the window and turn green, beside a check, when you do it there (hover, click or swipe it, drag a file over it, or use Esc, the arrows, or your open shortcut, which goes to it while the guide is up); a file dragged over it is never dropped. They never block
 Continue. The words follow your setup: with no open shortcut the key caps and the keyboard sentences go, the drop step follows
@@ -392,11 +399,10 @@ Continue. The words follow your setup: with no open shortcut the key caps and th
 guide**, which ends only by its own buttons.
 
 Granting Calendars turns on Calendar Events in Up Next, and Reminders turns on Due Reminders. Bluetooth starts the headphones
-monitor. Camera, Microphone and Speech, Screen Recording, Accessibility, and Focus are still asked the first time you use what
-needs them. On a fresh install the headphones and Downloads monitors wait until the guide ends.
+monitor, and Downloads starts the download monitor. **Nothing asks at launch, on any install:** a monitor with a permission starts only once it is allowed (Bluetooth) or asked (Downloads, which macOS won't say), and the Shelf doesn't look inside Desktop, Documents, or Downloads until it is shown. Settings → Privacy has a **Grant** for anything not yet asked.
 
 The ⊗, Done, Open Settings, and Skip each count the guide as seen; quitting with it open does not. **Skip** is temporary: it ends the
-guide at once and then asks every permission not yet asked, one after another. Someone who updates from a build they already used
+guide at once and then asks every permission not yet asked, one after another (ten of them now). Someone who updates from a build they already used
 sees neither the guide nor the tour. **Replay** them from Settings → General → Guide, or with `macisland://guide` and `macisland://tour`.
 
 Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-guide-09-access.png`.
@@ -409,6 +415,7 @@ Pictures: `docs/images/40-guide-01-welcome.png`, `40-guide-06-modules.png`, `40-
 | --- | --- |
 | Hover | Swell, then peek after 120 ms |
 | Click, two-finger swipe down, **⌃⌥Space** | Expanded |
+| **⌃⌥S** | Expanded on the Shelf (again on the Shelf: close) |
 | Pointer away for 300 ms | Compact |
 | Two-finger swipe up (expanded) | Close |
 | Two-finger swipe left or right (expanded) | Previous or next tab (once per swipe; follows your finger). Over the timer dial it scrubs the dial instead |

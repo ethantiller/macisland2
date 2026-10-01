@@ -119,7 +119,7 @@ private struct PomodoroStatus: View {
                 .font(Theme.Typography.bodyEmphasized)
                 .foregroundStyle(Theme.Palette.primary)
             Text(
-                "\(min(pomodoro.focusInCycle + (pomodoro.phase == .focus ? 1 : 0), PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)"
+                "\(min(pomodoro.focusInCycle + (pomodoro.phase == .focus ? 1 : 0), pomodoro.plan.sessions)) of \(pomodoro.plan.sessions)"
             )
             .font(Theme.Typography.numeral)
             .foregroundStyle(Theme.Palette.secondary)
@@ -589,7 +589,7 @@ private struct PomodoroPeekDetails: View {
                     .font(Theme.Typography.bodyEmphasized)
                     .foregroundStyle(Theme.Palette.primary)
                 Text(
-                    "\(min(finishedIncludingThis, PomodoroModel.sessionsPerCycle)) of \(PomodoroModel.sessionsPerCycle)"
+                    "\(min(finishedIncludingThis, pomodoro.plan.sessions)) of \(pomodoro.plan.sessions)"
                 )
                 .font(Theme.Typography.numeral)
                 .foregroundStyle(Theme.Palette.secondary)
@@ -616,7 +616,10 @@ private struct PomodoroPeekDetails: View {
 
     /// What follows this session, or that the cycle ends with it.
     private var nextText: String {
-        guard let next = PomodoroModel.next(after: pomodoro.phase, focusFinished: finishedIncludingThis) else {
+        guard
+            let next = PomodoroModel.next(
+                after: pomodoro.phase, focusFinished: finishedIncludingThis, sessions: pomodoro.plan.sessions)
+        else {
             return "Last one"
         }
         return "Then \(next.title)"

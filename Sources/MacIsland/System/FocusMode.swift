@@ -17,21 +17,38 @@ final class FocusMode {
     /// The person said no in the system prompt.
     private(set) var isDenied = false
 
-    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var isStarted = false
 
-    /// Starts watching. Asks for permission the first time; call only once it's needed.
+    /// Whether the person has already allowed it, read without asking. The launch starts Focus only when this is true.
+    static var isAuthorized: Bool { INFocusStatusCenter.default.authorizationStatus == .authorized }
+
+    /// Starts reading Focus. Asks for permission the first time; call only once it's needed.
+    ///
+    /// There's no change notification for Focus, and nothing polls it in the background (that was a standing timer
+    /// while nothing is live): a decision that needs it reads it then (`readNow`), and the Focus button reads it while
+    /// it is shown (`watch`).
     func start() {
-        guard timer == nil else { return }
+        guard !isStarted else { return }
+        isStarted = true
         INFocusStatusCenter.default.requestAuthorization { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
         refresh()
-        // There's no change notification for Focus, and a few seconds is fast enough.
-        let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+    }
+
+    /// Whether a Focus is on right now, read fresh once started.
+    func readNow() -> Bool {
+        if isStarted { refresh() }
+        return isFocused
+    }
+
+    /// Reads Focus every few seconds until cancelled, once started (the button itself may be what starts it). Run from
+    /// the `.task` of a view that shows it.
+    func watch() async {
+        while !Task.isCancelled {
+            if isStarted { refresh() }
+            try? await Task.sleep(for: .seconds(3))
         }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
     }
 
     func refresh() {

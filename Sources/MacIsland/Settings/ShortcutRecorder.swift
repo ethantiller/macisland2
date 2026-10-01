@@ -107,7 +107,9 @@ struct ShortcutRecorder: View {
             case .needsModifier:
                 message = "Include \u{2303}, \u{2325}, or \u{2318}."
             case .combo(let combo):
-                if settings.setShortcut(slot, combo) {
+                if let other = settings.slot(holding: combo, besides: slot) {
+                    message = "Already used for \(other.title)."
+                } else if settings.setShortcut(slot, combo) {
                     message = nil
                     stop()
                 } else {

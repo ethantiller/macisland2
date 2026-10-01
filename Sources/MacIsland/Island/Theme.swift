@@ -131,10 +131,20 @@ enum Theme {
         static let widgetRadius: CGFloat = innerRadius
         /// What sits inside a widget: artwork, a hovered segment.
         static let nestedRadius: CGFloat = artworkRadius
+        /// The volume HUD: a narrow side for the speaker glyph, a long one for the level bar and the percent.
+        static let volumeHUDLeading: CGFloat = 44
+        static let volumeHUDTrailing: CGFloat = 140
+        static let levelBarWidth: CGFloat = 80
+        static let levelBarHeight: CGFloat = 4
         static let clipboardCardWidth: CGFloat = 108
         static let shelfChoiceWidth: CGFloat = 150
         /// The Shelf: a Files or Clipboard choice, and cards tall enough for a smart action.
         static let shelfHeight: CGFloat = 96
+        /// A file's preview on the Shelf: as large as the row allows under the header, with its name below.
+        static let shelfThumbnail: CGFloat = 42
+        /// The ✕ that takes a file off the Shelf: its disc, and the larger area that takes the click.
+        static let shelfRemove: CGFloat = 16
+        static let shelfRemoveHit: CGFloat = 24
         /// Notes: the mode picker, then a list and editor (or the prompter and its controls).
         static let notesHeight: CGFloat = 28 + 8 + 112
         /// Reminders: the add field, then four rows of the list.
@@ -231,6 +241,8 @@ enum Theme {
         static let peekDwell: Duration = .milliseconds(120)
         /// Pointer gone before the island folds back in.
         static let closeDelay: Duration = .milliseconds(300)
+        /// How long the volume HUD stays after the last key press. The pointer on it holds it.
+        static let volumeHUD: Duration = .milliseconds(1500)
     }
 
     enum Motion {

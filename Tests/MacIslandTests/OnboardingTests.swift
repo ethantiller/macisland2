@@ -145,6 +145,10 @@ struct OnboardingTests {
         settings.movePinned(settings.visiblePinned[4], before: settings.visiblePinned[0])
         settings.quietDuringFocus = true
         settings.fullChargeLevel = 90
+        settings.pomodoroFocus = 50
+        settings.pomodoroShortBreak = 10
+        settings.pomodoroLongBreak = 30
+        settings.pomodoroSessions = 6
         settings.setMuted(.hotspot, true)
         settings.saveCustomWidget(
             CustomWidget(
@@ -264,12 +268,18 @@ struct AccessTests {
         let stub = StubAccess(states: [.reminders: .allowed])
         let model = makeModel(stub)
         await model.requestAllPending()
-        #expect(stub.requests == [.calendars, .bluetooth])
+        #expect(
+            stub.requests == [
+                .calendars, .bluetooth, .downloads, .camera, .microphone, .screenRecording, .accessibility, .focus,
+                .automation,
+            ])
         #expect(model.asking == nil)
     }
 
     @Test func skipAsksNothingWhenAllDecided() async {
-        let stub = StubAccess(states: [.calendars: .allowed, .reminders: .denied, .bluetooth: .allowed])
+        var decided: [AccessKind: PrivacyAccess.State] = [:]
+        for (index, kind) in AccessKind.allCases.enumerated() { decided[kind] = index.isMultiple(of: 2) ? .allowed : .denied }
+        let stub = StubAccess(states: decided)
         await makeModel(stub).requestAllPending()
         #expect(stub.requests.isEmpty)
     }
@@ -292,8 +302,9 @@ struct AccessTests {
 
     @Test func allAllowedNeedsEveryRow() {
         #expect(!makeModel(StubAccess()).allAllowed)
-        let all = StubAccess(states: [.calendars: .allowed, .reminders: .allowed, .bluetooth: .allowed])
+        let all = StubAccess(states: Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, .allowed) }))
         #expect(makeModel(all).allAllowed)
+        #expect(makeModel(all).settled == Set(AccessKind.allCases))
     }
 
     @Test func refreshReadsTheSystemAgain() {

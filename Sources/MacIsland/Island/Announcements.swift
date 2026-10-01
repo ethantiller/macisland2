@@ -100,6 +100,15 @@ enum Announcements {
         )
     }
 
+    /// The volume HUD: the speaker for the level, in white, and in red only when muted or at zero.
+    static func volume(_ level: VolumeLevel) -> IslandAlert {
+        var alert = IslandAlert(
+            systemImage: level.symbol, tint: level.isSilent ? Theme.Tint.attention : Theme.Tint.neutral,
+            text: "\(level.percent)%", tintsText: level.isSilent)
+        alert.volume = level
+        return alert
+    }
+
     static var hotspot: IslandAlert {
         IslandAlert(systemImage: "personalhotspot", tint: Theme.Tint.positive, text: "Hotspot")
     }

@@ -255,7 +255,8 @@ struct IslandSnapshots {
                 .frame(width: 472, height: Theme.Metrics.shelfHeight)
                 .padding(18)
                 .background(Color.black)
-            guard let outputDirectory, let image = ImageRenderer(content: content).nsImage,
+            guard let outputDirectory,
+                let image = ImageRenderer(content: content.environment(\.isSnapshot, true)).nsImage,
                 let tiff = image.tiffRepresentation,
                 let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
             else { continue }
@@ -295,7 +296,7 @@ struct IslandSnapshots {
         let content = IslandView(viewModel: viewModel, acceptsDrops: false)
             .frame(width: ScreenGeometry.panelSize.width, height: max(viewModel.size.height, 1) + 16, alignment: .top)
             .background(Color(white: 0.28))
-        let renderer = ImageRenderer(content: content)
+        let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = 2
         guard let image = renderer.nsImage,
             let tiff = image.tiffRepresentation,
