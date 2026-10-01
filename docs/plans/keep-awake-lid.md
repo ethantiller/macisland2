@@ -34,6 +34,10 @@ by the network proxy, so I only have their search summaries). **Nothing is built
 **I did not pick (b).** Whichever is built, the tool must say in words what it does and does not do, and must not be left showing "on" after macOS
 sleeps anyway: listen for the wake (`NSWorkspace.didWakeNotification`) and reconcile `isOn` with whether the assertion still exists.
 
+## What was built (option a)
+
+Keep Awake now holds the display assertion *and* `PreventSystemSleep`, says in words (a caption beside its chips, and its tooltip) that a shut lid can still sleep a Mac that isn't on power with an external display, and after every wake checks that the display assertion still exists, showing Off if it doesn't. No password, no `pmset`. **Whether `PreventSystemSleep` keeps a lid-closed Mac awake on power without a display is still untested**; if it does, the caption can say so. Options (b) and (c) are unchanged, below.
+
 ## Question for the owner
 
 Which do you want: **(a)** try the no-password route and report honestly what works once tested on your Mac, **(b)** accept a password step (and say

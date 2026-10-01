@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 718 tests, about a second.
+lines; 724 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -359,7 +359,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 45 files, about 10,300 lines, **718 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 46 files, about 10,400 lines, **724 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -397,6 +397,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
 | `VolumeHUDTests.swift` | The volume keys' math and speaker, the controller over a stub tap and volume, the island alert, and the setting |
+| `KeepAwakeTests.swift` | Keep Awake's two assertions over a stub, the wake check, and the honest label |
 | `ShortcutToolTests.swift` | Shortcut tools: identity, storage and the cap, the pinned row, the archive, dimming, running and failing with a stub runner |
 | `PermissionStepTests.swift` | The permission steps (Grant Permission, Not Now, the order, skipped steps, the copy), what is remembered as asked, and the Shelf not looking in protected folders at launch |
 | `OnboardingTests.swift`, `OnboardingFlowTests.swift` | First-run state and classification (and the evidence drift guard), access, the guide's steps, copy, practice, and model |
