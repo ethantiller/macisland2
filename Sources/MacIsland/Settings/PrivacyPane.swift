@@ -104,9 +104,48 @@ struct PrivacyPane: View {
                     "Read without asking. Grant asks for one now; nothing is asked at launch, only here, in the welcome guide, or when you use what needs it."
                 )
             }
+            optionalAccessSection
         }
         .formStyle(.grouped)
         .onAppear { access = PrivacyAccess.current() }
+    }
+
+    /// Permissions only an optional feature needs. Listed once such a feature exists in this build; never asked at launch.
+    @ViewBuilder private var optionalAccessSection: some View {
+        let listed = OptionalAccess.allCases.filter { $0.feature.isBuilt }
+        if !listed.isEmpty {
+            Section {
+                ForEach(listed) { item in
+                    let state = AccessCenter.model?.state(of: item) ?? .notAsked
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                            Text(item.usage(settings: settings))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(state.words)
+                            .foregroundStyle(.secondary)
+                        if state == .notAsked, settings.isOn(item.feature) {
+                            Button("Grant") { Task { await AccessCenter.model?.allow(item) } }
+                                .buttonStyle(.borderless)
+                        }
+                        if let url = item.settingsURL {
+                            Button("Open System Settings") { NSWorkspace.shared.open(url) }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            } header: {
+                Text("Optional Access").id(SettingsAnchor.optionalAccess)
+            } footer: {
+                Text(
+                    "Only a feature you turn on uses these, and macOS can't say whether they are on, so this shows what MacIsland has seen. They are asked in Features, never at launch."
+                )
+            }
+        }
     }
 
     private func row(_ title: String, _ detail: String, action: String? = nil, perform: (() -> Void)? = nil)

@@ -40,6 +40,7 @@ enum SettingsAnchor {
     static let leavesThisMac = "privacy.leaves"
     static let runs = "privacy.runs"
     static let access = "privacy.access"
+    static let optionalAccess = "privacy.optional"
 }
 
 extension SettingsAnchor {
@@ -249,7 +250,7 @@ enum SettingsSearch {
                     "permissions", "calendar", "reminders", "camera", "microphone", "accessibility", "screen recording",
                     "bluetooth", "system settings",
                 ], anchor: SettingsAnchor.access),
-        ] + featureEntries
+        ] + featureEntries + optionalAccessEntries
 
     /// A row in the Features pane for each feature this build has.
     static var featureEntries: [SettingsSearchEntry] {
@@ -258,6 +259,17 @@ enum SettingsSearch {
                 pane: .features, title: $0.title, keywords: $0.keywords + ["feature", "turn off", "turn on", "switch"],
                 anchor: SettingsAnchor.feature($0))
         }
+    }
+
+    /// The Privacy pane's Optional Access section is there once a feature that needs one is.
+    static var optionalAccessEntries: [SettingsSearchEntry] {
+        guard OptionalAccess.allCases.contains(where: { $0.feature.isBuilt }) else { return [] }
+        return [
+            SettingsSearchEntry(
+                pane: .privacy, title: "Optional Access",
+                keywords: OptionalAccess.allCases.map { $0.title.lowercased() } + ["permissions", "mixer"],
+                anchor: SettingsAnchor.optionalAccess)
+        ]
     }
 
     /// Lowercase and without accents, so "cafe" finds "Café".

@@ -10,6 +10,8 @@ struct FeaturesPane: View {
 
     /// What turning a feature off stopped, under its row until the pane is left.
     @State private var notices: [Feature: String] = [:]
+    /// Optional permissions the person said Not Now to, until the pane is left.
+    @State private var dismissed: Set<OptionalAccess> = []
 
     private static let ownChoice = "own"
 
@@ -98,10 +100,43 @@ struct FeaturesPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            accessLines(feature)
         }
         .id(SettingsAnchor.feature(feature))
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded { show(feature) })
+    }
+
+    /// A feature that is on and needs a permission nobody has been asked for says why first, and asks only when Allow is pressed (a
+    /// preset never asks; it shows this line). A permission that was refused offers System Settings.
+    @ViewBuilder private func accessLines(_ feature: Feature) -> some View {
+        if settings.isOn(feature), let model = AccessCenter.model {
+            ForEach(feature.optionalAccess) { access in
+                switch model.state(of: access) {
+                case .notAsked where !dismissed.contains(access):
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(access.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            FieldButton(title: "Allow") { Task { await model.allow(access) } }
+                            FieldButton(title: "Not Now") { dismissed.insert(access) }
+                        }
+                    }
+                case .denied:
+                    HStack(spacing: 8) {
+                        Text("\(access.title) is off.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let url = access.settingsURL {
+                            FieldButton(title: "Open System Settings") { NSWorkspace.shared.open(url) }
+                        }
+                    }
+                default:
+                    EmptyView()
+                }
+            }
+        }
     }
 
     private func show(_ feature: Feature) {

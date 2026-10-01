@@ -110,11 +110,17 @@ protocol AccessProviding: AnyObject {
     /// For a step that needs more than one permission (Microphone needs Speech Recognition too): the one that is off, if it isn't the
     /// step's own name. Nil otherwise.
     func offItem(of kind: AccessKind) -> PrivacyAccess.Item?
+    /// Where an optional permission stands (see `OptionalAccess`). The ten above are `state(of: AccessKind)`.
+    func state(of access: OptionalAccess) -> OptionalAccessState
+    /// Asks for an optional permission. Only Allow in the Features pane and Grant in Privacy get here.
+    func request(_ access: OptionalAccess) async
 }
 
 extension AccessProviding {
     func reload() async {}
     func offItem(of kind: AccessKind) -> PrivacyAccess.Item? { nil }
+    func state(of access: OptionalAccess) -> OptionalAccessState { .notAsked }
+    func request(_ access: OptionalAccess) async {}
 }
 
 /// The real Mac. States come from `PrivacyAccess.current()`; requests use the app's own paths. Nothing here runs until the person
@@ -125,6 +131,9 @@ final class LiveAccess: AccessProviding {
     private let bluetooth: BluetoothAccess
     private let transfers: TransferMonitor
     private let defaults: UserDefaults
+    /// Briefly taps a process so macOS shows the System Audio Recording prompt. Set by the Mixer; without it, asking only records that
+    /// it was asked.
+    var systemAudioProbe: (() async -> Void)?
 
     init(
         agenda: AgendaMonitor, bluetooth: BluetoothAccess, transfers: TransferMonitor, defaults: UserDefaults = .standard
@@ -146,6 +155,17 @@ final class LiveAccess: AccessProviding {
             return both.contains(.notAsked) ? .notAsked : .denied
         }
         return row(kind.rawValue)
+    }
+
+    func state(of access: OptionalAccess) -> OptionalAccessState {
+        OptionalAccessRecord.state(of: access, defaults: defaults)
+    }
+
+    func request(_ access: OptionalAccess) async {
+        OptionalAccessRecord.record(.asked, for: access, defaults: defaults)
+        switch access {
+        case .systemAudio: await systemAudioProbe?()
+        }
     }
 
     func offItem(of kind: AccessKind) -> PrivacyAccess.Item? {
@@ -229,6 +249,10 @@ final class AccessModel {
     private(set) var states: [AccessKind: PrivacyAccess.State]
     /// The permission whose system prompt is showing.
     private(set) var asking: AccessKind?
+    /// Where each optional permission stands.
+    private(set) var optionalStates: [OptionalAccess: OptionalAccessState]
+    /// The optional permission whose system prompt is showing.
+    private(set) var askingOptional: OptionalAccess?
 
     @ObservationIgnored private let provider: AccessProviding
     @ObservationIgnored private let settings: AppSettings
@@ -242,6 +266,30 @@ final class AccessModel {
         self.settings = settings
         self.onBluetoothAllowed = onBluetoothAllowed
         states = Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, provider.state(of: $0)) })
+        optionalStates = Dictionary(uniqueKeysWithValues: OptionalAccess.allCases.map { ($0, provider.state(of: $0)) })
+    }
+
+    // MARK: Optional access (never part of the setup gate)
+
+    func state(of access: OptionalAccess) -> OptionalAccessState { optionalStates[access] ?? .notAsked }
+
+    /// The optional permissions a feature still has to ask for.
+    func optionalAccessToAsk(for feature: Feature) -> [OptionalAccess] {
+        feature.optionalAccess.filter { state(of: $0) == .notAsked }
+    }
+
+    /// Asks for one optional permission, once. The system prompt appears only from here.
+    func allow(_ access: OptionalAccess) async {
+        guard asking == nil, askingOptional == nil, state(of: access) == .notAsked else { return }
+        askingOptional = access
+        await provider.request(access)
+        askingOptional = nil
+        readOptional()
+    }
+
+    private func readOptional() {
+        let fresh = Dictionary(uniqueKeysWithValues: OptionalAccess.allCases.map { ($0, provider.state(of: $0)) })
+        if fresh != optionalStates { optionalStates = fresh }
     }
 
     func state(of kind: AccessKind) -> PrivacyAccess.State { states[kind] ?? .notAsked }
@@ -271,6 +319,7 @@ final class AccessModel {
     /// Reads every state again: after a system prompt closes, and when the person comes back from System Settings. What can only be
     /// read off the main actor (Automation) follows a moment later.
     func refresh() {
+        readOptional()
         apply(readAll())
         Task { await reloadSlowReads() }
     }
@@ -297,6 +346,7 @@ final class AccessModel {
 
     /// Reads every state again, the slow ones too, and returns once they are in.
     func refreshed() async {
+        readOptional()
         apply(readAll())
         await reloadSlowReads()
     }

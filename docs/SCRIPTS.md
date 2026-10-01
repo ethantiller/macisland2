@@ -30,7 +30,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Format the code in place | `./scripts/format.sh` (see the warning below) |
 | Rebuild the Now Playing adapter | `./scripts/build-adapter.sh` |
 | Show the first-run guide again | `open macisland://guide` |
-| Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, the last Automation answers, and the step the guide stopped at, and opens the app |
+| Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, the optional permissions seen, the Features catalog, the last Automation answers, and the step the guide stopped at, and opens the app |
 | Open Settings on its tour | `open macisland://tour` |
 | See the guide as a fresh install would (debug builds) | `open 'macisland://guide?reset=1'` |
 | Forget the app's macOS permissions | `tccutil reset All com.ethantiller.MacIsland` |
@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 789 tests, about a second.
+lines; 796 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -364,7 +364,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 48 files, about 10,900 lines, **789 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 49 files, about 10,900 lines, **796 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -391,6 +391,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `PresentationTests.swift` | Hover, peek, expanded, banner widths, drag target, the hidden pill, swipes |
 | `SettingsTests.swift` | Hotkey, tabs |
 | `FeatureCatalogTests.swift` | The Features catalog: the words, defaults, presets, the two bridged settings, the clipboard migration, the shown tabs, the menu bar, the archive |
+| `OptionalAccessTests.swift` | Optional permissions: never part of the gate, never asked by turning a feature on or by a preset, asked once by Allow, and the evidence record |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

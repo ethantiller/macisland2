@@ -53,6 +53,8 @@
     <string>MacIsland turns your voice notes into text on this Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>MacIsland can change the volume and Favorite in Music and Spotify from the notch.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>MacIsland changes each app's volume and where it plays. Nothing is recorded or kept.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

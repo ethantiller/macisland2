@@ -147,7 +147,7 @@ lists every host and everything MacIsland runs.
 
 **Nothing asks at launch.** The first-run guide walks through Calendars, Reminders, Bluetooth, Downloads, Camera, Microphone (with Speech), Screen Recording, Accessibility, Focus, and Automation, one step each with a reason and **Grant Permission** (each required, so the island appears only once all ten are allowed); Settings → Privacy has a **Grant** for anything not yet asked; and otherwise macOS asks when a feature first needs it (and for a folder widget in Desktop or Documents). The app is signed
 ad hoc, so **every rebuild resets these**: reset them with `tccutil reset All com.ethantiller.MacIsland`.
-Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
+**Optional access:** a feature that starts off and needs a permission (the Mixer's System Audio Recording) asks only when you turn it on and press Allow; it is never part of the guide, and a preset never asks. Details and the full list: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#permissions-network-and-external-commands).
 
 ## Status
 

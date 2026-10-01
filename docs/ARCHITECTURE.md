@@ -519,7 +519,9 @@ Nothing is stored except these. All keys are in `UserDefaults` (the app's domain
 | Microphone | Voice Note | `NSMicrophoneUsageDescription` |
 | Speech recognition | Voice Note transcription (`SpeechTranscriber` is on-device; whether it needs this key was not verified, so the string is there) | `NSSpeechRecognitionUsageDescription` |
 | Screen Recording | Record Screen | (system prompt via `CGRequestScreenCaptureAccess`; no key) |
+| System Audio Recording (**optional**) | The Mixer (not built yet); asked only from Allow in Features | `NSAudioCaptureUsageDescription` |
 
+**Optional access.** `OptionalAccess` (`Onboarding/OptionalAccess.swift`) is separate from `AccessKind`, the ten the guide walks through, so `allAllowed`, `missing`, `SetupGate`, and the guide never see it: a feature that starts off must not close the island. There is no public API that reads or requests System Audio Recording (checked in the SDK's CoreAudio, AVFAudio, and ScreenCaptureKit headers); macOS asks the first time a process tap starts. Its state is therefore evidence, kept in `access.optional` (`OptionalAccessRecord`, not an install-evidence key, cleared by `make first-run`): `notAsked` until MacIsland has asked, `allowed` once a tap has delivered sound, `denied` once a tap delivered only silence while its app was playing, and `asked` in between (shown as "Can't Be Checked"). `AccessProviding` has `state(of: OptionalAccess)` and `request(_:)` with default implementations, so test doubles compile unchanged; `LiveAccess.systemAudioProbe` is the hook the Mixer sets. **The ask:** turning a feature on opens a line under its row in Features (the reason in a sentence, **Allow**, **Not Now**); only Allow reaches the system prompt, a preset never asks (its rows show the line), a refusal shows "is off" with **Open System Settings**, and the island itself never asks. Settings → Privacy lists the state under Optional Access once a feature that needs one is built.
 `LSUIElement` is true (no Dock icon). The app is signed with a **self-signed "MacIsland Dev" certificate**, which the first build
 on a Mac makes (`scripts/sign.sh`, through `make-signing-cert.sh`), so its identity to macOS (bundle ID plus certificate) stays the
 same across rebuilds and permissions stick. When it can't be made or used, or with `MACISLAND_ADHOC=1`, the build is ad-hoc signed,
@@ -679,7 +681,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **789 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **796 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

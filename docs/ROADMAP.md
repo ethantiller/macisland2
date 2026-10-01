@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (789 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (796 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
