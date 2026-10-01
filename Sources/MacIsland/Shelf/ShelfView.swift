@@ -28,6 +28,7 @@ struct ShelfView: View {
 
     private var shelf: ShelfModel { viewModel.shelf }
     private var clipboard: ClipboardHistory { viewModel.clipboard }
+    @State private var commandKeys = CommandKeyMonitor()
 
     /// The split drop target shows only while a file is actually being dragged, so a missed exit
     /// can never leave it covering the Shelf.
@@ -42,7 +43,22 @@ struct ShelfView: View {
             .onAppear {
                 viewModel.sweepShelf()
                 shelf.verify()
+                syncCommandKeys(showing: viewModel.isClipboardShowing)
             }
+            // The search is for this visit, and ⌘ is listened to only while the clipboard shows.
+            .onDisappear {
+                viewModel.clipboardQuery = ""
+                syncCommandKeys(showing: false)
+            }
+            .onChange(of: viewModel.isClipboardShowing) { _, showing in syncCommandKeys(showing: showing) }
+    }
+
+    private func syncCommandKeys(showing: Bool) {
+        if showing {
+            commandKeys.start { viewModel.isCommandHeld = $0 }
+        } else {
+            commandKeys.stop { viewModel.isCommandHeld = $0 }
+        }
     }
 
     @ViewBuilder
@@ -97,7 +113,11 @@ struct ShelfView: View {
                 }
                 .frame(width: Theme.Metrics.shelfChoiceWidth)
             }
-            Spacer()
+            if viewModel.shelfMode == .clipboard, viewModel.settings.isOn(.clipboard), !clipboard.entries.isEmpty {
+                ClipboardSearchField(viewModel: viewModel)
+            } else {
+                Spacer()
+            }
             switch viewModel.shelfMode {
             case .files where !shelf.items.isEmpty:
                 if FileTools.combinable(shelf.items).count > 1 {
@@ -130,13 +150,18 @@ struct ShelfView: View {
 
     @ViewBuilder
     private var clipboardList: some View {
+        let shown = viewModel.shownClipboardEntries
         if clipboard.entries.isEmpty {
             emptyState("Things you copy show up here", systemImage: "doc.on.clipboard")
+        } else if shown.isEmpty {
+            emptyState("Nothing matches", systemImage: "magnifyingglass")
         } else {
             ShelfRow {
-                ForEach(clipboard.entries) { entry in
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
                     ClipboardCard(
-                        entry: entry, onAction: viewModel.perform,
+                        entry: entry, query: viewModel.clipboardQuery,
+                        keyCap: ClipboardShortcut.keyCap(forIndex: index, commandHeld: viewModel.isCommandHeld),
+                        onAction: viewModel.perform,
                         onCopyText: { image in Task { await viewModel.fileTools.copyText(from: image) } },
                         onPlain: { viewModel.copyPlainText(entry) },
                         onSnippet: { viewModel.saveAsSnippet(entry) }
@@ -182,6 +207,10 @@ struct ShelfRow<Content: View>: View {
 /// address, or a color adds one action along the bottom. An image has nothing over it: reading its text is in the right-click menu.
 private struct ClipboardCard: View {
     let entry: ClipboardEntry
+    /// What is typed in the search: the words that matched are drawn apart from the rest.
+    let query: String
+    /// The key that pastes this card, while ⌘ is held.
+    let keyCap: String?
     let onAction: (SmartAction) -> Void
     let onCopyText: (NSImage) -> Void
     let onPlain: () -> Void
@@ -232,17 +261,30 @@ private struct ClipboardCard: View {
                 ChipButton(title: action.title) { onAction(action) }
                     .padding(6)
             }
+            if let keyCap {
+                KeyCap(keyCap, spoken: "Command " + String(keyCap.dropFirst()))
+                    .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: Theme.Metrics.clipboardCardWidth)
+    }
+
+    /// The copy's text. While searching, the words that matched are bright and the rest is quiet.
+    private func cardText(_ text: String) -> Text {
+        guard !ClipboardSearch.words(query).isEmpty else { return Text(text).foregroundStyle(Theme.Palette.primary) }
+        return ClipboardSearch.segments(of: query, in: text).reduce(Text("")) { result, part in
+            result + Text(part.text).foregroundStyle(part.isMatch ? Theme.Palette.primary : Theme.Palette.secondary)
+        }
     }
 
     @ViewBuilder
     private var content: some View {
         switch entry.content {
         case .text(let text):
-            Text(text.trimmingCharacters(in: .whitespacesAndNewlines))
+            cardText(text.trimmingCharacters(in: .whitespacesAndNewlines))
                 .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Palette.primary)
                 .multilineTextAlignment(.leading)
                 .lineLimit(action == nil ? 3 : 2)
                 .padding(.leading, 8)

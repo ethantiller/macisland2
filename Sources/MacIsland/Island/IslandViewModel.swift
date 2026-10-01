@@ -961,8 +961,76 @@ final class IslandViewModel {
             respectingFocus: false)
     }
 
+    // MARK: Clipboard search and paste
+
+    /// What is typed in the Shelf's Clipboard search. Cleared when the Shelf goes.
+    var clipboardQuery = ""
+    /// ⌘ is down while the clipboard shows: its first nine cards show their keys.
+    var isCommandHeld = false
+    /// Where a copy goes back to. The general pasteboard; a test gives it a private one.
+    @ObservationIgnored var pasteboard: NSPasteboard = .general
+    @ObservationIgnored var paster: Pasting = LivePaster()
+    /// A moment for the app that had the keyboard to take it back before ⌘V is pressed.
+    @ObservationIgnored var pasteDelay: Duration = .milliseconds(50)
+    /// Lets go of the keyboard so the app behind the island has it again. Set by the app.
+    @ObservationIgnored var onReleaseKeyboard: (() -> Void)?
+    @ObservationIgnored private(set) var pasteTask: Task<Void, Never>?
+
+    /// The copies that match what is typed, newest first.
+    var shownClipboardEntries: [ClipboardEntry] { features.clipboard.matches(clipboardQuery) }
+
+    /// The Shelf is open on its Clipboard, which is where the paste keys work.
+    var isClipboardShowing: Bool {
+        state == .expanded && selectedTab == .shelf && shelfMode == .clipboard && features.settings.isOn(.clipboard)
+    }
+
+    /// Puts the copy back on the pasteboard, folds the island, gives the keyboard back, and presses ⌘V in the app that has it. Without
+    /// Accessibility it only copies, and says so, as clicking a card does.
+    func pasteClipboardEntry(_ entry: ClipboardEntry) {
+        guard paster.canPaste else {
+            copyFromClipboardHistory(entry)
+            return
+        }
+        features.clipboard.copy(entry, to: pasteboard)
+        clipboardQuery = ""
+        closePinned()
+        onReleaseKeyboard?()
+        let paster = paster
+        let delay = pasteDelay
+        pasteTask?.cancel()
+        pasteTask = Task {
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            _ = paster.paste()
+        }
+    }
+
+    /// ⌘1 to ⌘9: paste the nth copy shown. False (so the key goes on) when the clipboard isn't showing or has no such copy.
+    func pasteClipboardShortcut(_ digit: Int) -> Bool {
+        let entries = shownClipboardEntries
+        guard isClipboardShowing, (1...9).contains(digit), digit <= entries.count else { return false }
+        pasteClipboardEntry(entries[digit - 1])
+        return true
+    }
+
+    /// Return: paste the first copy shown.
+    func pasteFirstClipboardMatch() -> Bool {
+        guard isClipboardShowing, let first = shownClipboardEntries.first else { return false }
+        pasteClipboardEntry(first)
+        return true
+    }
+
+    /// Esc takes back one thing before it closes the island: the clipboard search. True when it did.
+    func stepBack() -> Bool {
+        if !clipboardQuery.isEmpty {
+            clipboardQuery = ""
+            return true
+        }
+        return false
+    }
+
     func copyFromClipboardHistory(_ entry: ClipboardEntry) {
-        features.clipboard.copy(entry)
+        features.clipboard.copy(entry, to: pasteboard)
         flash(
             IslandAlert(systemImage: "doc.on.clipboard.fill", tint: Theme.Tint.neutral, text: "Copied"),
             respectingFocus: false)

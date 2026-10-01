@@ -104,6 +104,7 @@ one of the two standing timers; both have a tolerance so macOS can fire them wit
 launch busier. `AppSettings.dragTarget` gates `setFileDragActive`, the drop delegate, and the drop tiles. Show Music Beside the Notch
 off makes `compactActivities` skip `.media`. The Shelf's last mode is stored (`shelfMode`); a drop always shows Files.
 
+**Clipboard search and paste.** `ClipboardSearch` (pure) matches every word of the query in any order, ignoring case and accents, and finds the ranges to mark; images match only an empty query. `IslandViewModel.clipboardQuery` is the field's text (cleared when the Shelf goes), `shownClipboardEntries` the filter, and the paste keys (⌘1 to ⌘9 through `IslandPanel.performKeyEquivalent`, Return through `keyDown`) go to `pasteClipboardShortcut` and `pasteFirstClipboardMatch`, which work only while `isClipboardShowing`. `pasteClipboardEntry` copies the entry back (to `pasteboard`), folds the island, asks the app to give the keyboard back (`onReleaseKeyboard`: the panel is ordered out and back), and after `pasteDelay` (50 ms, **verify** with TextEdit, Safari, and Terminal) presses ⌘V through the `Pasting` seam (`LivePaster`: a `CGEvent` for key 9 with the command flag to `.cghidEventTap`, only when `AXIsProcessTrusted()`). Without Accessibility it copies and flashes "Copied" instead. A local `flagsChanged` monitor (`CommandKeyMonitor`) tells the view model when ⌘ is down, and exists only while the clipboard shows. `stepBack()` is Esc's first answer (it clears the search) before `closePinned()`.
 ### The settings archive
 
 `SettingsArchive` (`{format: "MacIsland Settings", version: 1, ...}`, every field optional) holds every choice on the panes and Home
@@ -681,7 +682,7 @@ lets the key through while text is edited or a shortcut is recorded (`ShortcutCa
 
 ## Testing
 
-`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **800 tests** in about a second, no real
+`./scripts/test.sh` runs Swift Testing (`import Testing`) in the `MacIslandTests` target: **812 tests** in about a second, no real
 hardware or network. Patterns:
 
 - **`TestSupport.makeViewModel()`** builds a view model from test doubles (temp folders, private `UserDefaults` suites, an adapter-less

@@ -657,13 +657,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registerShortcuts()
 
         viewModel.onWantsKeyboard = { [weak panel] in panel?.makeKey() }
-        panel.keyHandler = { keyCode in
+        viewModel.onReleaseKeyboard = { [weak panel] in
+            // The panel is not the app's main window, so ordering it out and back hands the keyboard to the app behind it.
+            panel?.orderOut(nil)
+            panel?.orderFrontRegardless()
+        }
+        panel.keyHandler = { keyCode, modifiers in
             switch Int(keyCode) {
-            case kVK_Escape: viewModel.closePinned()
+            case kVK_Escape: if !viewModel.stepBack() { viewModel.closePinned() }
             case kVK_LeftArrow: viewModel.selectAdjacentTab(-1)
             case kVK_RightArrow: viewModel.selectAdjacentTab(1)
             case kVK_Space: return viewModel.quickLookHoveredItem()
-            default: return false
+            case kVK_Return, kVK_ANSI_KeypadEnter: return viewModel.pasteFirstClipboardMatch()
+            default:
+                guard modifiers.contains(.command), let digit = ClipboardShortcut.digit(forKeyCode: keyCode) else {
+                    return false
+                }
+                return viewModel.pasteClipboardShortcut(digit)
             }
             return true
         }

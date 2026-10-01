@@ -100,7 +100,7 @@ Prints the SHA-1 of the "MacIsland Dev" identity, or `-` when there is none. `si
 Runs `swift test`. With only the Command Line Tools installed, Swift Testing lives outside the default search path, so when
 `Testing.framework` is found under `xcode-select -p`, the script adds the framework, linker, and rpath flags (`-F`, `-rpath`)
 for the compiler and linker. Extra arguments pass through to `swift test` (`--filter`, `--parallel`, and so on). Output: pass/fail
-lines; 800 tests, about a second.
+lines; 812 tests, about a second.
 
 The **snapshot test** (`IslandSnapshots`) only runs when `ISLAND_SNAPSHOT_DIR` is set, and then writes one PNG per island state to
 that folder.
@@ -276,6 +276,7 @@ Every Swift file in `Sources/MacIsland/` (83 files, about 11,500 lines). One fol
 | `ShelfThumbnails.swift` | QuickLook thumbnails for Shelf files, cached in memory |
 | `ShelfView.swift` | The Files and Clipboard views, drop tiles, item and card views with their menus |
 | `ClipboardHistory.swift` | The pasteboard poller and the memory-only history (0, 10, 25, or 50 items) |
+| `ClipboardSearch.swift`, `ClipboardSearchField.swift`, `ClipboardPaste.swift` | The pure search (every word, ranges, segments), the header's search field and the command-key monitor, and the paste seam (`Pasting`, `LivePaster`) with the command-digit keys |
 | `SmartAction.swift` | Detects a lone link, address, or `#hex` color and names the action |
 | `FileTools.swift` | Zip, unzip, and the Shelf jobs (convert, combine, resize, compress, Copy Text): staged results and the choice of where they go, unique names |
 | `Converters.swift` | `FileKind`, `ConversionTarget`, and every converter: images, documents, PDF, video, audio, plus `MarkdownText` |
@@ -364,7 +365,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 49 files, about 10,900 lines, **800 tests**. Swift Testing.
+`Tests/MacIslandTests/`: 50 files, about 10,900 lines, **812 tests**. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -392,6 +393,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `SettingsTests.swift` | Hotkey, tabs |
 | `FeatureCatalogTests.swift` | The Features catalog: the words, defaults, presets, the two bridged settings, the clipboard migration, the shown tabs, the menu bar, the archive |
 | `OptionalAccessTests.swift` | Optional permissions: never part of the gate, never asked by turning a feature on or by a preset, asked once by Allow, and the evidence record |
+| `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |
 | `Phase2Tests.swift` | Minimal pairs, full charge, Keep Awake, drives, screenshots |

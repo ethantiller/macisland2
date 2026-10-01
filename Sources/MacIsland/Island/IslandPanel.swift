@@ -24,11 +24,17 @@ final class IslandPanel: NSPanel {
         contentView = hosting
     }
 
-    /// Esc and the arrow keys while the island has keyboard focus. Return `true` if handled.
-    var keyHandler: ((_ keyCode: UInt16) -> Bool)?
+    /// Esc, Return, and the arrow keys while the island has keyboard focus, and ⌘-digits. Return `true` if handled.
+    var keyHandler: ((_ keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags) -> Bool)?
 
     override func keyDown(with event: NSEvent) {
-        if keyHandler?(event.keyCode) != true { super.keyDown(with: event) }
+        if keyHandler?(event.keyCode, event.modifierFlags) != true { super.keyDown(with: event) }
+    }
+
+    /// A command key never reaches `keyDown` (and a text field takes it first), so ⌘-digits are offered to the handler here.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command), keyHandler?(event.keyCode, event.modifierFlags) == true { return true }
+        return super.performKeyEquivalent(with: event)
     }
 
     override var canBecomeKey: Bool { true }

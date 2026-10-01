@@ -240,6 +240,7 @@ from anywhere, pinned like ⌃⌥Space, even when the Shelf isn't in the tab str
   link, an email address, or a `#hex` color gets one action: **Open**, **New Email**, or **Copy RGB** (with a swatch). An
   image card shows the picture and nothing over it; right-click it for *Copy Text from Image* (Vision, on this Mac). Right-click a text card for *Copy as Plain Text* (the string only, no other types) or *Save as
   Snippet* (kept in Notes, and written to disk because you chose to). History itself stays in memory.
+  **Search and paste.** A search field sits in the header while the Clipboard shows. Typing keeps the copies that have every word you typed (any order, ignoring case and accents) and draws the matched words bright and the rest quiet; "Nothing matches" when none do. Hold ⌘ and the first nine cards show ⌘1 to ⌘9: pressing one pastes that card into the app you were in and folds the island, and **Return** pastes the first match. Pasting presses ⌘V for you, which needs Accessibility (one of the ten; never asked here): without it the card is only copied and "Copied" shows, as a click does. The keys work once the island has the keyboard (opened with ⌃⌥S, or after a click into the search); a hover-opened island doesn't have it. Esc clears the search before it closes the island
 
 ### Clock
 

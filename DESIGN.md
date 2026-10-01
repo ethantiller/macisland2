@@ -36,7 +36,7 @@ There are 7 modules. (An Agents slot is reserved in code; it is an [idea](docs/R
 | --- | --- |
 | Home | A dashboard of widgets on a 6 by 3 grid: today (opens a month calendar), what is next, what is playing, the everyday tools, timers, Shelf |
 | Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics |
-| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions) |
+| Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
 | Tools | Keep Awake, Mic Mute, Ring Light, Capture, Color Picker, Focus, Clean Keyboard, Mirror, Record Screen |

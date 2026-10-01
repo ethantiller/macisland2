@@ -14,7 +14,7 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (800 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (812 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
@@ -156,7 +156,7 @@ protocol TextRecognizing: Sendable { func recognize(_ image: CGImage) async thro
 
 - On text cards, the context menu gets **Copy as Plain Text** (writes the `.string` type only) and **Save as Snippet**
   (`NotesModel`; saved to disk only because the person chose to).
-- In the palette, `clip <text>` or `cb <text>` lists matching history entries; Return copies one.
+- ~~In the palette, `clip <text>` or `cb <text>` lists matching history entries; Return copies one.~~ The palette was removed; search is in the Shelf's Clipboard now (see the clipboard search and paste hand tests).
 - History stays in memory only.
 - **Files:** `Shelf/ShelfView.swift`, `Shelf/ClipboardHistory.swift` (`matches(_:) -> [ClipboardEntry]`, pure),
   `Palette/PaletteModel.swift`.
@@ -526,6 +526,12 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With Music off (defaults, as above) and a relaunch, `pgrep -fl mediaremote-adapter` shows nothing, and idle CPU with every feature off is no higher than with all on (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Turning Clock off while a timer runs stops it; turning Weather off keeps the city; turning Shelf off makes a dragged file do nothing and ⌃⌥S do nothing; Tools off stops Keep Awake
 - [ ] A Home widget of a feature turned off is in Add Widgets with its size, and returns with the feature
+
+**Clipboard search and paste (C)** *(written, not run)*
+- [ ] Typing in the Shelf's Clipboard filters and marks the words that matched; "Nothing matches" when none do
+- [ ] With TextEdit frontmost and the island open from ⌃⌥S, ⌘2 puts the second card into TextEdit and the island folds; Return pastes the first match; the same in Safari and Terminal (the 50 ms delay may need to grow)
+- [ ] Holding ⌘ shows ⌘1 to ⌘9 on the first nine cards and releasing hides them; idle CPU is unchanged once the Shelf closes (no flags monitor)
+- [ ] Without Accessibility the card is only copied and "Copied" shows
 
 **Content pane (F5)** *(written, not run)*
 - [ ] The sidebar reads General, Features, Content, Home, Notifications, Privacy, and the window still meets its 830 pt minimum
