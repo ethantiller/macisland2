@@ -52,9 +52,9 @@ final class AgentActivity {
     /// Changes when a deadline passes, so what shows is looked at again.
     private var tick = 0
 
-    init(clock: @escaping () -> Date = Date.init, usage: AgentUsageModel = AgentUsageModel()) {
+    init(clock: @escaping () -> Date = Date.init, usage: AgentUsageModel? = nil) {
         self.clock = clock
-        self.usage = usage
+        self.usage = usage ?? AgentUsageModel()
     }
 
     // MARK: Lines in

@@ -26,7 +26,7 @@ struct MixerRow: Identifiable, Equatable {
 @Observable
 final class AppMixer {
     /// Calls and pro-audio apps stay as they are: where latency matters, the Mixer keeps its hands off. Kept as bundle IDs.
-    static let neverTappedBundleIDs: Set<String> = [
+    nonisolated static let neverTappedBundleIDs: Set<String> = [
         // Calls.
         "us.zoom.xos", "com.apple.FaceTime", "com.microsoft.teams", "com.microsoft.teams2", "com.apple.TelephonyUtilities",
         // Pro audio.
@@ -35,7 +35,7 @@ final class AppMixer {
         "com.image-line.flstudio",
     ]
 
-    static func neverTapped(bundleID: String) -> Bool {
+    nonisolated static func neverTapped(bundleID: String) -> Bool {
         bundleID == Bundle.main.bundleIdentifier || neverTappedBundleIDs.contains(bundleID)
             || neverTappedBundleIDs.contains { bundleID.hasPrefix($0 + ".") }
     }
