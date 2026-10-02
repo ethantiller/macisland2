@@ -26,16 +26,96 @@ project). One borderless `NSPanel` hosts the whole island.
 
 ## Quick start
 
-Requires macOS 26 and Swift 6.3 (the Command Line Tools are enough).
+Runs on **macOS 15 Sequoia or later, on Apple Silicon**. On macOS 26 the surfaces are Liquid Glass; on 15 they are the
+same shapes in material. It is built from source (there is no download), with the Command Line Tools only: Xcode is not
+needed. The steps are the same on every macOS version from 15 up.
+
+**1. Check your Mac.**
 
 ```sh
-./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app   # build, (re)start (the first build makes a signing identity)
-./scripts/test.sh                                                     # 983 tests, under a second
-ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots   # render every state to PNG
+sw_vers -productVersion    # 15.0 or later
+uname -m                   # arm64
 ```
 
-UI changes only show after the bundle step. The app has no Dock icon; look for the notch, and the capsule icon in the
-menu bar (Settings, Quit). All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md).
+**2. Install the Command Line Tools 26 or later** (Swift 6.2+ and the macOS 26 SDK), then check them.
+
+```sh
+xcode-select --install     # or: System Settings > General > Software Update > Command Line Tools for Xcode 26
+swift --version            # must say Swift version 6.2 or later
+```
+
+If `swift --version` still says something older, an old Xcode is selected (or one was deleted): run
+`sudo xcode-select -s /Library/Developer/CommandLineTools`, then check again. Still older? See [Troubleshooting](#troubleshooting).
+
+**3. Get the code.** `git` comes with the Command Line Tools.
+
+```sh
+git clone https://github.com/ethantiller/macisland2.git
+cd macisland2
+```
+
+**4. Build and start it.**
+
+```sh
+make build-and-restart
+```
+
+The first build takes a few minutes. It also makes a signing identity, "MacIsland Dev", in your login keychain, so macOS
+keeps the permissions you grant across rebuilds; macOS may ask for your login password, and if you say no, the build signs
+ad hoc and still works (permissions are then asked again after each rebuild).
+
+**5. Finish the guide.** There is no Dock icon. Look for the capsule icon in the menu bar, and for the island at the
+notch (a Mac without a notch gets a pill at the top of the screen). A short guide asks for each permission in turn, and
+the island stays hidden until it is finished and everything is allowed.
+
+**Updating:** `git pull && make build-and-restart`.
+
+For developers:
+
+```sh
+./scripts/test.sh                                                           # the tests, under a few seconds
+ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots  # render every state to PNG
+make doctor                                                                 # print the Mac, toolchain and build, for bug reports
+```
+
+UI changes only show after `make build-and-restart`. All scripts: [docs/SCRIPTS.md](docs/SCRIPTS.md). `make first-run`
+is a dev-only reset to a true first launch (it wipes permissions); skip it when installing.
+
+## Troubleshooting
+
+First, run **`make doctor`**. It prints the macOS version, the selected toolchain, the checkout, and the built app, and
+changes nothing; paste it when asking for help.
+
+| What you see | What it means | Fix |
+| --- | --- | --- |
+| `Package.swift:6:25: error: reference to member 'v26' cannot be resolved without a contextual type`, or `SwiftSetting has no member 'swiftLanguageMode'` | The selected Swift is older than 6.0 (usually an old Xcode picked by `xcode-select`). It is not your macOS version. | Step 2: `xcode-select --install`, then `sudo xcode-select -s /Library/Developer/CommandLineTools`, then `swift --version` must say 6.2 or later |
+| `The selected toolchain is too old` | `scripts/check-toolchain.sh` found Swift below 6.2 or an SDK below 26 | The same fix; the message prints what is selected |
+| `swift: command not found`, `xcode-select: error: invalid developer directory`, or `make: command not found` | No toolchain is selected, or the Xcode that was is gone | `xcode-select --install`, then `sudo xcode-select -s /Library/Developer/CommandLineTools` |
+| `xcode-select --install` says the software can't be installed, or Software Update shows no Command Line Tools 26 | Your macOS is too old for the newest tools, or an organization policy hides updates | Update macOS in Software Update first; on a managed Mac, ask IT for Command Line Tools 26 |
+| `is only available in macOS 26.0 or newer` while building | A new macOS 26 API was used without a macOS 15 fallback (a bug in the code, not your setup) | Report it with `make doctor`; the fix is an `if #available(macOS 26, *)` ([ARCHITECTURE.md](docs/ARCHITECTURE.md#gotchas-and-lessons)) |
+| Build errors that make no sense after switching toolchains or pulling | A stale build | `rm -rf .build build && make build-and-restart` |
+| A password prompt for the keychain, or `Couldn't make it; signing ad hoc` | The signing identity could not be made | Harmless. Allow it and rebuild to keep permissions; or `MACISLAND_ADHOC=1 make bundle` to skip it |
+| Nothing appears | The island stays hidden until the guide is finished and every permission is allowed | Click the capsule icon in the menu bar, then Settings > General > Guide. `pgrep -x MacIsland` says whether it is running |
+| `"MacIsland" can't be opened` | macOS quarantined a copy of the app that was downloaded or sent to you | Build it yourself (step 4), or `xattr -dr com.apple.quarantine build/MacIsland.app` |
+| A permission shows on in System Settings but the app says it's off | The permission belongs to an older build of the app | `tccutil reset All com.ethantiller.MacIsland`, open the app, and allow it again |
+| Nothing shows in Now Playing | Music and Spotify need the Automation permission, and the track is read through `/usr/bin/perl` | Grant Automation in the guide (Settings > Privacy > Grant); play something |
+| A voice note says speech recognition isn't available for the language | Notes are turned into text on this Mac only, and no on-device model exists for your language | Nothing is sent to Apple, so the note can't be made; pick a supported language |
+
+### Digging deeper
+
+```sh
+# The full build output, to send along
+make bundle 2>&1 | tee /tmp/macisland-build.log
+
+# What the app logs while it runs (leave this open, then reproduce the problem)
+log stream --predicate 'subsystem == "com.ethantiller.MacIsland"' --level debug
+
+# Run it in the foreground, so its NSLog output shows in this terminal
+pkill -x MacIsland; build/MacIsland.app/Contents/MacOS/MacIsland
+
+# A crash leaves a report here; send the newest MacIsland one
+open ~/Library/Logs/DiagnosticReports
+```
 
 ## How you use it
 

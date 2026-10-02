@@ -22,6 +22,8 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Build signed ad hoc, leaving the keychain alone | `MACISLAND_ADHOC=1 make bundle` |
 | Build a release bundle | `./scripts/bundle.sh release` |
 | Run the tests | `./scripts/test.sh` |
+| Check the Swift toolchain is new enough | `./scripts/check-toolchain.sh` (bundle.sh and test.sh run it first) |
+| Print the Mac, toolchain and build for a bug report | `make doctor` |
 | Run some tests | `./scripts/test.sh --filter WidgetTests` |
 | Render every state to PNG | `ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots` |
 | Refresh the pictures in the docs | `./scripts/docs-images.sh` |
@@ -47,6 +49,14 @@ All are Bash with `set -euo pipefail`, run from anywhere (each `cd`s to the repo
 
 Dev only. Puts this Mac back to a true first run, to test the guide's permission steps. In this order, because the preferences daemon caches: quits MacIsland, runs `tccutil reset All com.ethantiller.MacIsland`, **writes** `onboarding.install fresh` (writing, not deleting: a deleted key would be read as an existing install), `onboarding.guide 0`, and `onboarding.settingsTour 0`, deletes `access.asked` (what the guide asked), `access.automation` (the last answer for Music and Spotify), and `onboarding.resumeStep` (where the guide stopped), and opens `build/MacIsland.app`. Run `make bundle` first.
 
+### `check-toolchain.sh`
+
+Fails with one plain message when the selected Swift toolchain is older than 6.2 or its macOS SDK older than 26, or the Mac runs older than macOS 15, instead of the confusing `Package.swift` errors an old toolchain gives. Prints nothing when all is well. `bundle.sh` and `test.sh` (and so `docs-images.sh`) call it first. `MIN_SWIFT` matches `swift-tools-version` in `Package.swift`.
+
+### `doctor.sh` (`make doctor`)
+
+Changes nothing; prints what is needed to work out why a build or launch fails: macOS version and chip, the selected toolchain (`xcode-select -p`, Swift, SDK, Command Line Tools version, and whether `check-toolchain.sh` passes), the checkout (commit, changed files), the built app (build time, minimum macOS, signing identity, the adapter framework, running or not), and the newest MacIsland crash report. The README's Troubleshooting says to paste it when asking for help.
+
 ### `bundle.sh`
 
 Builds the app and wraps the binary in a bundle you can open.
@@ -55,12 +65,13 @@ Builds the app and wraps the binary in a bundle you can open.
 ./scripts/bundle.sh [debug|release]      # default: debug
 ```
 
-1. `swift build -c <config>`, then finds the built binary with `--show-bin-path`.
-2. If `build/adapter/MediaRemoteAdapter.framework` does not exist, runs `build-adapter.sh` first.
-3. Recreates `build/MacIsland.app/Contents/{MacOS,Resources,Frameworks}`.
-4. Copies in the binary, `Support/Info.plist`, SwiftPM's resource bundle (into `Contents/Resources/`), the adapter framework (into
+1. `check-toolchain.sh`.
+2. `swift build -c <config>`, then finds the built binary with `--show-bin-path`.
+3. If `build/adapter/MediaRemoteAdapter.framework` does not exist, runs `build-adapter.sh` first.
+4. Recreates `build/MacIsland.app/Contents/{MacOS,Resources,Frameworks}`.
+5. Copies in the binary, `Support/Info.plist`, SwiftPM's resource bundle (into `Contents/Resources/`), the adapter framework (into
   `Frameworks/`), and `mediaremote-adapter.pl` (into `Resources/`).
-5. Signs the bundle with `sign.sh`: as "MacIsland Dev", which the first build on a Mac makes, or ad hoc (`codesign --sign -`) when
+6. Signs the bundle with `sign.sh`: as "MacIsland Dev", which the first build on a Mac makes, or ad hoc (`codesign --sign -`) when
   that identity can't be made or used.
 
 Output: `build/MacIsland.app`. Signed as "MacIsland Dev", its designated requirement is the bundle ID and that certificate, so
@@ -219,7 +230,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `ModuleContent.swift` | The one module-to-view switch used everywhere |
 | `Theme.swift` | All design tokens: `Palette`, `SurfaceInk`, `Tint` (with `Tint.airDrop` for the AirDrop target), `Typography`, `Metrics`, `Timing`, `Motion`, `BlurFade`, the `\.islandSurface` key |
 | `Components.swift` | Shared controls: `IconButton`, `ChipButton`, `SegmentedChoice`, `IslandSlider`, `ArtworkView`, `ProgressRing`, `EdgeFade`, `ChargingBadge`, `AirDropGlyph`, `Glyph`, `IslandButtonStyle`, `formatTime` |
-| `FloatingGlass.swift` | The `floatingGlass()` modifier (padding plus Liquid Glass) |
+| `FloatingGlass.swift` | The `floatingGlass()` modifier (padding plus Liquid Glass) and `glassSurface(in:)` (glass on macOS 26, material on 15) |
 | `FloatingGlassPanel.swift` | The torn-off window class and the `\.isFloatingWindow` key |
 
 ### `Widgets/`
@@ -351,7 +362,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | File | Contains |
 | --- | --- |
 | `Notes/NotesModel.swift` | Notes and snippets, saved as one JSON file after a pause in typing |
-| `Notes/VoiceRecorder.swift` | `VoiceRecorder` (10-minute cap), `Transcribing`, the level meter, and the on-device Speech transcriber |
+| `Notes/VoiceRecorder.swift` | `VoiceRecorder` (10-minute cap), `Transcribing`, the level meter, and the two on-device transcribers (`SpeechVoiceTranscriber` on macOS 26, `RecognizerVoiceTranscriber` before it) |
 | `Notes/NotesView.swift` | The Notes tab: lists, editors, the Prompter |
 | `Weather/WeatherModel.swift` | Open-Meteo geocoding and forecast (with quarter-hour rain), WMO code names, `WeatherGlance` |
 | `Weather/RainRule.swift` | `RainSample`, `RainRule` (dry now, 0.2 mm within 30 minutes), `RainSpell` (once per spell) |

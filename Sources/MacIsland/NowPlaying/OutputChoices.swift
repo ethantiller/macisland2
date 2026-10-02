@@ -268,7 +268,11 @@ struct OutputSatellites: View {
             }
         }
         // Liquid Glass bubbles beside the island, not inside it: they merge and part like drops as they swell and move.
-        GlassEffectContainer(spacing: Theme.Metrics.outputSatelliteGap) { stack }
+        if #available(macOS 26, *) {
+            GlassEffectContainer(spacing: Theme.Metrics.outputSatelliteGap) { stack }
+        } else {
+            stack
+        }
     }
 
     /// Shows or hides every dot: staggered going out, in reverse coming back, a short fade under Reduce Motion.
@@ -320,8 +324,7 @@ private struct OutputSatelliteButton: View {
             .foregroundStyle(Color.white)
             .padding(.horizontal, 8)
             .frame(width: pillWidth, height: size, alignment: .leading)
-            .glassEffect(isShown ? Glass.regular.tint(Theme.Palette.satelliteTint) : Glass.identity, in: Capsule())
-            .glassEffectID(choice.id, in: glassNamespace)
+            .modifier(SatelliteSurface(isShown: isShown, id: choice.id, namespace: glassNamespace))
             .environment(\.colorScheme, .dark)
             .contentShape(Capsule())
         }
@@ -395,5 +398,27 @@ private struct OutputChoiceRow: View {
         .buttonStyle(IslandButtonStyle())
         .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+/// A satellite's bubble: tinted Liquid Glass that merges with its neighbours on macOS 26, a tinted material capsule on
+/// macOS 15 (which has no glass), and nothing while hidden.
+private struct SatelliteSurface: ViewModifier {
+    let isShown: Bool
+    let id: String
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .glassEffect(isShown ? Glass.regular.tint(Theme.Palette.satelliteTint) : Glass.identity, in: Capsule())
+                .glassEffectID(id, in: namespace)
+        } else {
+            content
+                .background {
+                    if isShown {
+                        Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(Theme.Palette.satelliteTint))
+                    }
+                }
+        }
     }
 }

@@ -68,6 +68,11 @@ final class VoiceRecorder {
         }
     }
 
+    /// The transcriber for this Mac: `SpeechTranscriber` on macOS 26, the older on-device recognizer before it.
+    static func systemTranscriber() -> Transcribing {
+        if #available(macOS 26, *) { SpeechVoiceTranscriber() } else { RecognizerVoiceTranscriber() }
+    }
+
     static var defaultFolder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("MacIsland", isDirectory: true)
@@ -146,7 +151,20 @@ final class LevelMeter: @unchecked Sendable {
     func reset() { lock.withLock { current = 0 } }
 }
 
+/// The `.m4a` a voice note is kept in: AAC at the microphone's own sample rate and channels.
+private func voiceAudioFile(writingTo file: URL, matching micFormat: AVAudioFormat) throws -> AVAudioFile {
+    try AVAudioFile(
+        forWriting: file,
+        settings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: micFormat.sampleRate,
+            AVNumberOfChannelsKey: micFormat.channelCount,
+            AVEncoderBitRateKey: 64_000,
+        ])
+}
+
 /// The microphone, written to an .m4a and read by the on-device `SpeechTranscriber` (macOS 26).
+@available(macOS 26, *)
 @MainActor
 final class SpeechVoiceTranscriber: Transcribing {
     private let engine = AVAudioEngine()
@@ -183,14 +201,7 @@ final class SpeechVoiceTranscriber: Transcribing {
 
         let inputNode = engine.inputNode
         let micFormat = inputNode.outputFormat(forBus: 0)
-        let audio = try AVAudioFile(
-            forWriting: file,
-            settings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: micFormat.sampleRate,
-                AVNumberOfChannelsKey: micFormat.channelCount,
-                AVEncoderBitRateKey: 64_000,
-            ])
+        let audio = try voiceAudioFile(writingTo: file, matching: micFormat)
         let converter = AVAudioConverter(from: micFormat, to: format)
         let meter = meter
         meter.reset()
@@ -228,6 +239,76 @@ final class SpeechVoiceTranscriber: Transcribing {
             words = nil
         }
         try await analyzer?.finalizeAndFinishThroughEndOfInput()
+        return try await words?.value ?? ""
+    }
+}
+
+/// The microphone, written to an .m4a and read by `SFSpeechRecognizer`, on this Mac only (macOS 15, before `SpeechTranscriber`).
+@MainActor
+final class RecognizerVoiceTranscriber: Transcribing {
+    private let engine = AVAudioEngine()
+    private let meter = LevelMeter()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var task: SFSpeechRecognitionTask?
+    private var words: Task<String, Error>?
+
+    var level: Float { meter.value }
+
+    func start(writingTo file: URL) async throws {
+        guard await AVAudioApplication.requestRecordPermission() else { throw VoiceError.microphoneDenied }
+        // Audio must never go to Apple's servers, so a language without an on-device model can't be used.
+        guard let recognizer = SFSpeechRecognizer(locale: Locale.current), recognizer.supportsOnDeviceRecognition else {
+            throw VoiceError.noSpeechModel
+        }
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.requiresOnDeviceRecognition = true
+        request.addsPunctuation = true
+        request.shouldReportPartialResults = false
+        self.request = request
+        words = Task {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                var finished = false
+                task = recognizer.recognitionTask(with: request) { result, error in
+                    guard !finished else { return }
+                    if let result, result.isFinal {
+                        finished = true
+                        continuation.resume(returning: result.bestTranscription.formattedString)
+                    } else if let error {
+                        finished = true
+                        // "No speech detected" is an empty note, not a failure.
+                        let quiet = (error as NSError).domain == "kAFAssistantErrorDomain"
+                            && [1110, 203].contains((error as NSError).code)
+                        if quiet { continuation.resume(returning: "") } else { continuation.resume(throwing: error) }
+                    }
+                }
+            }
+        }
+
+        let inputNode = engine.inputNode
+        let micFormat = inputNode.outputFormat(forBus: 0)
+        let audio = try voiceAudioFile(writingTo: file, matching: micFormat)
+        let meter = meter
+        meter.reset()
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: micFormat) { buffer, _ in
+            try? audio.write(from: buffer)
+            meter.update(from: buffer)
+            request.append(buffer)
+        }
+        engine.prepare()
+        try engine.start()
+    }
+
+    func stop() async throws -> String {
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        meter.reset()
+        request?.endAudio()
+        defer {
+            request = nil
+            task = nil
+            words = nil
+        }
         return try await words?.value ?? ""
     }
 }

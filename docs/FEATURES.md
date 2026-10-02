@@ -341,7 +341,7 @@ Notes, Snippets, and a Prompter, stored as JSON in Application Support.
 - **Notes**: a list and an editor. A note is named by its first line.
 - **Snippets**: named text you copy in one tap.
 - **Prompter**: the selected note, scrolling under the camera at a speed you set, with fade at the edges.
-- **Voice Note** (the mic in the header): records audio and turns it into text on this Mac (macOS speech recognition; the language model is downloaded once). Stopping makes a note called "Voice Note, 3:45 PM" that holds the words, and puts the audio (an .m4a kept in Application Support) on the Shelf. The blue waveform and time sit beside the notch; hovering shows a level meter and **Stop**. Ten minutes at most. If Mute Mic is on, a banner offers **Unmute** first.
+- **Voice Note** (the mic in the header): records audio and turns it into text on this Mac (macOS speech recognition; on macOS 26 the language model is downloaded once, and on macOS 15 it uses the older on-device recognizer, and a language with no on-device model says so instead of sending audio to Apple). Stopping makes a note called "Voice Note, 3:45 PM" that holds the words, and puts the audio (an .m4a kept in Application Support) on the Shelf. The blue waveform and time sit beside the notch; hovering shows a level meter and **Stop**. Ten minutes at most. If Mute Mic is on, a banner offers **Unmute** first.
 
 ---
 

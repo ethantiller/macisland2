@@ -4,6 +4,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+./scripts/check-toolchain.sh
 DEV="$(xcode-select -p)/Library/Developer"
 FW="$DEV/Frameworks"
 if [ -d "$FW/Testing.framework" ]; then

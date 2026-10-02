@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             bluetooth: BluetoothDevices(provider: IOBluetoothProvider(), work: work),
             mirror: CameraMirror(provider: AVCameraProvider()),
             screenRecorder: ScreenRecorder(recorder: SCKScreenRecorder(), shelf: shelf),
-            voice: VoiceRecorder(transcriber: SpeechVoiceTranscriber(), notes: notes, shelf: shelf),
+            voice: VoiceRecorder(transcriber: VoiceRecorder.systemTranscriber(), notes: notes, shelf: shelf),
             widgets: CustomWidgetValues(fetcher: LiveWidgetFetcher()),
             system: SystemModel(sampler: LiveSystemSampler()),
             agents: AgentActivity(),

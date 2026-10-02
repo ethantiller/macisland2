@@ -117,6 +117,10 @@ protocol AccessProviding: AnyObject {
 }
 
 extension AccessProviding {
+    /// Every permission's state. A provider that has to look each one up should read them together.
+    func allStates() -> [AccessKind: PrivacyAccess.State] {
+        Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, state(of: $0)) })
+    }
     func reload() async {}
     func offItem(of kind: AccessKind) -> PrivacyAccess.Item? { nil }
     func state(of access: OptionalAccess) -> OptionalAccessState { .notAsked }
@@ -144,8 +148,16 @@ final class LiveAccess: AccessProviding {
         self.defaults = defaults
     }
 
-    func state(of kind: AccessKind) -> PrivacyAccess.State {
+    func allStates() -> [AccessKind: PrivacyAccess.State] {
         let rows = PrivacyAccess.current(defaults: defaults)
+        return Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, state(of: $0, rows: rows)) })
+    }
+
+    func state(of kind: AccessKind) -> PrivacyAccess.State {
+        state(of: kind, rows: PrivacyAccess.current(defaults: defaults))
+    }
+
+    private func state(of kind: AccessKind, rows: [PrivacyAccess]) -> PrivacyAccess.State {
         func row(_ id: String) -> PrivacyAccess.State { rows.first { $0.id == id }?.state ?? .notAsked }
         if kind == .microphone {
             // Voice notes need the microphone and speech recognition: allowed only when both are, asked again while either isn't.
@@ -177,6 +189,8 @@ final class LiveAccess: AccessProviding {
     }
 
     func request(_ kind: AccessKind) async -> Bool {
+        // A system prompt stays hidden, or never appears, while an accessory app isn't the active one.
+        NSApp.activate()
         switch kind {
         case .calendars: return await agenda.requestAccess(to: .event)
         case .reminders: return await agenda.requestAccess(to: .reminder)
@@ -313,7 +327,9 @@ final class AccessModel {
     }
 
     private func readAll() -> [AccessKind: PrivacyAccess.State] {
-        Dictionary(uniqueKeysWithValues: AccessKind.allCases.map { ($0, read($0)) })
+        provider.allStates().reduce(into: [:]) { result, pair in
+            result[pair.key] = grantedThisSession.contains(pair.key) && pair.value != .denied ? .allowed : pair.value
+        }
     }
 
     /// Reads every state again: after a system prompt closes, and when the person comes back from System Settings. What can only be

@@ -120,7 +120,7 @@ struct MenuBarPreview: View {
         }
         .padding(padding)
         .frame(width: Theme.Metrics.detachedWidth + 2 * padding)
-        .glassEffect(.regular, in: .rect(cornerRadius: Theme.Metrics.floatRadius))
+        .glassSurface(in: .rect(cornerRadius: Theme.Metrics.floatRadius))
         .environment(\.islandSurface, .glass)
         .environment(\.isFloatingWindow, true)
         .allowsHitTesting(false)

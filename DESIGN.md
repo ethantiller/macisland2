@@ -19,6 +19,8 @@
 
 Glass never goes inside the island, and glass is never stacked on glass.
 
+On macOS 15, which has no Liquid Glass, every glass surface falls back to `.regularMaterial` in the same shape (`glassSurface(in:)`), and the output satellites are tinted `.ultraThinMaterial` capsules that no longer merge. On macOS 26 nothing changes.
+
 The Media output satellites are bubbles of Liquid Glass leaning to near black (`Palette.satelliteTint`), outside the island, so glass is not inside it or on glass. Their glyphs are white, whether or not the device is connected (a device that isn't says so to VoiceOver). They are 40 pt circles that merge and part like drops (`GlassEffectContainer`) and grow, on hover, only as wide as the device's name; they emerge beside the island edge in a staggered motion, and a hidden bubble draws nothing. Choosing an output moves its glyph into the current-output chip, while the previous output moves back into the column. Reduce Motion fades them without scaling or travel.
 
 ### Presentations

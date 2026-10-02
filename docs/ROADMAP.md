@@ -622,6 +622,16 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Every former Media, Clock, Shelf, and Tools setting is under Content (click the module's row, or its tab in the preview) and from search, and works as before; the tour's Content stops show their module
 - [ ] A module switched off in Features is listed under Off in Features with Open Features; the island's right-click Edit on a Shortcut tool opens Content on Tools with its sheet
 
+**Sequoia (macOS 15)** *(built, never run: this Mac is on a newer macOS)*
+- [ ] `make build-and-restart` works on Command Line Tools 26 and the app launches with the island at the notch
+- [ ] The floating panels, the menu-bar modules and the virtual pill read as dark or system-appearance material (no glass, still legible)
+- [ ] The Media output satellites show as tinted capsules, grow on hover, and a hidden one draws nothing
+- [ ] A voice note transcribes (on-device, no network); a language with no on-device model says "Speech recognition isn’t available for this language."
+- [ ] Now Playing works (the vendored perl adapter is the 15.4+ path)
+- [ ] Notifications mirrored through Accessibility find the banners (Notification Center’s tree may differ on 15)
+- [ ] The Volume HUD replacement works
+- [ ] The first-run guide reaches Done with every permission
+
 **Features pane (F3)** *(written, not run)*
 - [ ] Settings → Features is second in the sidebar; every row turns its feature off and on with the island following at once, and a row that stops something running says what stopped
 - [ ] Each preset asks, then switches; choosing the rows afterwards shows "Your Own"

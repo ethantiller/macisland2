@@ -6,12 +6,24 @@ struct FloatingGlass: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(Theme.Metrics.floatPadding)
-            .glassEffect(.regular, in: .rect(cornerRadius: Theme.Metrics.floatRadius))
+            .glassSurface(in: .rect(cornerRadius: Theme.Metrics.floatRadius))
     }
 }
 
 extension View {
     func floatingGlass() -> some View {
         modifier(FloatingGlass())
+    }
+}
+
+extension View {
+    /// Liquid Glass on macOS 26; on macOS 15, which has none, the regular material in the same shape.
+    @ViewBuilder
+    func glassSurface(in shape: some Shape) -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(.regular, in: shape)
+        } else {
+            background(.regularMaterial, in: shape)
+        }
     }
 }

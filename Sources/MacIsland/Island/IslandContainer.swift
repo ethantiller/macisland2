@@ -76,7 +76,7 @@ struct IslandSurfaceStyle<S: Shape>: ViewModifier {
         case .glass:
             content
                 .clipShape(shape)
-                .glassEffect(.regular, in: shape)
+                .glassSurface(in: shape)
         }
     }
 }
