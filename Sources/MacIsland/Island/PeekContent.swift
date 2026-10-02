@@ -17,11 +17,13 @@ struct PeekContent: View {
 
     private var content: some View {
         Group {
-            switch viewModel.compactActivity {
+            switch viewModel.peekActivity {
             case .media:
                 NowPlayingView(
                     nowPlaying: viewModel.nowPlaying, outputs: viewModel.outputs, bluetooth: viewModel.bluetooth,
-                    isPeek: true)
+                    isPeek: true, peekOutputList: Binding(
+                        get: { viewModel.showsPeekOutputList },
+                        set: { viewModel.showsPeekOutputList = $0 }))
             case .timer, .pomodoro, .stopwatch:
                 ClockPeekView(viewModel: viewModel)
             case .agent:

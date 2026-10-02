@@ -21,14 +21,22 @@ struct PreviewContext: Equatable {
     var menuBarTab: IslandModule = .home
     /// The ambient event whose banner or alert the Banner presentation shows.
     var event: AmbientEvent?
-    /// The volume HUD's alert, as the compact island shows it.
-    var showsVolume = false
+    /// The volume and brightness HUD levels held on the island, as the compact island (and the open one's band) shows them.
+    var levels: Set<LevelKind> = []
     /// A file is being dragged toward the island: the compact preview shows the drop target the setting chose.
     var fileDrag = false
     /// The Media tab's Mixer panel is open.
     var showsMixer = false
     /// A timer runs beside the music, so the peek has two things to choose between.
     var twoActivities = false
+    /// Which tool the island shows on its own: its mark, its task, its Done notice, and Stats filtered to it. Nil is both.
+    var agent: AgentKind?
+    /// The mode the Agents tab opens on. Nil leaves it as it was.
+    var agentsMode: AgentsMode?
+    /// What leads the island: nothing live (`.idle`), or one activity ahead of the rest. Nil leaves the usual order.
+    var lead: PreviewLead?
+    /// Home's layout while this is shown, for a feature that lives in a widget the person may not have placed. Nil is theirs.
+    var homeLayout: HomeLayout?
     /// The Shelf mode the Shelf tab opens on in the preview. Nil leaves it as it was.
     var shelfMode: ShelfMode?
     /// The mode the Clock tab opens on, for a pane that is about one of them. Nil leaves it as it was.
@@ -52,6 +60,10 @@ final class IslandPreviewModel {
     let viewModel: IslandViewModel
     private(set) var context = PreviewContext()
     @ObservationIgnored private let scratch = PreviewFeatures.Scratch()
+    /// A context put its own Home layout on the island, which the next one takes off (the Home editor's is not ours to clear).
+    @ObservationIgnored private var overridesHome = false
+    /// Which tool the sample tasks are of now, so they are made again only when it changes.
+    @ObservationIgnored private var seededAgent: AgentKind??
 
     init(live: IslandFeatures) {
         viewModel = IslandViewModel(features: PreviewFeatures.make(live: live, scratch: scratch))
@@ -70,6 +82,7 @@ final class IslandPreviewModel {
         viewModel.setFileDragActive(false)
         viewModel.dismissBanner()
         viewModel.clearAlert()
+        viewModel.setPreviewLevels(volume: nil, brightness: nil)
     }
 
     /// How far the preview has slid from the island (0) to the menu bar (1). It animates with the change of view, so the
@@ -120,6 +133,20 @@ final class IslandPreviewModel {
                 viewModel.chosenActivityID = nil
             }
             menuBarProgress = context.presentation == .menuBar ? 1 : 0
+            if seededAgent != .some(context.agent) {
+                PreviewSamples.seedTasks(in: viewModel.agents, for: context.agent)
+                seededAgent = .some(context.agent)
+            }
+            viewModel.setStatsAgent(context.agent)
+            if let mode = context.agentsMode { viewModel.agentsMode = mode }
+            viewModel.previewLead = context.lead
+            if let layout = context.homeLayout {
+                viewModel.homeLayoutOverride = layout
+                overridesHome = true
+            } else if overridesHome {
+                viewModel.homeLayoutOverride = nil
+                overridesHome = false
+            }
             switch context.presentation {
             case .compact:
                 clearAnnouncements()
@@ -128,17 +155,11 @@ final class IslandPreviewModel {
             case .peek:
                 clearAnnouncements()
                 viewModel.state = .peek
-            case .banner where context.showsVolume:
-                clearAnnouncements()
-                viewModel.state = .compact
-                var alert = Announcements.volume(PreviewSamples.volume)
-                alert.staysUntilSeen = true
-                viewModel.flash(alert, respectingFocus: false)
             case .banner:
                 clearAnnouncements()
                 let announcement =
                     context.event.map {
-                        Announcements.sample(for: $0, agenda: viewModel.agenda)
+                        Announcements.sample(for: $0, agenda: viewModel.agenda, agent: context.agent ?? .claudeCode)
                     } ?? .banner(PreviewSamples.banner())
                 switch announcement {
                 case .banner(let banner):
@@ -159,6 +180,11 @@ final class IslandPreviewModel {
             case .menuBar:
                 // The island keeps the state it had: it shrinks and slides away as it is, and comes back the same.
                 clearAnnouncements()
+            }
+            if !context.levels.isEmpty, context.presentation != .menuBar, context.presentation != .banner {
+                viewModel.setPreviewLevels(
+                    volume: context.levels.contains(.volume) ? PreviewSamples.volume : nil,
+                    brightness: context.levels.contains(.brightness) ? PreviewSamples.brightness : nil)
             }
         }
         if animated { withAnimation(slides ? Theme.Motion.slide : Theme.Motion.open, apply) } else { apply() }

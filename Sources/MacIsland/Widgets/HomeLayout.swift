@@ -104,6 +104,11 @@ struct HomeLayout: Codable, Equatable {
         placement(.today, 3), placement(.music, 3), placement(.quickTools, 1), placement(.clockActions, 5),
     ])
 
+    /// Everyday with the System widget in place of the date, for the Settings preview of a feature whose card the person may not have.
+    static let showingSystem = HomeLayout(widgets: [
+        placement(.system, 3), placement(.music, 3), placement(.quickTools, 1), placement(.clockActions, 5),
+    ])
+
     static let presets: [HomePreset] = [
         HomePreset(name: "Everyday", layout: .default),
         HomePreset(

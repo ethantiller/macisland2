@@ -10,6 +10,22 @@ struct AgentTask: Identifiable, Equatable {
     var model: String?
     var startedAt: Date
     var lastActivity: Date
+    /// What the person asked this turn, on one line.
+    var title: String?
+    /// What this turn has used so far: each streamed response once.
+    var tokens = AgentTokens()
+    /// How much of the model's context the latest request filled, and how much there is.
+    var context: (used: Int, window: Int)?
+
+    static func == (lhs: AgentTask, rhs: AgentTask) -> Bool {
+        lhs.id == rhs.id && lhs.agent == rhs.agent && lhs.project == rhs.project && lhs.model == rhs.model
+            && lhs.startedAt == rhs.startedAt && lhs.lastActivity == rhs.lastActivity && lhs.title == rhs.title
+            && lhs.tokens == rhs.tokens && lhs.context?.used == rhs.context?.used
+            && lhs.context?.window == rhs.context?.window
+    }
+
+    /// What the island calls the task: what was asked, else its folder.
+    var displayTitle: String { title ?? project }
 }
 
 /// What the agents are doing, from the lines their logs gain. Pure state, so it is tested without a file: `ingest` takes parsed lines,
@@ -47,6 +63,9 @@ final class AgentActivity {
     @ObservationIgnored private var processes: [String: Int32] = [:]
     /// What a session's lines said about its model and folder, for a turn that starts after them.
     @ObservationIgnored private var meta: [String: (model: String?, cwd: String?)] = [:]
+    /// Each response's tokens in the open turn, by what identifies it, so a response written twice counts once (the later line has the
+    /// final count).
+    @ObservationIgnored private var responses: [String: [String: AgentTokens]] = [:]
     @ObservationIgnored private var deadline: Task<Void, Never>?
     @ObservationIgnored private let clock: () -> Date
     /// Changes when a deadline passes, so what shows is looked at again.
@@ -76,6 +95,8 @@ final class AgentActivity {
                     startedAt: seen, lastActivity: seen)
             if open[session] != nil { task.lastActivity = max(seen, task.lastActivity) }
             task.model = event.model ?? task.model
+            if open[session] == nil { responses[session] = [:] }
+            if let prompt = event.prompt { task.title = prompt }
             open[session] = task
         case .activity:
             if event.model != nil || event.cwd != nil {
@@ -85,9 +106,13 @@ final class AgentActivity {
             task.lastActivity = max(seen, task.lastActivity)
             if let model = event.model { task.model = model }
             if let folder = event.cwd ?? cwd { task.project = AgentLogParser.project(fromCwd: folder) }
+            if task.title == nil, let prompt = event.prompt { task.title = prompt }
+            if let tokens = event.tokens { add(tokens, id: event.messageID, to: &task, session: session) }
+            if let used = event.contextTokens, let window = event.contextWindow, window > 0 { task.context = (used, window) }
             open[session] = task
         case .turnEnded(let outcome):
             meta[session] = nil
+            responses[session] = nil
             guard let task = open.removeValue(forKey: session) else { break }
             let duration = seen.timeIntervalSince(task.startedAt)
             if announces, outcome == .finished, duration >= minimumDuration(),
@@ -97,6 +122,14 @@ final class AgentActivity {
             }
         }
         changed()
+    }
+
+    /// Counts a request: by its identity when it has one (a later line for the same response replaces the earlier), else as another.
+    private func add(_ tokens: AgentTokens, id: String?, to task: inout AgentTask, session: String) {
+        var seen = responses[session] ?? [:]
+        seen[id ?? "#\(seen.count)"] = tokens
+        responses[session] = seen
+        task.tokens = seen.values.reduce(AgentTokens(), +)
     }
 
     // MARK: Sessions that went away
@@ -118,9 +151,19 @@ final class AgentActivity {
 
     // MARK: Stopping
 
+    /// Forgets the tasks that are open, and keeps the usage: the Settings preview puts other sample tasks in their place.
+    func clearTasks() {
+        open = [:]
+        responses = [:]
+        meta = [:]
+        processes = [:]
+        changed()
+    }
+
     /// Forgets everything, as when Agents is switched off.
     func reset() {
         open = [:]
+        responses = [:]
         meta = [:]
         processes = [:]
         deadline?.cancel()

@@ -199,7 +199,8 @@ struct PlayerControlsTests {
         #expect(viewModel.contentHeight(for: .media) > base + Theme.Metrics.lyricsRowHeight)
         #expect(
             viewModel.mediaContentHeight(peek: false) - viewModel.mediaContentHeight(peek: true)
-                == Theme.Metrics.playerArtwork - Theme.Metrics.playerPeekArtwork + Theme.Metrics.playerTopInset)
+                == Theme.Metrics.playerArtwork - Theme.Metrics.playerPeekArtwork + Theme.Metrics.playerTopInset
+                    - (Theme.Metrics.outputRowHeight - Theme.Metrics.playerScrubber))
     }
 }
 

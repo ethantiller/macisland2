@@ -238,6 +238,7 @@ struct ShelfRow<Content: View>: View {
                 HStack(spacing: 8) { content }
                     .frame(height: proxy.size.height)
             }
+            .reportsScrollArea(.horizontal)
         }
     }
 }

@@ -5,22 +5,25 @@ import SwiftUI
 /// permission: without it the panel says so and points to Settings.
 struct MixerPanel: View {
     let viewModel: IslandViewModel
-    /// Whether there is a player above to go back to (the chevron).
+    /// With media playing, the transport row below this panel owns the output button.
     let canHide: Bool
 
     private var mixer: AppMixer { viewModel.mixer }
+    /// The player's own app, kept first: its row is the volume the Media tab would otherwise draw twice.
+    private var pinnedID: String? { viewModel.nowPlaying.state.bundleIdentifier }
 
     var body: some View {
-        VStack(spacing: Theme.Metrics.playerSpacing) {
-            HStack(spacing: 8) {
-                OutputPicker(outputs: viewModel.outputs, bluetooth: viewModel.bluetooth)
-                if canHide {
-                    IconButton(systemName: "chevron.up", label: "Hide Mixer", size: 12) {
-                        withAnimation(Theme.Motion.resize) { viewModel.showsMediaOutputs = false }
-                    }
+        VStack(spacing: canHide ? 0 : Theme.Metrics.playerSpacing) {
+            if !canHide {
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    AudioOutputButton(
+                        currentDeviceID: viewModel.outputs.currentDevice?.id ?? viewModel.outputs.defaultDeviceID,
+                        isSelected: viewModel.showsMediaOutputs,
+                        action: viewModel.toggleMediaOutputs)
                 }
+                .frame(height: Theme.Metrics.outputRowHeight)
             }
-            .frame(height: Theme.Metrics.playerScrubber)
             content
         }
         .onAppear { viewModel.bluetooth.refresh() }
@@ -73,7 +76,7 @@ struct MixerPanel: View {
 
     @ViewBuilder
     private var rows: some View {
-        let rows = mixer.rows
+        let rows = MixerRow.pinning(mixer.rows, first: pinnedID)
         if rows.isEmpty {
             Text("Nothing is making sound.")
                 .font(Theme.Typography.caption)
@@ -84,6 +87,7 @@ struct MixerPanel: View {
                 VStack(spacing: 0) { ForEach(rows) { MixerRowView(row: $0, mixer: mixer, outputs: viewModel.outputs) } }
             }
             .frame(height: CGFloat(Theme.Metrics.mixerMaxRows) * Theme.Metrics.mixerRowHeight)
+            .reportsScrollArea(.vertical)
         } else {
             VStack(spacing: 0) { ForEach(rows) { MixerRowView(row: $0, mixer: mixer, outputs: viewModel.outputs) } }
         }
@@ -104,7 +108,7 @@ private struct MixerRowView: View {
                 .font(Theme.Typography.body)
                 .foregroundStyle(Theme.Palette.primary)
                 .lineLimit(1)
-                .frame(width: 96, alignment: .leading)
+                .frame(width: Theme.Metrics.mixerNameWidth, alignment: .leading)
             if row.isNeverTapped {
                 Text("Calls and music apps stay as they are")
                     .font(Theme.Typography.caption)
@@ -120,7 +124,7 @@ private struct MixerRowView: View {
                 Text("\(Int((level * 100).rounded()))%")
                     .font(Theme.Typography.numeral)
                     .foregroundStyle(Theme.Palette.secondary)
-                    .frame(width: 40, alignment: .trailing)
+                    .frame(width: Theme.Metrics.mixerPercentWidth, alignment: .trailing)
                     .onTapGesture(count: 2) { mixer.setLevel(1, for: row.id) }
                     .help("Double-click for 100%")
                 outputMenu

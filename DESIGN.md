@@ -19,6 +19,8 @@
 
 Glass never goes inside the island, and glass is never stacked on glass.
 
+The Media output satellites are bubbles of Liquid Glass leaning to near black (`Palette.satelliteTint`), outside the island, so glass is not inside it or on glass. Their glyphs are white, whether or not the device is connected (a device that isn't says so to VoiceOver). They are 40 pt circles that merge and part like drops (`GlassEffectContainer`) and grow, on hover, only as wide as the device's name; they emerge beside the island edge in a staggered motion, and a hidden bubble draws nothing. Choosing an output moves its glyph into the current-output chip, while the previous output moves back into the column. Reduce Motion fades them without scaling or travel.
+
 ### Presentations
 | Presentation | Trigger | Shows | Size |
 | --- | --- | --- | --- |
@@ -30,12 +32,12 @@ Glass never goes inside the island, and glass is never stacked on glass.
 Peek and a banner with buttons share a width of 380, so one becomes the other by changing height only; an alert banner (nothing to press) is narrower, 290.
 
 ### Modules and tabs
-There are 7 modules, and an eighth, **Agents**, that is off until it is switched on in Features: it is not a default tab (like Shelf and Notes, it opens from its compact activity, the menu bar, or a link) and shows beside the notch only while an agent works. Its module has three modes under a segmented control, like the Shelf's: Now (what runs, and the plan limits as bars), Usage, and Activity (a map of 91 days in four steps of white); a limit bar turns red, beside a warning glyph, only at its threshold. The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and every module is reachable from its tab, the pencil, a drop, or a link. Settings open in a standard Settings window; the gear opens that window.
+There are 7 modules, and an eighth, **Agents**, that is off until it is switched on in Features: it is not a default tab (like Shelf and Notes, it opens from its compact activity, the menu bar, or a link) and shows beside the notch only while an agent works. Its module has three modes under a segmented control, like the Shelf's: Now (what runs, and the plan limits as bars), Usage, and Stats (a year of days in four steps of white, a range of All Time, 30 Days, or 7 Days, and eight numbers; a filter for Claude or Codex appears once both have been used); a limit bar turns red, beside a warning glyph, only at its threshold. The tab strip has two sides: up to **5 left of the notch** and **1 right of it**, arranged in Settings by dragging tabs between the Left, Right, and Not Shown lists (each with an on/off switch). The defaults are **Home, Media, Clock, Reminders, Tools** on the left and nothing on the right; **Shelf, Notes** wait in Not Shown. Shelf still opens by itself when a file is dropped on the island, and Home has a Shelf chip. People can put any module in the menu bar, and every module is reachable from its tab, the pencil, a drop, or a link. Settings open in a standard Settings window; the gear opens that window.
 
 | Module | Holds |
 | --- | --- |
 | Home | A dashboard of widgets on a 6 by 3 grid: today (opens a month calendar), what is next, what is playing, the everyday tools, timers, Shelf |
-| Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics; the Mixer (a row per app, up to four before it scrolls) behind the same output button when it is on |
+| Media | Now Playing, scrubber, shuffle, repeat, Favorite, app volume, output, lyrics; the Mixer (a row per app, up to four before it scrolls) behind the same output button when it is on; other outputs appear as satellites beside the expanded Media tab |
 | Shelf | Files (Quick Look, zip, convert, screenshots, AirDrop drop target) / Downloads (the newest twenty in the folder, when that feature is on; its tiles are the Shelf's, and `shelfChoiceWidthThree` makes room for the third segment) / Clipboard (history, smart actions, search with matched words bright, ⌘1 to ⌘9 key caps while ⌘ is held) |
 | Clock | Timer / Stopwatch / Pomodoro |
 | Reminders | Add a reminder, the open list, check them off |
@@ -52,14 +54,14 @@ There are 7 modules, and an eighth, **Agents**, that is off until it is switched
 | Red | `Tint.attention` | Needs you: low battery, missing permission, a failure |
 | White | `Palette.*` | Everything else |
 
-One exception: AirDrop blue (`Tint.airDrop`) appears only on the AirDrop target, while a file is dragged, and always beside `AirDropGlyph`. The drop target can route to Shelf, AirDrop, either half, or do nothing.
+Two exceptions: Claude Code's orange (`Mark.claude`) appears only as Claude's mark, and AirDrop blue (`Tint.airDrop`) appears only on the AirDrop target, while a file is dragged, and always beside `AirDropGlyph`. The drop target can route to Shelf, AirDrop, either half, or do nothing.
 
 Rules:
 - Text is `primary` (21:1) or `secondary` (7.4:1). `tertiary` (3.4:1) is for glyphs only.
 - "Selected" is shown by a white fill with black content.
 - Every tint sits next to a glyph or a number.
 
-**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, agent (sparkles in the working blue), transfer, music, then Keep Awake's time left (a state, not a clock being timed, so it is white and ranks last). At most 2 activities show at once. With **Choose the Activity** on (off by default), a peek with two or more things live starts with a row of chips, one per activity, the leading one selected; choosing one moves it to the front of this order (after an alert; a banner still stands alone), so it leads the closed island and fills the peek. The choice lasts as long as that activity does. There is no Combine menu: the top two are always paired.
+**Compact priority:** banner, needs-you alert, recording, microphone, timer/Pomodoro, stopwatch, countdown (an event about to start, in orange like the other clocks), working, transfer, music, agent (its mark, with the time it has run in the working blue; music outranks an agent, which can run for an hour), then Keep Awake's time left (a state, not a clock being timed, so it is white and ranks last). At most 2 activities show at once. With **Choose the Activity** on (off by default), a peek with two or more things live starts with a row of chips, one per activity, the leading one selected; choosing one moves it to the front of this order (after an alert; a banner still stands alone), so it leads the closed island and fills the peek. The choice lasts as long as that activity does. There is no Combine menu: the top two are always paired.
 
 ### Type
 Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing numbers; 10 pt minimum. Tokens beyond the base set: `prompter` (20 medium), because the Prompter is read from arm's length while looking at the camera; `query` (20 regular) for the palette field; and `headline` (15 semibold) and `subheadline` (13 regular) for the music player, which are also the first-run guide's title and copy.
@@ -73,7 +75,11 @@ Type is SF Pro for text and SF Pro Rounded with monospaced digits for changing n
 | `swell` | 8 × 2 |
 | `floatRadius` / `floatPadding` / `floatGap` | 24 / 14 / 8 (24 − 14 = `cardRadius` 10, so corners are concentric) |
 | `mirrorWidth` / `mirrorHeight` | 320 / 180 (16:9; 180 is the Mirror's whole content height, which keeps the island under the 276 panel) |
-| `ScreenGeometry.panelSize` | 560 × 276 (`panelHeight`, derived; at least as wide as the widest presentation) |
+| `ScreenGeometry.panelSize` / hosting panel | 560 × 276 for the island and previews; 976 × 276 for the click-through host, reserving 208 pt on each side for output pills |
+| Output satellites | 40 pt circles, 8 pt from the island, 6 pt apart; pills as wide as their name, max 200 pt; device rows 28 pt; the peek list shows up to 4 device rows before scrolling |
+| `mixerNameWidth` / `mixerPercentWidth` | 96 / 40: the Mixer's columns, which the player's own volume row shares |
+| `levelSideWidth` / `levelBarSplitWidth` / `levelBarOpenWidth` | 140 / 56 / 64: each side of the notch while volume and brightness show together, and the bars when they do and on an open island |
+| `yearCell` / `yearGap` / `agentsStatsHeight` / `statTileHeight` | 6 / 2 / 208 / 30: the Stats map (53 columns are 422 wide) and its height; Now and Usage keep `agentsHeight` 176 |
 | Home's grid | `homeColumns` 6 of `homeColumnWidth` 72 with `rowSpacing` 8 between (a span of n columns is 80n − 8 wide: 72, 152, 232, 312, 392, 472); rows of `homeRowHeight` 64 with `homeRowGap` 10 between, 1 to `homeMaxRows` 3 (m rows are 74m − 10 tall: 64, 138, 212) |
 | `homeContentWidth` / `homeMaxContentHeight` | 472 / 212 (520 less two sides of flare and margin; three rows) |
 | `guideWidth` / `guideDetailHeight` | 588 (the 560 band plus `floatPadding` each side) / 150 (the tallest step detail, so the guide never changes height) |
@@ -103,9 +109,9 @@ Reduce Motion turns every token into a short ease, removes the swell, and swaps 
 | Hover | Swell (`track`), then peek after the Peek After delay, 120 ms by default (Peek on Hover off: the swell only, and a click or swipe opens it). With Hide the Island Until You Point at It the closed island draws nothing until the pointer is on it, and with Hide in Full Screen it also draws nothing and does not peek while the front app covers the display; an alert that stays until seen waits for it, and a banner is dropped |
 | Click, two-finger swipe down, or ⌃⌥Space | Expanded |
 | Pointer leaves for 300 ms | Compact (`close`), unless something holds it open: a menu, Quick Look, a panel, a text field, or the Mirror camera. The 300 ms starts when the last hold ends |
-| Two-finger horizontal swipe | Previous or next tab; over the timer dial, it scrubs the dial. Swiping (down opens, up closes, sideways changes tab) can be turned off in Settings |
+| Two-finger horizontal swipe | Previous or next tab; over the timer dial, it scrubs the dial; over an overflowing Shelf or Mixer scroller, it scrolls that view for the whole gesture. A swipe on the other axis keeps its normal island action. Swiping (down opens, up closes, sideways changes tab) can be turned off in Settings |
 | ←/→ | Previous or next tab |
-| Esc | Steps back one level (the clipboard search, the Mixer's panel, the Tools grid, a picked day, then the month), then closes |
+| Esc | Steps back one level (the clipboard search, Media output controls, the Tools grid, a picked day, then the month), then closes |
 
 ### Carried over
 
@@ -161,7 +167,7 @@ does not get a setting. A widget's size on Home's grid is arrangement, like its 
 - No new typefaces, no light or thin weights, no text under 10 pt.
 - No per-view magic numbers for color, font, or spacing: add a token in `Theme.swift`.
 - No settings for how the island looks or behaves by default.
-- No logos or app icons in the island.
+- No logos or app icons in the island, except the marks of the two agents (Claude Code's critter and Codex's cloud, drawn as vector shapes by `AgentMark`), which say which one is working. Claude's orange (`Theme.Mark.claude`) is the one color that is not a meaning: it appears only as its mark, never as a tint, like AirDrop blue. Codex's mark is white.
 
 ## Module notes
 
@@ -177,7 +183,8 @@ does not get a setting. A widget's size on Home's grid is arrangement, like its 
   address, or `#hex` color gets one action on its card.
 - **Notes.** Notes, Snippets, and a Prompter share the tab. Focusing a text field keeps the island open
   until Esc, the shortcut, or a click outside.
-- **Volume HUD.** With Replace the Volume HUD on, a compact alert with a volume level: a speaker glyph (`speaker.slash.fill` when muted or at zero, then one, two, or three waves by thirds) leading, and a thin read-only `LevelBar` (`levelBarWidth` 80 by `levelBarHeight` 4) and the percent in `compactNumeral` trailing; the glyph side is `volumeHUDLeading` 44 and the bar side `volumeHUDTrailing` 140 (other alerts take 64 on each), so the island shifts right to keep the notch between them. White on black; red (`Tint.attention`, beside the slashed glyph) only when muted or at zero. It stays `Timing.volumeHUD` (1.5 s) after the last press, and the pointer on it holds it. It never replaces or queues behind an alert that needs you, and it doesn't draw on an open island: then the system shows its own. Reduce Motion follows the `track` token.
+- **Volume and Brightness HUD.** With Replace the Volume and Brightness HUD on, the island takes the volume, mute, and brightness keys (an event tap; brightness through the private DisplayServices, on the built-in display only) and shows them instead of the system's square. **Closed**, it stands alone (it is an activity of its own, `CompactActivity.levels`, ranking where the volume alert did): one level has a glyph leading (a speaker, slashed when muted or at zero, then one, two, or three waves by thirds; `sun.min.fill` under half and `sun.max.fill` above for brightness) and a thin read-only `LevelBar` with the percent trailing, `volumeHUDLeading` 44 and `volumeHUDTrailing` 140 (other alerts take 64), so the island shifts right to keep the notch between them. With both at once the sides are equal, `levelSideWidth` 140: brightness (glyph, bar, percent) left of the notch and volume right of it, and when one goes the island animates back to the single layout (`resize`). **Open** (peek or expanded), nothing changes size: the same two readouts fade in over the tabs and the status strip in the notch-height band, a `LevelBar` of `levelBarOpenWidth` 64 each, and fade back. White on black; red (`Tint.attention`, beside the slashed glyph) only when the volume is muted or at zero; brightness is never red. Each level stays `Timing.levelHUD` (1.5 s) after its last press, and the pointer on the HUD holds both. It never replaces or queues behind an alert that needs you, nor while a full-screen app has the display; then the system shows its own. Reduce Motion follows the `track` token.
+- **Agents.** The compact activity is the marks of the agents working (one per kind, at most two, 4 pt apart) with the longest task's time. The peek (380 wide) is one `AgentTaskRow`, built the same as Now's: for one task, the mark in a 28 pt box, the task's title (what was asked, else its folder), and the time; under it "project \u00B7 Model" and the tokens used this turn; then a full-width white `LevelBar` for the context used and its percent (left out when unknown). Two or more tasks are two rows (the mark, the title over "project \u00B7 Model", the time), a third showing as "+1". When a task ends well the **Done** notice is an alert banner (nothing to press, 290 wide): the agent's mark in a ring that draws once in green, the title, and "Done in 4:12 \u00B7 184K tokens"; a plan-limit notice draws the mark in a red ring.
 - **Tools.** Nine built-in tools, up to two of the person's own (each made from one of their Shortcuts, with an SF Symbol they pick), and Less fill the grid, two rows of six; the row pins 4, 6, or 8 and keeps its More chevron. Clean Keys swallows every key
   for 30 seconds (the mouse still works) and needs Accessibility access. Nothing in the island asks for an administrator's password: a tool that would (Low Power, Lock Screen) is not offered.
   The Mirror replaces the row or grid with a 16:9 camera view (clipped to `widgetRadius`) and a column of Ring Light and **Done**.

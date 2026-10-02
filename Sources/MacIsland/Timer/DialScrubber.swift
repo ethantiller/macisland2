@@ -117,16 +117,19 @@ enum ScrollAction: Equatable {
     case swipe(Swipe)
 }
 
-/// Sends each scroll gesture to the dial or to the island. A horizontal trackpad gesture that starts over the
-/// dial belongs to the dial for its whole life, momentum included, so a flick coasts. A vertical one, and
-/// anything off the dial, is an ordinary swipe.
+/// Sends each scroll gesture to the dial, a scrolling view, or the island. The chosen owner keeps the whole
+/// gesture, momentum included.
 struct ScrollRouting {
+    private enum Owner { case none, dial, scroller }
+
     private var swipe = SwipeRecognizer()
     private var lock = AxisLock()
-    /// The current gesture is the dial's.
-    private(set) var ownsGesture = false
+    private var owner = Owner.none
+    var ownsGesture: Bool { owner != .none }
 
-    mutating func route(_ sample: ScrollSample, overDial: Bool) -> ScrollAction? {
+    mutating func route(
+        _ sample: ScrollSample, overDial: Bool, scrollerAxis: AxisLock.Axis? = nil
+    ) -> ScrollAction? {
         let sign: CGFloat = sample.isInverted ? 1 : -1
         let fingerX = sample.dx * sign
         let fingerY = sample.dy * sign
@@ -141,15 +144,22 @@ struct ScrollRouting {
 
         if sample.isBegan {
             lock.reset()
-            ownsGesture = false
+            owner = .none
         }
-        // Momentum belongs to the dial only if the gesture did.
-        if sample.isMomentum { return ownsGesture ? .scrubDial(fingerX) : nil }
+        if sample.isMomentum {
+            return owner == .dial ? .scrubDial(fingerX) : nil
+        }
 
-        if ownsGesture { return .scrubDial(fingerX) }
+        if owner != .none {
+            return owner == .dial ? .scrubDial(fingerX) : nil
+        }
         let result = lock.add(dx: fingerX, dy: fingerY)
+        if result.justLocked, result.locked == scrollerAxis {
+            owner = .scroller
+            return nil
+        }
         if result.justLocked, result.locked == .horizontal, overDial {
-            ownsGesture = true
+            owner = .dial
             return .scrubDial(result.horizontalSoFar)
         }
         return swipe.add(dx: sample.dx, dy: sample.dy, inverted: sample.isInverted, began: sample.isBegan).map(

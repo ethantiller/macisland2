@@ -105,6 +105,8 @@ final class PreviewSystemSampler: SystemSampling {
 enum PreviewSamples {
     /// The level the volume HUD shows in the preview.
     static let volume = VolumeLevel(fraction: 0.62, isMuted: false)
+    /// And the brightness it shows beside it.
+    static let brightness = 0.7
 
     static func track() -> NowPlayingState {
         var state = NowPlayingState()
@@ -221,19 +223,49 @@ enum PreviewSamples {
         return mixer
     }
 
-    /// A task for the Agents module and the closed island.
+    /// The tasks for the Agents module and the closed island: Claude Code's, Codex's, or both when `agent` is nil.
     @MainActor
-    static func agents() -> AgentActivity {
+    static func agents(for agent: AgentKind? = nil) -> AgentActivity {
         let activity = AgentActivity()
         activity.usage.show(usageSnapshot())
-        let started = Date().addingTimeInterval(-252)
-        activity.ingest(
-            AgentLogEvent(kind: .turnStarted, sessionID: "preview", cwd: "/Users/you/code/island", model: "claude-opus-4-5-20251101", date: started),
-            agent: .claudeCode, session: "preview", announces: false)
+        seedTasks(in: activity, for: agent)
         return activity
     }
 
-    /// Forty days of use and two plan limits, for the Usage and Activity modes and the Agents widget.
+    /// Two sample tasks, one per tool, each with a title, tokens, and the context used. Replaces what was there.
+    @MainActor
+    static func seedTasks(in activity: AgentActivity, for agent: AgentKind?) {
+        activity.clearTasks()
+        let started = Date().addingTimeInterval(-252)
+        func work(
+            _ kind: AgentKind, session: String, project: String, model: String, title: String, tokens: AgentTokens,
+            context: (used: Int, window: Int)
+        ) {
+            activity.ingest(
+                AgentLogEvent(
+                    kind: .turnStarted, sessionID: session, cwd: "/Users/you/code/\(project)", model: model, date: started,
+                    prompt: title),
+                agent: kind, session: session, announces: false)
+            activity.ingest(
+                AgentLogEvent(
+                    kind: .activity, tokens: tokens, contextTokens: context.used, contextWindow: context.window),
+                agent: kind, session: session, announces: false)
+        }
+        if agent != .codex {
+            work(
+                .claudeCode, session: "preview-claude", project: "island", model: "claude-opus-4-5-20251101",
+                title: "Fix the volume HUD", tokens: AgentTokens(input: 4_000, output: 30_000, cacheRead: 150_000),
+                context: (124_000, 200_000))
+        }
+        if agent != .claudeCode {
+            work(
+                .codex, session: "preview-codex", project: "site", model: "gpt-5-codex", title: "Add the stats view",
+                tokens: AgentTokens(input: 6_000, output: 20_000, cacheRead: 70_000), context: (98_040, 258_000))
+        }
+    }
+
+    /// Forty days of use and the plan limits of both tools, for the Usage and Stats modes and the Agents widget. Codex was used on other
+    /// days and at other hours than Claude Code, so the filter visibly changes the map.
     @MainActor
     static func usageSnapshot(now: Date = Date()) -> AgentUsageSnapshot {
         let calendar = Calendar.current
@@ -241,18 +273,42 @@ enum PreviewSamples {
         snapshot.generated = now
         let projects = ["island", "notes", "site"]
         let models = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929"]
-        for offset in 0..<40 where offset % 7 != 3 {
+        func note(_ agent: AgentKind, day: Int, hour: Int, requests: Int) {
+            var hours = snapshot.hours["\(day)|\(agent.rawValue)"] ?? Array(repeating: 0, count: 24)
+            hours[hour] += requests
+            snapshot.hours["\(day)|\(agent.rawValue)"] = hours
+        }
+        for offset in 0..<40 {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: now) else { continue }
             let day = UsageDay.key(date, calendar: calendar)
-            let model = models[offset % 2]
-            let project = projects[offset % 3]
             let scale = 1 + (offset * 7) % 5
-            let bucket = UsageBucket(
-                day: day, agent: .claudeCode, model: model, project: project,
-                tokens: AgentTokens(
-                    input: 40_000 * scale, output: 90_000 * scale, cacheRead: 6_000_000 * scale, cacheWrite: 500_000 * scale),
-                requests: 30 * scale)
-            snapshot.buckets.append(bucket)
+            if offset % 7 != 3 {
+                snapshot.buckets.append(
+                    UsageBucket(
+                        day: day, agent: .claudeCode, model: models[offset % 2], project: projects[offset % 3],
+                        tokens: AgentTokens(
+                            input: 40_000 * scale, output: 90_000 * scale, cacheRead: 6_000_000 * scale, cacheWrite: 500_000 * scale),
+                        requests: 30 * scale))
+                note(.claudeCode, day: day, hour: 10, requests: 18 * scale)
+                note(.claudeCode, day: day, hour: 21, requests: 12 * scale)
+                let minutes = offset == 9 ? 20 * 60 : 25 + (offset * 37) % 240
+                let last = date.timeIntervalSince1970
+                snapshot.sessions.append(
+                    AgentSession(
+                        agent: .claudeCode, first: last - Double(minutes) * 60, last: last, requests: 30 * scale,
+                        project: projects[offset % 3]))
+            }
+            if offset % 4 == 2 {
+                snapshot.buckets.append(
+                    UsageBucket(
+                        day: day, agent: .codex, model: "gpt-5-codex", project: "site",
+                        tokens: AgentTokens(input: 20_000 * scale, output: 40_000 * scale, cacheRead: 2_000_000 * scale),
+                        requests: 14 * scale))
+                note(.codex, day: day, hour: 15, requests: 14 * scale)
+                let last = date.timeIntervalSince1970
+                snapshot.sessions.append(
+                    AgentSession(agent: .codex, first: last - 45 * 60, last: last, requests: 14 * scale, project: "site"))
+            }
         }
         snapshot.hasClaudePlanFile = true
         snapshot.limits = [
@@ -260,6 +316,10 @@ enum PreviewSamples {
                 agent: .claudeCode, kind: .session, percent: 64, resetsAt: now.addingTimeInterval(2 * 3600 + 600), asOf: nil),
             AgentLimit(
                 agent: .claudeCode, kind: .week, percent: 41, resetsAt: now.addingTimeInterval(3 * 86_400), asOf: nil),
+            AgentLimit(
+                agent: .codex, kind: .session, percent: 22, resetsAt: now.addingTimeInterval(3 * 3600), asOf: nil),
+            AgentLimit(
+                agent: .codex, kind: .week, percent: 12, resetsAt: now.addingTimeInterval(4 * 86_400), asOf: nil),
         ]
         return snapshot
     }

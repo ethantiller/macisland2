@@ -8,7 +8,7 @@ import Testing
 struct NotificationMirrorTests {
     private static let closeAction = "Name:Close\nTarget:0x0\nSelector:(null)"
 
-    private struct Rig {
+    @MainActor private struct Rig {
         let viewModel: IslandViewModel
         let mac: FixtureMac
         var mirror: NotificationMirror { viewModel.features.notifications }

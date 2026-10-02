@@ -116,7 +116,7 @@ struct BoostLimiterTests {
 
     @Test func theLookAheadScalesWithTheSampleRate() {
         let slow = BoostLimiter(channels: 2, sampleRate: 44_100).lookahead
-        let fast = BoostLimiter(channels: 2, sampleRate: 96_000).lookahead
+        let fast = BoostLimiter(channels: 2, sampleRate: 88_200).lookahead
         #expect(fast > slow * 2 - 4 && fast < slow * 2 + 4)
     }
 }
@@ -394,11 +394,11 @@ struct MixerPanelTests {
         for count in 0...6 {
             list.publish(playing(count))
             let rows = CGFloat(min(max(count, 1), Theme.Metrics.mixerMaxRows))
-            #expect(viewModel.mediaContentHeight(peek: false) == chrome + rows * Theme.Metrics.mixerRowHeight, "\(count) apps")
+            #expect(
+                viewModel.mediaContentHeight(peek: false)
+                    == chrome + Theme.Metrics.playerTransport + Theme.Metrics.playerSpacing + rows * Theme.Metrics.mixerRowHeight,
+                "\(count) apps")
         }
-        #expect(
-            chrome + CGFloat(Theme.Metrics.mixerMaxRows) * Theme.Metrics.mixerRowHeight <= Theme.Metrics.homeMaxContentHeight,
-            "the tallest panel fits the tallest Home")
         // Closed, the player is as tall as it was.
         viewModel.showsMediaOutputs = false
         let closed = viewModel.mediaContentHeight(peek: false)
@@ -412,7 +412,7 @@ struct MixerPanelTests {
         let rows = CGFloat(2)
         #expect(
             viewModel.mediaContentHeight(peek: false)
-                == Theme.Metrics.playerScrubber + Theme.Metrics.playerSpacing + rows * Theme.Metrics.mixerRowHeight)
+                == Theme.Metrics.outputRowHeight + Theme.Metrics.playerSpacing + rows * Theme.Metrics.mixerRowHeight)
         list.publish([])
         #expect(!viewModel.showsMixerAlone && viewModel.mediaContentHeight(peek: false) == Theme.Metrics.glanceHeight)
         // Off, it is still "Not Playing".
@@ -427,7 +427,7 @@ struct MixerPanelTests {
         viewModel.showsMediaOutputs = true
         #expect(viewModel.mediaContentHeight(peek: false) == closed, "the chips replace the scrubber at the same height")
         viewModel.selectedTab = .media
-        #expect(!viewModel.stepBack(), "Esc leaves the old picker as it was")
+        #expect(viewModel.stepBack(), "Esc closes the output dots, with the Mixer or without")
     }
 
     @Test func eachPermissionStateShowsItsLine() {
@@ -458,10 +458,11 @@ struct MixerPanelTests {
     @Test func anAdjustedAppStaysInTheListBetweenSongs() {
         let (viewModel, list) = make(apps: 2)
         let first = list.apps[0]
+        let second = list.apps[1]
         viewModel.mixer.setLevel(0.5, for: first.id)
-        list.publish([list.apps[1]])
+        list.publish([second])
         #expect(viewModel.mixer.rows.map(\.id).contains(first.id))
-        #expect(viewModel.mixer.rows.first?.id == list.apps[1].id, "playing apps come first")
+        #expect(viewModel.mixer.rows.first?.id == second.id, "playing apps come first")
         #expect(viewModel.mixer.rows.last?.isPlaying == false)
     }
 

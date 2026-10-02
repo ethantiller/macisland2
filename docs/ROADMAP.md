@@ -380,7 +380,7 @@ struct IslandBanner { /* … */ var actions: [Action] = [] }                    
 | --- | --- |
 | Island on the lock screen | Private SkyLight API; still Dropped for good unless the user asks for a test build first |
 | Away summary on unlock, walk-away lock, meeting countdown, world clocks, music sleep timer | Not picked this round (walk-away lock would break the idle budget) |
-| Custom brightness HUD, camera-in-use pill | Dropped for good: brightness has no public API (private DisplayServices; DDC is private on Apple silicon), and macOS draws its own dots. **The volume HUD is built** (Phase 6, below): the earlier reason, that the HUD can't be suppressed, was wrong, because taking the key with an event tap stops the system drawing it |
+| Camera-in-use pill | Dropped for good. **The volume and brightness HUD is built** (Phase 6, below): the earlier reason, that the HUD can't be suppressed, was wrong, because taking the key with an event tap stops the system drawing it; brightness uses the private DisplayServices on the built-in display only (DDC stays private on Apple silicon) |
 | Hide desktop icons | Needs `defaults write com.apple.finder CreateDesktop` and relaunching Finder |
 | 20-20-20 eye breaks | Needs a standing timer while nothing is live |
 | Microsoft Graph calendar | See N4 |
@@ -449,6 +449,19 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The caption "A shut lid can still sleep it" shows beside the chips. Test on your Mac: on power with no external display, shut the lid for 30 s and open it: did it stay awake (`pmset -g log | tail`)? On battery? With an external display? Report the answers and I'll make the caption exact
 - [ ] Sleep the Mac and wake it: if macOS dropped the hold the tool is Off, never a stuck On
 
+**Volume and brightness HUD, liquid satellites, agent marks, Stats, previews (2026-10-02)** *(written, not run by hand)*
+- [ ] **Brightness keys reach the tap (the spike): turn the HUD on, press F1 and F2.** If nothing shows, `rtk proxy log stream --predicate 'process == "MacIsland"'` and find whether they arrive; if they never do, this build is volume only
+- [ ] F1/F2 change the built-in display's brightness and show a sun, a bar, and the percent beside the notch; with an external display only, they are the system's
+- [ ] A volume key and a brightness key within 1.5 s split the island around the notch (brightness left, volume right); when one leaves, the island eases back to the single layout
+- [ ] With the island peeked or expanded, the volume and brightness keys show in the band beside the notch (over the tabs and the strip) and macOS's square never appears; the island's size does not change
+- [ ] Media with outputs open: dark Liquid Glass bubbles with white glyphs beside the island, each only as wide as its name on hover, and **nothing left on screen after they close**; the island's right edge does not bulge
+- [ ] The player's volume row in Media is as wide as a Mixer row and lines up with it; with the Mixer on and the player listed, the Mixer's first row is the player and the scrubber is back above the transport
+- [ ] With music playing and Claude Code working, music leads on the closed island and Claude's critter is in the pair
+- [ ] Claude Code at work: the critter in its orange, its prompt as the title in the peek, tokens climbing, the context bar; Codex: the white cloud (**verify** its log lines); both at once: two rows with "+1" for a third
+- [ ] A task of the minimum length ends with the Done banner: the mark in a ring drawing once in green, the title, and "Done in … · … tokens"; clicking it opens Agents
+- [ ] Settings → Features: on Expanded choosing Weather, Clipboard, System stays on Expanded and shows weather, the Clipboard, and the System widget; on Peek, rows show what was picked
+- [ ] Settings → Content → AI Agents: clicking Claude Code or Codex previews that tool alone in Compact, Peek, Banner, and Expanded (Stats filtered); the switches still switch
+
 **Volume HUD (written, not run)**
 - [ ] Settings → Notifications → Replace the Volume HUD: turning it on without Accessibility leaves it off, shows the prompt and a banner with **Open Settings**; after allowing it, turning it on again works; the preview shows the HUD
 - [ ] On: volume up, down, and mute change the volume and show a speaker, a thin bar, and the percent beside the notch for about 1.5 s; holding a key repeats; Option+Shift is a quarter step; muted or zero shows the slashed speaker in red; pointer on the HUD holds it
@@ -481,6 +494,9 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] Music playing, then a video: the play/pause button controls the **music**; first use asks for Automation permission
 - [ ] Shuffle, repeat, Favorite (Apple Music), app volume, and lyrics on a real track
 - [ ] The Automation prompt for Spotify
+- [ ] Peek output chip opens the device list in place of transport; selecting an output switches it and closes the list; more than four devices scroll vertically
+- [ ] Expanded Media output dots emerge from the island edge, show white glyphs on the island surface, expand to named pills on hover, and morph the selected glyph into the chip while the previous output takes its place; Esc closes outputs with and without the Mixer
+- [ ] Moving the pointer from Media onto a satellite keeps the island open; clicking outside still closes it; clicking the menu bar beside the island works; on a display without a notch the satellites use glass; Reduce Motion fades them without travel
 - [ ] The peek and the Media tab size themselves to the song (written, not run): a track with no lyrics (or an instrumental) has no lyric row, 24 pt shorter than one with lyrics; the next track with lyrics grows the island when they arrive and the next without shrinks it again; hover peek and Media tab agree; Home's Music widget never shows the row. If there is still extra height, note which surface, which track, and whether the lyric row is blank (a line not yet started) or absent
 
 **Home, Clock, Reminders**
@@ -500,6 +516,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
       and haptics tap at the ends; the same in a torn-off Clock window
 
 **Shelf and Tools**
+- [ ] With many Shelf files or Clipboard cards, a horizontal swipe over the row scrolls without changing tabs; with only two files, it changes tabs; swiping up over the row still closes the island
+- [ ] Mixer with more than four app rows scrolls vertically without closing or changing tabs
 - [ ] Drop a file on each half; it lands on the Shelf, the drop tiles go away, and AirDrop opens the picker
 - [ ] Right-click a file: Zip, Unzip, Convert To (HEIC), Show in Finder; Zip All; results appear and the blue activity shows
 - [ ] Clipboard cards: Open, New Email, Copy RGB actions
@@ -544,7 +562,7 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] With AI Agents on, Usage → Today shows a value in the right range for your own day (compare with Claude Code's `/cost`), and 7 Days and 30 Days grow; the first read of your logs ends without a beachball, and idle CPU afterwards is unchanged (`ps -o cputime= -p $(pgrep -x MacIsland)` ten seconds apart)
 - [ ] Now shows the session and week bars with the same percent as the Claude app's menu bar within a reading's age; with the app's menu-bar item off, it says the limit is estimated
 - [ ] A window at 80% flashes the red "Claude at 80%" once and not again until it resets; turning Agents off deletes `~/Library/Caches/com.ethantiller.MacIsland/Agents/usage.json`
-- [ ] Activity shows your last 91 days with today's cell last, the streak is right, and hovering a cell names its day; the Agents widget (Add Widgets) fits at 2 × 1 and 3 × 1
+- [ ] Stats shows a year with today's cell last, month names over it, the streak right, and hovering a cell names its day in the header (the cell grows); All Time, 30 Days, and 7 Days change the figures and dim the days outside the range; with both Claude Code and Codex used, a filter appears and changes the map; the Agents widget (Add Widgets) fits at 2 × 1 and 3 × 1
 
 **Mixer engine (M1)** *(written, not run; no UI until M2)*
 - [ ] With the Mixer feature on and System Audio Recording allowed, Music at 50% (set from M2) is half as loud, Safari at 150% is louder without crackle, Spotify can play on headphones while Music stays on the speakers; with nothing adjusted idle CPU is unchanged
@@ -629,6 +647,8 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 
 Not planned, not promised.
 
+- **Approval alerts via Claude Code hooks:** skipped 2026-10-01. MacIsland cannot detect a pending approval from the logs; a hook that writes a file might.
+
 - **Automatic updates** need Developer ID signing and a hosted feed (dropped for now). (Permissions no longer reset on each
   rebuild: `make-signing-cert.sh` gives dev builds a stable signature.)
 - **An app icon** (the app has no Dock icon).
@@ -691,7 +711,7 @@ Considered during planning and ruled out, each for a concrete reason. Check here
 | Keyboard Backlight | Private CoreBrightness |
 | External Display Control | DDC/CI is private on Apple silicon |
 | EQ, Live Audio Spectrum | A different engine from the Mixer's per-app taps |
-| Alt HUD Styles, Caps Lock HUD, a brightness HUD | Brightness: no public API. The system volume HUD **can** be replaced by taking the key (see [plans/volume-hud.md](plans/volume-hud.md) and Replace the Volume HUD in Settings → Notifications), so the old reason no longer stands for volume |
+| Alt HUD Styles, Caps Lock HUD | The system volume and brightness HUDs **can** be replaced by taking the keys (see [plans/volume-hud.md](plans/volume-hud.md) and Replace the Volume and Brightness HUD in Settings → Notifications) |
 | Keystroke HUD | Input Monitoring for a niche use |
 | Window Snapping | A separate product |
 | Menu Bar Icon Hiding | Fragile on macOS 26 and later |

@@ -4,7 +4,7 @@ extension CompactActivity {
     /// Banners and alerts always come first, and nothing is chosen between them.
     var isChoosable: Bool {
         switch self {
-        case .banner, .alert, .none: false
+        case .banner, .alert, .levels, .none: false
         default: true
         }
     }
@@ -14,6 +14,7 @@ extension CompactActivity {
         switch self {
         case .banner: "banner"
         case .alert: "alert"
+        case .levels: "levels"
         case .recording(let kind): kind == .screen ? "recording.screen" : "recording.voice"
         case .microphone: "microphone"
         case .timer: "timer"
@@ -32,7 +33,7 @@ extension CompactActivity {
     /// What its chip in the peek says.
     var title: String {
         switch self {
-        case .banner, .alert, .none: ""
+        case .banner, .alert, .levels, .none: ""
         case .recording(let kind): kind == .screen ? "Screen Recording" : "Voice Note"
         case .microphone: "Microphone"
         case .timer: "Timer"

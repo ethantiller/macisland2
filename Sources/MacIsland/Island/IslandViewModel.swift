@@ -98,8 +98,16 @@ struct IslandAlert: Equatable {
     var opensTab: IslandModule?
     /// The glyph is drawn as a `ChargingBadge`, with a ring circling the bolt.
     var isCharging = false
-    /// The volume HUD: a level bar and its percent take the place of the text.
+}
+
+/// What the volume and brightness HUD shows: each side until its own time is up, so both can show at once.
+struct LevelHUD: Equatable {
     var volume: VolumeLevel?
+    var brightness: Double?
+
+    var isEmpty: Bool { volume == nil && brightness == nil }
+    /// Both are showing, so the island splits around the notch: brightness leading, volume trailing.
+    var isBoth: Bool { volume != nil && brightness != nil }
 }
 
 /// A wider, momentary announcement below the notch, with at most two actions. With two, the first is the main one.
@@ -118,6 +126,10 @@ struct IslandBanner: Equatable {
     var actions: [Action] = []
     /// When set, the glyph sits inside a ring of this color that draws once around it, as the charging alert's does.
     var ringTint: Color?
+    /// When set, this agent's mark is drawn in place of the symbol (the symbol stays for accessibility).
+    var agent: AgentKind?
+    /// The tab to show when the person opens the island because of this banner.
+    var opensTab: IslandModule?
 
     /// A banner with nothing to press is an alert: narrower than one with buttons, and its contents are centered.
     var isAlert: Bool { actions.isEmpty }
@@ -131,8 +143,18 @@ enum RecordingKind: Equatable {
     case screen, voice
 }
 
+/// What the Settings preview puts first on its island.
+enum PreviewLead: Equatable {
+    /// Nothing live shows except banners, alerts, and the levels.
+    case idle
+    /// This activity (by `choiceID`) leads the others.
+    case activity(String)
+}
+
 enum CompactActivity: Equatable {
     case banner(IslandBanner)
+    /// The volume and brightness HUD. It stands alone, like an alert.
+    case levels(LevelHUD)
     case alert(IslandAlert)
     case recording(RecordingKind)
     case microphone
@@ -190,6 +212,11 @@ struct IslandFeatures {
 @Observable
 @dynamicMemberLookup
 final class IslandViewModel {
+    private struct ScrollArea {
+        let frame: CGRect
+        let axis: AxisLock.Axis
+    }
+
     enum State: Equatable {
         case compact
         /// The pointer rests on the island: the top activity at full size, no tabs.
@@ -199,17 +226,24 @@ final class IslandViewModel {
 
     let features: IslandFeatures
     var geometry = ScreenGeometry.current()
+    @ObservationIgnored private var scrollAreas: [UUID: ScrollArea] = [:]
     var selectedTab: IslandModule = .home {
         didSet { if selectedTab != .tools { features.mirror.stop() } }
     }
     var clockMode: ClockMode = .timer
-    /// The Media tab's Audio Output and Volume panel is open: the output chips and volume, or the Mixer when it is on.
+    /// The Media tab's output satellites and volume control are open, or the Mixer when it is on.
     var showsMediaOutputs = false
+    var showsPeekOutputList = false
+    private(set) var hoveredOutputSatelliteID: String?
     /// The activity the person chose to lead the closed island and the peek, by `CompactActivity.choiceID`. Memory only: it ends with
     /// the activity.
     var chosenActivityID: String?
     var agentsMode: AgentsMode = .now
     var usageRange: UsageRange = .today
+    /// What the Stats mode counts: which tool, and over how long. In memory, like `usageRange`.
+    var statsFilter: StatsFilter = .all
+    var statsRange: StatsRange = .all
+    var statsAgent: AgentKind? { statsFilter.agent }
     /// Where the timer dial's ruler is drawn while it is being scrubbed, in minutes. Nil when at rest.
     private(set) var dialPosition: Double?
     /// How far the ruler is stretched past 1 minute or the maximum, in points.
@@ -225,6 +259,7 @@ final class IslandViewModel {
     var notesMode = NotesMode.notes
     var state: State = .compact {
         didSet {
+            if state != .peek { showsPeekOutputList = false }
             if state == .compact {
                 pruneChosenActivity()
                 toolsExpanded = false
@@ -252,6 +287,10 @@ final class IslandViewModel {
     /// Asks the app to give the island the keyboard (set by the app, which owns the panel).
     @ObservationIgnored var onWantsKeyboard: (() -> Void)?
     private(set) var alert: IslandAlert?
+    /// The volume and brightness HUD, each side with its own expiry.
+    private(set) var levels = LevelHUD()
+    @ObservationIgnored private var volumeTask: Task<Void, Never>?
+    @ObservationIgnored private var brightnessTask: Task<Void, Never>?
     private(set) var banner: IslandBanner?
     /// A file from another app is being dragged: the compact island grows into a bigger target.
     private(set) var isFileDragActive = false
@@ -263,6 +302,8 @@ final class IslandViewModel {
     /// Home's layout as the Settings editor is showing it while a widget is held over a spot. Only ever set on the preview's
     /// view model, so the real island never sees it.
     var homeLayoutOverride: HomeLayout?
+    /// Only ever set on the Settings preview's view model, like `homeLayoutOverride`: what leads the island there.
+    var previewLead: PreviewLead?
 
     /// The layout Home draws: the editor's preview while one is showing, otherwise the person's.
     var homeLayout: HomeLayout { homeLayoutOverride ?? features.settings.homeLayout }
@@ -297,7 +338,18 @@ final class IslandViewModel {
     /// Everything live, highest priority first, with the one the person chose in the peek (while Choose the Activity is on and it is
     /// still live) moved up to lead, behind an alert. The island shows the top two.
     var compactActivities: [CompactActivity] {
-        let live = liveActivities
+        var live = liveActivities
+        if let lead = previewLead {
+            // The Settings preview picks what shows, whether or not Choose the Activity is on.
+            let standing = live.filter { !$0.isChoosable }
+            switch lead {
+            case .idle: return standing
+            case .activity(let id):
+                guard let chosen = live.first(where: { $0.choiceID == id && $0.isChoosable }) else { return standing }
+                live.removeAll { $0.choiceID == id }
+                return standing + [chosen] + live.filter(\.isChoosable)
+            }
+        }
         guard features.settings.isOn(.chooseActivity), let chosen = chosenActivityID,
             let index = live.firstIndex(where: { $0.choiceID == chosen && $0.isChoosable })
         else { return live }
@@ -308,11 +360,12 @@ final class IslandViewModel {
         return list
     }
 
-    /// Everything live in the order DESIGN gives: banner, alert, recording, microphone, the clocks, a countdown, work, an agent,
-    /// a transfer, music.
+    /// Everything live in the order DESIGN gives: banner, alert, recording, microphone, the clocks, a countdown, work,
+    /// a transfer, music, an agent.
     var liveActivities: [CompactActivity] {
         if let banner { return [.banner(banner)] }
         var list: [CompactActivity] = []
+        if !levels.isEmpty { list.append(.levels(levels)) }
         if let alert { list.append(.alert(alert)) }
         if features.screenRecorder.isRecording { list.append(.recording(.screen)) }
         if features.voice.isRecording { list.append(.recording(.voice)) }
@@ -325,12 +378,13 @@ final class IslandViewModel {
         if clockIsOn, features.stopwatch.isActive { list.append(.stopwatch) }
         if let event = activeCountdown { list.append(.countdown(event)) }
         if let job = features.work.current { list.append(.working(job.title)) }
-        if features.settings.isOn(.agents), features.settings.showsAgentCompact, !features.agents.liveTasks.isEmpty {
-            list.append(.agent)
-        }
         if !features.transfers.transfers.isEmpty { list.append(.transfer) }
         if features.settings.showsMusicCompact, features.settings.isOn(.music), features.nowPlaying.state.hasMedia {
             list.append(.media)
+        }
+        // Music outranks a running agent: an agent can run for an hour, and the song is what is being listened to.
+        if features.settings.isOn(.agents), features.settings.showsAgentCompact, !features.agents.liveTasks.isEmpty {
+            list.append(.agent)
         }
         if features.settings.isOn(.tools), features.settings.showsKeepAwakeCompact, features.keepAwake.isOn,
             features.keepAwake.endsAt != nil
@@ -353,6 +407,11 @@ final class IslandViewModel {
 
     /// The top activity.
     var compactActivity: CompactActivity { compactActivities.first ?? .none }
+
+    /// What a peek is about: the top activity, leaving out the level HUD, which an open island draws in its own band.
+    var peekActivity: CompactActivity {
+        compactActivities.first { if case .levels = $0 { false } else { true } } ?? .none
+    }
 
     /// Whether the strip beside the notch has live status to show: a running clock, or a glyph for hotspot,
     /// Ring Light, Keep Awake, or a locked keyboard.
@@ -390,12 +449,15 @@ final class IslandViewModel {
         let list = compactActivities
         guard list.count >= 2 else { return nil }
         if case .alert = list[0] { return nil }
+        if case .levels = list[0] { return nil }
         return (list[0], list[1])
     }
 
-    /// Width added on each side of the notch. Equal on both sides, except for the volume HUD.
+    /// Width added on each side of the notch. Equal on both sides, except for the level HUD, which is a glyph and a bar when one level
+    /// shows and a bar on each side when both do.
     private var compactSideWidths: (leading: CGFloat, trailing: CGFloat) {
-        if presentation == .compact, case .alert(let alert) = compactActivity, alert.volume != nil, compactPair == nil {
+        if presentation == .compact, case .levels(let hud) = compactActivity {
+            if hud.isBoth { return (Theme.Metrics.levelSideWidth, Theme.Metrics.levelSideWidth) }
             return (Theme.Metrics.volumeHUDLeading, Theme.Metrics.volumeHUDTrailing)
         }
         return (compactSideWidth, compactSideWidth)
@@ -412,7 +474,7 @@ final class IslandViewModel {
         if compactPair != nil { return geometry.notchSize.height + 8 }
         switch compactActivity {
         case .banner, .none: return 0
-        case .alert: return 64
+        case .alert, .levels: return 64
         case .microphone: return 60
         case .timer, .pomodoro, .stopwatch, .countdown, .transfer: return 52
         case .working, .recording, .agent: return 64
@@ -470,7 +532,7 @@ final class IslandViewModel {
 
     /// The height of the top activity's own peek.
     private var activityPeekHeight: CGFloat {
-        switch compactActivity {
+        switch peekActivity {
         case .timer, .pomodoro, .stopwatch, .countdown: Theme.Metrics.glanceHeight
         case .media: mediaContentHeight(peek: true)
         case .recording: Theme.Metrics.glanceHeight
@@ -487,22 +549,44 @@ final class IslandViewModel {
         // scrubber, lyric line, and transport while the Audio Output button has it open.
         if !peek, isMixerOn {
             if !features.nowPlaying.state.hasMedia {
-                if showsMixerAlone { return Theme.Metrics.playerScrubber + gap + mixerBodyHeight }
+                if showsMixerAlone {
+                    return Theme.Metrics.outputRowHeight + gap + mixerBodyHeight
+                }
             } else if showsMediaOutputs {
                 return Theme.Metrics.playerTopInset + Theme.Metrics.playerArtwork + gap + Theme.Metrics.playerScrubber + gap
-                    + mixerBodyHeight
+                    + Theme.Metrics.playerTransport + gap + mixerBodyHeight
             }
         }
         guard features.nowPlaying.state.hasMedia else { return Theme.Metrics.glanceHeight }
         let art = peek ? Theme.Metrics.playerPeekArtwork : Theme.Metrics.playerArtwork
         let inset = peek ? 0 : Theme.Metrics.playerTopInset
-        let lyrics = features.nowPlaying.lyrics.lines.isEmpty ? 0 : Theme.Metrics.lyricsRowHeight
-        return inset + art + gap + Theme.Metrics.playerScrubber + gap + Theme.Metrics.playerTransport + lyrics
+        let showsList = peek && showsPeekOutputList
+        let lyrics = !showsList && !features.nowPlaying.lyrics.lines.isEmpty ? Theme.Metrics.lyricsRowHeight : 0
+        let controlsHeight = showsList ? mediaOutputListHeight : Theme.Metrics.playerTransport
+        let rowHeight = peek ? Theme.Metrics.outputRowHeight : Theme.Metrics.playerScrubber
+        return inset + art + gap + rowHeight + gap + controlsHeight + lyrics
+    }
+
+    var mediaOutputListHeight: CGFloat {
+        Self.outputListHeight(
+            connectedCount: features.outputs.devices.count,
+            disconnectedCount: features.bluetooth.notConnected.count)
+    }
+
+    static func outputListHeight(connectedCount: Int, disconnectedCount: Int) -> CGFloat {
+        let rows = min(max(connectedCount + disconnectedCount, 1), Theme.Metrics.peekOutputMaxRows)
+        return CGFloat(rows) * Theme.Metrics.outputRowHeight
+            + (disconnectedCount == 0 ? 0 : Theme.Metrics.outputCaptionHeight)
     }
 
     // MARK: The Mixer's panel
 
     var isMixerOn: Bool { features.settings.isOn(.mixer) }
+
+    func toggleMediaOutputs() {
+        if !showsMediaOutputs { features.bluetooth.refresh() }
+        withAnimation(Theme.Motion.resize) { showsMediaOutputs.toggle() }
+    }
 
     /// The Media tab shows the Mixer's panel alone: Now Playing has nothing, but apps are making sound.
     var showsMixerAlone: Bool {
@@ -549,7 +633,7 @@ final class IslandViewModel {
                     + (features.keepAwake.isOn ? Theme.Metrics.keepAwakeChipsHeight : 0)
         case .notes: Theme.Metrics.notesHeight
         case .reminders: Theme.Metrics.remindersHeight
-        case .agents: Theme.Metrics.agentsHeight
+        case .agents: agentsMode == .stats ? Theme.Metrics.agentsStatsHeight : Theme.Metrics.agentsHeight
         }
     }
 
@@ -588,6 +672,53 @@ final class IslandViewModel {
 
     /// Area that counts as "over the island", in screen coordinates.
     var hitRect: CGRect { geometry.islandRect(for: hitSize).offsetBy(dx: horizontalOffset, dy: 0) }
+
+    var showsOutputSatellites: Bool {
+        presentation == .expanded && selectedTab == .media && showsMediaOutputs
+    }
+
+    var outputSatelliteLimit: Int {
+        let availableHeight = Theme.Metrics.panelHeight - geometry.notchSize.height
+            - Theme.Metrics.contentTopGap - Theme.Metrics.margin
+        return max(Int(availableHeight / (Theme.Metrics.outputSatelliteSize + Theme.Metrics.outputSatelliteSpacing)), 0)
+    }
+
+    var outputSatellitesRect: CGRect? {
+        let available = features.outputs.otherDevices.count + features.bluetooth.notConnected.count
+        let count = min(available, outputSatelliteLimit)
+        guard showsOutputSatellites, count > 0 else { return nil }
+        let metrics = Theme.Metrics.self
+        let height = CGFloat(count) * metrics.outputSatelliteSize + CGFloat(count - 1) * metrics.outputSatelliteSpacing
+        let island = geometry.islandRect(for: size).offsetBy(dx: horizontalOffset, dy: 0)
+        let top = geometry.screenFrame.maxY - geometry.notchSize.height - metrics.contentTopGap
+        let width = metrics.outputSatelliteGap
+            + (hoveredOutputSatelliteID == nil ? metrics.outputSatelliteSize : metrics.outputPillMaxWidth)
+        return CGRect(x: island.maxX, y: top - height, width: width, height: height)
+    }
+
+    func isOverIsland(_ point: CGPoint) -> Bool {
+        hitRect.contains(point) || (outputSatellitesRect?.contains(point) ?? false)
+    }
+
+    func setOutputSatelliteHover(_ id: String, hovering: Bool) {
+        if hovering {
+            hoveredOutputSatelliteID = id
+        } else if id.isEmpty || hoveredOutputSatelliteID == id {
+            hoveredOutputSatelliteID = nil
+        }
+    }
+
+    func updateScrollArea(_ id: UUID, frame: CGRect?, axis: AxisLock.Axis) {
+        guard let frame else {
+            scrollAreas.removeValue(forKey: id)
+            return
+        }
+        scrollAreas[id] = ScrollArea(frame: frame, axis: axis)
+    }
+
+    func scrollAxis(at point: CGPoint) -> AxisLock.Axis? {
+        scrollAreas.values.first { $0.frame.contains(point) }?.axis
+    }
 
     /// The timer is being set: the dial is on screen and takes horizontal scrolls.
     var isSettingTimer: Bool {
@@ -1008,6 +1139,15 @@ final class IslandViewModel {
         withAnimation(Theme.Motion.resize) { agentsMode = mode }
     }
 
+    func setStatsAgent(_ agent: AgentKind?) {
+        statsFilter = StatsFilter(agent: agent)
+    }
+
+    func setStatsRange(_ range: StatsRange) {
+        guard range != statsRange else { return }
+        statsRange = range
+    }
+
     func setUsageRange(_ range: UsageRange) {
         guard range != usageRange else { return }
         usageRange = range
@@ -1168,7 +1308,7 @@ final class IslandViewModel {
             clipboardQuery = ""
             return true
         }
-        if showsMediaOutputs, selectedTab == .media, isMixerOn, features.nowPlaying.state.hasMedia {
+        if showsMediaOutputs, selectedTab == .media {
             withAnimation(Theme.Motion.resize) { showsMediaOutputs = false }
             return true
         }
@@ -1204,9 +1344,15 @@ final class IslandViewModel {
         isHovering = hovering
         hoverTask?.cancel()
 
-        // The volume HUD holds still while the pointer is on it, then leaves as it would have.
-        if alert?.volume != nil {
-            if hovering { alertTask?.cancel() } else { scheduleAlertDismissal(after: Theme.Timing.volumeHUD) }
+        // The level HUD holds still while the pointer is on it, then leaves as it would have.
+        if !levels.isEmpty {
+            if hovering {
+                volumeTask?.cancel()
+                brightnessTask?.cancel()
+            } else {
+                if levels.volume != nil { scheduleLevelExpiry(.volume) }
+                if levels.brightness != nil { scheduleLevelExpiry(.brightness) }
+            }
         }
 
         // A banner holds still while the pointer is on it, then leaves shortly after.
@@ -1262,11 +1408,13 @@ final class IslandViewModel {
     func open(applyingOpenOn: Bool = true) {
         hoverTask?.cancel()
         bannerTask?.cancel()
+        let bannerTab = banner?.opensTab
         withAnimation(Theme.Motion.open) {
             isSwelling = false
             banner = nil
             if applyingOpenOn, state != .expanded { applyOpenOn() }
             revealPendingAlert()
+            if let bannerTab { selectedTab = bannerTab }
             state = .expanded
         }
     }
@@ -1296,7 +1444,7 @@ final class IslandViewModel {
         case .transfer: .shelf
         case .agent: .agents
         case .countdown: .home
-        case .banner, .alert, .recording, .microphone, .working, .keepAwake, .none: nil
+        case .banner, .alert, .levels, .recording, .microphone, .working, .keepAwake, .none: nil
         }
     }
 
@@ -1429,17 +1577,51 @@ final class IslandViewModel {
         }
     }
 
-    // MARK: Volume HUD
+    // MARK: Volume and brightness HUD
 
-    /// Whether the volume HUD may take the stage: the island is folded, and nothing that needs the person is showing. It is never queued
-    /// behind one: the key goes to the system's own HUD instead.
-    var canShowVolumeHUD: Bool {
-        state == .compact && banner == nil && alert?.staysUntilSeen != true
+    /// Whether the HUD may take the stage: nothing that needs the person is showing, and no full-screen app has the display. It shows in
+    /// any state (the open island draws it in the band beside the notch). It is never queued behind an alert that stays until seen: the
+    /// key goes to the system's own HUD instead.
+    var canShowLevelHUD: Bool {
+        banner == nil && alert?.staysUntilSeen != true && !hidesForFullScreen
     }
 
-    /// Shows the volume in the island for a moment. Each press shows it again, and the pointer on it holds it.
-    func showVolume(_ level: VolumeLevel) {
-        flash(Announcements.volume(level), for: Theme.Timing.volumeHUD, respectingFocus: false)
+    /// Shows a level in the island for a moment. Each press shows it again, and the pointer on it holds it.
+    func showLevel(_ reading: LevelReading) {
+        switch reading {
+        case .volume(let level): withAnimation(Theme.Motion.open) { levels.volume = level }
+        case .brightness(let fraction): withAnimation(Theme.Motion.open) { levels.brightness = fraction }
+        }
+        scheduleLevelExpiry(reading.kind)
+    }
+
+    /// For the Settings preview only: holds the levels on the island, with no expiry, or clears them.
+    func setPreviewLevels(volume: VolumeLevel?, brightness: Double?) {
+        volumeTask?.cancel()
+        brightnessTask?.cancel()
+        let hud = LevelHUD(volume: volume, brightness: brightness)
+        if levels != hud { withAnimation(Theme.Motion.open) { levels = hud } }
+    }
+
+    private func scheduleLevelExpiry(_ kind: LevelKind) {
+        let task = Task { [weak self] in
+            try? await Task.sleep(for: Theme.Timing.levelHUD)
+            guard !Task.isCancelled, let self else { return }
+            withAnimation(Theme.Motion.resize) {
+                switch kind {
+                case .volume: self.levels.volume = nil
+                case .brightness: self.levels.brightness = nil
+                }
+            }
+        }
+        switch kind {
+        case .volume:
+            volumeTask?.cancel()
+            volumeTask = task
+        case .brightness:
+            brightnessTask?.cancel()
+            brightnessTask = task
+        }
     }
 
     /// Whether a banner for `event` would show right now: it isn't muted, no full-screen app has the display, and no Focus is holding

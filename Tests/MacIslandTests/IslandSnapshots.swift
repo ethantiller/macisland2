@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import SwiftUI
 import Testing
 
@@ -265,7 +266,12 @@ struct IslandSnapshots {
             ("04g-expanded-media-mixer", OptionalAccessState.allowed),
             ("04h-expanded-media-mixer-needs-access", .notAsked),
         ] {
-            let viewModel = TestSupport.makeViewModel(mixerApps: list, mixerAccess: access)
+            let outputs = AudioOutputs(
+                devices: [AudioOutputs.Device(
+                    id: AudioDeviceID(1), name: "MacBook Speakers",
+                    transportType: kAudioDeviceTransportTypeBuiltIn, uid: "builtin")],
+                defaultDeviceID: AudioDeviceID(1))
+            let viewModel = TestSupport.makeViewModel(outputs: outputs, mixerApps: list, mixerAccess: access)
             viewModel.settings.setOn(.mixer, true)
             viewModel.settings.mixerLevels = ["com.spotify.client": 0.6]
             viewModel.nowPlaying.apply(sampleTrack())
@@ -277,7 +283,105 @@ struct IslandSnapshots {
         }
     }
 
+    /// The peek's output list and the Media tab's satellite outputs.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderOutputChoices() {
+        let bluetooth = StubBluetooth()
+        bluetooth.devices = [PairedDevice(id: "airpods", name: "AirPods Pro", isConnected: false)]
+        let viewModel = TestSupport.makeViewModel(bluetooth: bluetooth, outputs: sampleOutputs())
+        viewModel.nowPlaying.apply(sampleTrack())
+        viewModel.state = .peek
+        viewModel.showsPeekOutputList = true
+        render(viewModel, "03j-peek-output-list")
+
+        viewModel.state = .expanded
+        viewModel.selectedTab = .media
+        viewModel.showsMediaOutputs = true
+        render(viewModel, "04i-expanded-media-outputs", wideHostingPanel: true)
+    }
+
     /// The Shelf's Downloads mode (G1), over a folder of sample files.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderLevels() {
+        let viewModel = makeViewModel()
+        viewModel.setPreviewLevels(volume: PreviewSamples.volume, brightness: nil)
+        render(viewModel, "10a-levels-volume")
+        viewModel.setPreviewLevels(volume: nil, brightness: PreviewSamples.brightness)
+        render(viewModel, "10b-levels-brightness")
+        viewModel.setPreviewLevels(volume: PreviewSamples.volume, brightness: PreviewSamples.brightness)
+        render(viewModel, "10c-levels-both")
+        viewModel.state = .expanded
+        render(viewModel, "10d-levels-expanded-band")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderAgents() {
+        func work(_ viewModel: IslandViewModel, _ agent: AgentKind, _ title: String, project: String, model: String) {
+            let session = agent.rawValue
+            viewModel.agents.ingest(
+                AgentLogEvent(
+                    kind: .turnStarted, sessionID: session, cwd: "/code/\(project)", model: model,
+                    date: Date().addingTimeInterval(-252), prompt: title),
+                agent: agent, session: session, announces: false)
+            viewModel.agents.ingest(
+                AgentLogEvent(
+                    kind: .activity, tokens: AgentTokens(input: 4_000, output: 30_000, cacheRead: 150_000),
+                    contextTokens: 124_000, contextWindow: 200_000),
+                agent: agent, session: session, announces: false)
+        }
+        let viewModel = makeViewModel()
+        viewModel.settings.setOn(.agents, true)
+        work(viewModel, .claudeCode, "Fix the volume HUD", project: "island", model: "claude-opus-4-5-20251101")
+        render(viewModel, "20a-agent-compact-claude")
+        viewModel.state = .peek
+        render(viewModel, "20b-agent-peek-claude")
+        viewModel.state = .compact
+        work(viewModel, .codex, "Add the stats view", project: "site", model: "gpt-5-codex")
+        render(viewModel, "20c-agent-compact-both")
+        viewModel.state = .peek
+        render(viewModel, "20d-agent-peek-both")
+        viewModel.state = .compact
+        let task = AgentTask(
+            id: "s", agent: .claudeCode, project: "island", model: "claude-opus-4-5", startedAt: Date(), lastActivity: Date(),
+            title: "Fix the volume HUD", tokens: AgentTokens(input: 4_000, output: 180_000))
+        viewModel.showBanner(Announcements.agentDone(task: task, duration: 252), for: .seconds(600), respectingFocus: false)
+        render(viewModel, "20e-agent-done-claude")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderStats() {
+        let viewModel = makeViewModel()
+        viewModel.settings.setOn(.agents, true)
+        viewModel.agents.usage.start()
+        viewModel.agents.usage.show(PreviewSamples.usageSnapshot())
+        viewModel.selectedTab = .agents
+        viewModel.setAgentsMode(.stats)
+        viewModel.state = .expanded
+        render(viewModel, "30a-stats-all")
+        viewModel.setStatsAgent(.claudeCode)
+        viewModel.setStatsRange(.month)
+        render(viewModel, "30b-stats-claude-30days")
+        viewModel.setStatsAgent(.codex)
+        render(viewModel, "30c-stats-codex")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderAgentPreviews() {
+        let live = makeViewModel()
+        live.settings.setOn(.agents, true)
+        let preview = IslandPreviewModel(live: live.features)
+        defer { preview.stop() }
+        preview.viewModel.geometry = live.geometry
+        for agent in AgentKind.allCases {
+            let name = agent == .claudeCode ? "claude" : "codex"
+            for (index, presentation) in [PreviewPresentation.compact, .peek, .banner, .expanded].enumerated() {
+                preview.show(
+                    AgentsOptions.previewContext(for: agent, from: PreviewContext(presentation: presentation)), animated: false)
+                render(preview.viewModel, "31-preview-\(name)-\(index + 1)-\(presentation.rawValue.lowercased())")
+            }
+        }
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderDownloads() {
         let viewModel = makeViewModel()
@@ -337,6 +441,27 @@ struct IslandSnapshots {
         return state
     }
 
+    private func sampleOutputs() -> AudioOutputs {
+        let devices = [
+            AudioOutputs.Device(
+                id: AudioDeviceID(1), name: "MacBook Speakers", transportType: kAudioDeviceTransportTypeBuiltIn,
+                uid: "builtin"),
+            AudioOutputs.Device(
+                id: AudioDeviceID(2), name: "Studio Display", transportType: kAudioDeviceTransportTypeDisplayPort,
+                uid: "display"),
+            AudioOutputs.Device(
+                id: AudioDeviceID(3), name: "Living Room", transportType: kAudioDeviceTransportTypeAirPlay,
+                uid: "airplay"),
+            AudioOutputs.Device(
+                id: AudioDeviceID(4), name: "HDMI", transportType: kAudioDeviceTransportTypeHDMI, uid: "hdmi"),
+            AudioOutputs.Device(
+                id: AudioDeviceID(5), name: "USB DAC", transportType: kAudioDeviceTransportTypeUSB, uid: "usb"),
+            AudioOutputs.Device(
+                id: AudioDeviceID(6), name: "Office", transportType: kAudioDeviceTransportTypeBluetooth, uid: "office"),
+        ]
+        return AudioOutputs(devices: devices, defaultDeviceID: devices[0].id)
+    }
+
     private func sampleArtwork() -> Data {
         let image = NSImage(size: NSSize(width: 120, height: 120), flipped: false) { rect in
             NSGradient(colors: [
@@ -349,10 +474,13 @@ struct IslandSnapshots {
         return NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) ?? Data()
     }
 
-    private func render(_ viewModel: IslandViewModel, _ name: String) {
+    private func render(_ viewModel: IslandViewModel, _ name: String, wideHostingPanel: Bool = false) {
         guard let outputDirectory else { return }
         let content = IslandView(viewModel: viewModel, acceptsDrops: false)
-            .frame(width: ScreenGeometry.panelSize.width, height: max(viewModel.size.height, 1) + 16, alignment: .top)
+            .frame(
+                width: wideHostingPanel ? ScreenGeometry.hostingPanelWidth : ScreenGeometry.panelSize.width,
+                height: wideHostingPanel ? ScreenGeometry.panelSize.height : max(viewModel.size.height, 1) + 16,
+                alignment: .top)
             .background(Color(white: 0.28))
         let renderer = ImageRenderer(content: content.environment(\.isSnapshot, true))
         renderer.scale = 2

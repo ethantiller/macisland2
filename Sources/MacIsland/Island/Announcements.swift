@@ -65,10 +65,14 @@ enum Announcement {
 /// island does.
 @MainActor
 enum Announcements {
-    /// A task an agent worked on has finished: "Done 4:12", in green, with the module's sparkles.
-    static func agentDone(duration: TimeInterval) -> IslandAlert {
-        IslandAlert(
-            systemImage: "sparkles", tint: Theme.Tint.positive, text: "Done " + formatTime(duration), opensTab: .agents)
+    /// A task an agent worked on has finished: an alert banner with the agent's mark in a ring that draws once in green, the task's
+    /// title, and how long it took and what it used.
+    static func agentDone(task: AgentTask, duration: TimeInterval) -> IslandBanner {
+        var detail = "Done in " + formatTime(duration)
+        if task.tokens.total > 0 { detail += " \u{00B7} " + AgentUsageFormat.tokens(task.tokens.total) + " tokens" }
+        return IslandBanner(
+            systemImage: "sparkles", tint: Theme.Tint.positive, title: task.displayTitle, detail: detail,
+            ringTint: Theme.Tint.positive, agent: task.agent, opensTab: .agents)
     }
 
     /// A plan limit is near: "Claude at 80%" and when the window resets. Red, because it is the one thing here that asks you to slow down.
@@ -76,7 +80,8 @@ enum Announcements {
         let name = agent == .claudeCode ? "Claude" : "Codex"
         return IslandBanner(
             systemImage: "gauge.with.needle.fill", tint: Theme.Tint.attention, title: "\(name) at \(percent)%",
-            detail: resetsAt.map { "Resets at " + $0.formatted(date: .omitted, time: .shortened) })
+            detail: resetsAt.map { "Resets at " + $0.formatted(date: .omitted, time: .shortened) },
+            ringTint: Theme.Tint.attention, agent: agent)
     }
 
     /// A notification macOS showed, on the island: "Messages: Maya" over the first line of what it says, with Open and Dismiss. The bell
@@ -141,15 +146,6 @@ enum Announcements {
         )
     }
 
-    /// The volume HUD: the speaker for the level, in white, and in red only when muted or at zero.
-    static func volume(_ level: VolumeLevel) -> IslandAlert {
-        var alert = IslandAlert(
-            systemImage: level.symbol, tint: level.isSilent ? Theme.Tint.attention : Theme.Tint.neutral,
-            text: "\(level.percent)%", tintsText: level.isSilent)
-        alert.volume = level
-        return alert
-    }
-
     static var hotspot: IslandAlert {
         IslandAlert(systemImage: "personalhotspot", tint: Theme.Tint.positive, text: "Hotspot")
     }
@@ -187,7 +183,7 @@ enum Announcements {
     }
 
     /// What an event looks like, for the Settings preview. Nothing here acts on the Mac.
-    static func sample(for event: AmbientEvent, agenda: AgendaMonitor) -> Announcement {
+    static func sample(for event: AmbientEvent, agenda: AgendaMonitor, agent: AgentKind = .claudeCode) -> Announcement {
         switch event {
         case .charging: .alert(charging(percent: 64))
         case .fullCharge: .alert(fullCharge(percent: 100))
@@ -212,9 +208,21 @@ enum Announcements {
         case .rainSoon: .banner(rainSoon(start: Date().addingTimeInterval(20 * 60)))
         case .download: .alert(downloadSaved)
         case .lowDisk: .banner(lowDisk(free: 4_000_000_000).banner)
-        case .agentDone: .alert(agentDone(duration: 252))
+        case .agentDone:
+            .banner(
+                agentDone(
+                    task: agent == .codex
+                        ? AgentTask(
+                            id: "preview", agent: .codex, project: "site", model: "gpt-5-codex", startedAt: Date(),
+                            lastActivity: Date(), title: "Add the stats view",
+                            tokens: AgentTokens(input: 6_000, output: 20_000, cacheRead: 70_000))
+                        : AgentTask(
+                            id: "preview", agent: .claudeCode, project: "island", model: "claude-opus-4-5-20251101",
+                            startedAt: Date(), lastActivity: Date(), title: "Fix the volume HUD",
+                            tokens: AgentTokens(input: 4_000, output: 30_000, cacheRead: 150_000)),
+                    duration: 252))
         case .agentLimit:
-            .banner(agentLimit(agent: .claudeCode, percent: 80, resetsAt: Date().addingTimeInterval(2 * 3600)))
+            .banner(agentLimit(agent: agent, percent: 80, resetsAt: Date().addingTimeInterval(2 * 3600)))
         case .notification:
             .banner(
                 mirrored(

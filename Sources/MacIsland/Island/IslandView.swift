@@ -47,12 +47,48 @@ struct IslandView: View {
                 }
             }
         }
-        .environment(\.mediaNamespace, mediaNamespace)
         .modifier(
             DropTarget(
                 enabled: acceptsDrops && viewModel.settings.effectiveDragTarget != .nothing,
                 delegate: IslandDropDelegate(viewModel: viewModel, zone: $dropZone))
         )
+        .overlay(alignment: .top) {
+            if viewModel.presentation == .peek || viewModel.presentation == .expanded, !viewModel.levels.isEmpty {
+                LevelBand(
+                    levels: viewModel.levels, notchWidth: viewModel.geometry.notchSize.width,
+                    height: viewModel.geometry.notchSize.height)
+                    .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            OutputSatellites(
+                outputs: viewModel.outputs,
+                bluetooth: viewModel.bluetooth,
+                maxCount: viewModel.outputSatelliteLimit,
+                isVisible: viewModel.showsOutputSatellites,
+                onHover: viewModel.setOutputSatelliteHover
+            )
+            .frame(width: Theme.Metrics.outputPillMaxWidth, alignment: .leading)
+            .offset(
+                x: Theme.Metrics.outputPillMaxWidth + Theme.Metrics.outputSatelliteGap + viewModel.horizontalOffset,
+                y: viewModel.geometry.notchSize.height + Theme.Metrics.contentTopGap
+            )
+        }
+        .environment(\.mediaNamespace, mediaNamespace)
+        .environment(\.updateScrollArea) { id, frame, axis in
+            guard let frame else {
+                viewModel.updateScrollArea(id, frame: nil, axis: axis)
+                return
+            }
+            let panelFrame = viewModel.geometry.panelFrame
+            let screenFrame = CGRect(
+                x: panelFrame.minX + frame.minX,
+                y: panelFrame.maxY - frame.maxY,
+                width: frame.width,
+                height: frame.height
+            )
+            viewModel.updateScrollArea(id, frame: screenFrame, axis: axis)
+        }
         // When the drag ends, however it ends, the drop target goes with it.
         .onChange(of: viewModel.isFileDragActive) { _, active in
             if !active { dropZone = nil }
@@ -200,7 +236,7 @@ struct IslandView: View {
         case .working:
             WorkingGlyph()
         case .agent:
-            Glyph(systemName: "sparkles", tint: Theme.Tint.working)
+            AgentMarks(tasks: viewModel.agents.liveTasks)
         case .transfer:
             TransferIcon(transfers: viewModel.transfers)
         case .media:
@@ -208,7 +244,7 @@ struct IslandView: View {
                 .mediaMatch("artwork")
         case .keepAwake:
             Glyph(systemName: "cup.and.saucer.fill")
-        case .alert, .banner, .none:
+        case .alert, .levels, .banner, .none:
             EmptyView()
         }
     }
@@ -216,6 +252,14 @@ struct IslandView: View {
     @ViewBuilder
     private var compactLeading: some View {
         switch viewModel.compactActivity {
+        case .levels(let hud):
+            if hud.isBoth, let brightness = hud.brightness {
+                LevelHUD.brightnessReadout(brightness, barWidth: Theme.Metrics.levelBarSplitWidth, showsGlyph: true)
+            } else if let level = hud.volume {
+                Glyph(systemName: level.symbol, tint: level.isSilent ? Theme.Tint.attention : nil)
+            } else if let brightness = hud.brightness {
+                Glyph(systemName: LevelHUD.brightnessSymbol(brightness))
+            }
         case .alert(let alert):
             if alert.isCharging {
                 ChargingBadge(size: notchSize.height - 10)
@@ -237,7 +281,7 @@ struct IslandView: View {
         case .working:
             WorkingGlyph()
         case .agent:
-            Glyph(systemName: "sparkles", tint: Theme.Tint.working)
+            AgentMarks(tasks: viewModel.agents.liveTasks)
         case .transfer:
             TransferIcon(transfers: viewModel.transfers)
         case .media:
@@ -253,29 +297,20 @@ struct IslandView: View {
     @ViewBuilder
     private var compactTrailing: some View {
         switch viewModel.compactActivity {
-        case .alert(let alert):
-            if let level = alert.volume {
-                HStack(spacing: 6) {
-                    LevelBar(fraction: level.shown, tint: level.isSilent ? Theme.Tint.attention : nil)
-                        .frame(width: Theme.Metrics.levelBarWidth)
-                    Text(alert.text)
-                        .font(Theme.Typography.compactNumeral)
-                        .foregroundStyle(
-                            level.isSilent ? AnyShapeStyle(Theme.Tint.attention) : AnyShapeStyle(Theme.Palette.primary)
-                        )
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                }
-                .animation(Theme.Motion.track, value: level)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(level.isMuted ? "Volume muted" : "Volume \(level.percent) percent")
-            } else {
-                Text(alert.text)
-                    .font(Theme.Typography.compactNumeral)
-                    .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        case .levels(let hud):
+            if hud.isBoth, let level = hud.volume {
+                LevelHUD.volumeReadout(level, barWidth: Theme.Metrics.levelBarSplitWidth, showsGlyph: true)
+            } else if let level = hud.volume {
+                LevelHUD.volumeReadout(level, barWidth: Theme.Metrics.levelBarWidth, showsGlyph: false)
+            } else if let brightness = hud.brightness {
+                LevelHUD.brightnessReadout(brightness, barWidth: Theme.Metrics.levelBarWidth, showsGlyph: false)
             }
+        case .alert(let alert):
+            Text(alert.text)
+                .font(Theme.Typography.compactNumeral)
+                .foregroundStyle(alert.tintsText ? AnyShapeStyle(alert.tint) : AnyShapeStyle(Theme.Palette.primary))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         case .recording(let kind):
             if let since = kind == .screen ? viewModel.screenRecorder.startedAt : viewModel.voice.startedAt {
                 ElapsedText(since: since, tint: Theme.Tint.working)
@@ -471,7 +506,12 @@ private struct BannerContent: View {
     /// The symbol, in a ring that draws around it once when the banner has one (AirPods: green, or red when low).
     @ViewBuilder
     private var glyph: some View {
-        if let ringTint = banner.ringTint {
+        if let ringTint = banner.ringTint, let agent = banner.agent {
+            RingedGlyph(ringTint: ringTint, size: 36, label: banner.title) {
+                AgentMark(agent: agent, size: 20)
+            }
+            .id(banner.id)
+        } else if let ringTint = banner.ringTint {
             RingedGlyph(
                 systemName: banner.systemImage, ringTint: ringTint, glyphTint: nil, size: 36, label: banner.title
             )

@@ -4,7 +4,7 @@ import SwiftUI
 enum AgentsMode: String, CaseIterable, Identifiable {
     case now = "Now"
     case usage = "Usage"
-    case activity = "Activity"
+    case stats = "Stats"
 
     var id: Self { self }
 }
@@ -190,59 +190,5 @@ struct RankColumn: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-}
-
-// MARK: Activity
-
-/// The last 91 days, a week to a column. Hovering a day names it in the header.
-struct AgentActivityMapView: View {
-    let usage: AgentUsageModel
-    @Binding var hovered: ActivityMap.Cell?
-
-    var body: some View {
-        if let snapshot = usage.snapshot {
-            let map = ActivityMap.make(buckets: snapshot.buckets, now: Date())
-            HStack(alignment: .top, spacing: 18) {
-                HStack(spacing: Theme.Metrics.activityGap) {
-                    ForEach(Array(map.weeks.enumerated()), id: \.offset) { _, week in
-                        VStack(spacing: Theme.Metrics.activityGap) {
-                            ForEach(week) { cell in
-                                RoundedRectangle(cornerRadius: Theme.Metrics.activityCell / 4, style: .continuous)
-                                    .fill(cell.date == nil ? Theme.Palette.none : Theme.Palette.activitySteps[cell.level])
-                                    .frame(width: Theme.Metrics.activityCell, height: Theme.Metrics.activityCell)
-                                    .onHover { inside in
-                                        if inside, cell.date != nil {
-                                            hovered = cell
-                                        } else if hovered?.id == cell.id {
-                                            hovered = nil
-                                        }
-                                    }
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                    }
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(map.streak)")
-                        .font(Theme.Typography.largeNumeral)
-                        .foregroundStyle(Theme.Palette.primary)
-                    Text(map.streak == 1 ? "day in a row" : "days in a row")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                    Text("\(map.activeDays) active days")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(map.activeDays) active days in the last 91, \(map.streak) in a row")
-        } else {
-            Text(usage.isEnabled ? "Reading history\u{2026}" : "Turn on AI Agents to see activity.")
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Palette.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
     }
 }

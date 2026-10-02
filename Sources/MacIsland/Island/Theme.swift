@@ -10,6 +10,8 @@ enum Theme {
     enum Palette {
         /// Pure black so the island is indistinguishable from the notch.
         static let surface = Color.black
+        /// The tint of the Media tab's output bubbles: Liquid Glass leaning to near black.
+        static let satelliteTint = Color.black.opacity(0.62)
         static let primary = SurfaceInk(opacity: 1)
         static let secondary = SurfaceInk(opacity: 0.6)
         /// Glyphs only (≈3.4:1); never use for text.
@@ -49,6 +51,11 @@ enum Theme {
         static let airDrop = Color(red: 0.16, green: 0.62, blue: 1.0)
     }
 
+    /// The one color that is not a meaning: Claude Code's own orange, drawn only as its mark (like AirDrop blue), never as a tint.
+    enum Mark {
+        static let claude = Color(red: 0.851, green: 0.467, blue: 0.341)
+    }
+
     enum Typography {
         static let title = Font.system(size: 13, weight: .semibold)
         static let body = Font.system(size: 12)
@@ -56,6 +63,8 @@ enum Theme {
         static let caption = Font.system(size: 10, weight: .medium)
         static let numeral = Font.system(size: 10, weight: .medium, design: .rounded).monospacedDigit()
         static let compactNumeral = Font.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit()
+        /// A figure in the Stats tiles.
+        static let statValue = Font.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit()
         static let largeNumeral = Font.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit()
         static let glyph = Font.system(size: 13, weight: .medium)
         /// The music player, after the Dynamic Island's: the song, and who plays it.
@@ -107,6 +116,13 @@ enum Theme {
         /// Space between the player's rows.
         static let playerSpacing: CGFloat = 6
         static let playerScrubber: CGFloat = 20
+        static let outputSatelliteSize: CGFloat = 40
+        static let outputSatelliteGap: CGFloat = 8
+        static let outputSatelliteSpacing: CGFloat = 6
+        static let outputPillMaxWidth: CGFloat = 200
+        static let outputRowHeight: CGFloat = 28
+        static let outputCaptionHeight: CGFloat = 18
+        static let peekOutputMaxRows = 4
         /// Timer and stopwatch ring; its height sets the Clock tab's height.
         static let clockRing: CGFloat = 64
         /// The minute ruler shown while a timer is being set: labels, ticks, and the marker.
@@ -139,6 +155,15 @@ enum Theme {
         /// The volume HUD: a narrow side for the speaker glyph, a long one for the level bar and the percent.
         static let volumeHUDLeading: CGFloat = 44
         static let volumeHUDTrailing: CGFloat = 140
+        /// Between two agents' marks.
+        static let agentMarkGap: CGFloat = 4
+        /// The box an agent's mark sits in on a task row.
+        static let agentMarkBox: CGFloat = 28
+        /// Each side of the notch while volume and brightness show together.
+        static let levelSideWidth: CGFloat = 140
+        /// The bar beside the notch when both levels show (the single layout's bar is `levelBarWidth`), and on an open island.
+        static let levelBarSplitWidth: CGFloat = 56
+        static let levelBarOpenWidth: CGFloat = 64
         static let levelBarWidth: CGFloat = 80
         static let levelBarHeight: CGFloat = 4
         static let clipboardCardWidth: CGFloat = 108
@@ -237,6 +262,9 @@ enum Theme {
         static let mixerRowHeight: CGFloat = 28
         /// The most rows the Mixer shows before it scrolls.
         static let mixerMaxRows = 4
+        /// The Mixer's columns: an app's name before its slider, and the percent after it. The player's volume row shares them.
+        static let mixerNameWidth: CGFloat = 96
+        static let mixerPercentWidth: CGFloat = 40
         /// The Agents module, in every mode: its header, then what fits under it (two tasks and the limits; the usage; the map).
         static let agentsHeight: CGFloat = 176
         /// The header's two choosers: the modes, and the range of the usage.
@@ -244,6 +272,18 @@ enum Theme {
         static let agentsRangeWidth: CGFloat = 170
         /// A day in the activity map, and the gap between days. Seven of them, with their gaps, fit under the header.
         static let activityCell: CGFloat = 12
+        /// The Stats mode: the year map's cells and gaps (53 columns of 6 and 2 are 422 wide), the room above it for month names and
+        /// beside it for weekday letters, the tiles under it, and the mode's height (the other modes keep `agentsHeight`).
+        static let yearCell: CGFloat = 6
+        static let yearGap: CGFloat = 2
+        static let yearCellRadius: CGFloat = 1.5
+        static let yearMonthRowHeight: CGFloat = 12
+        static let yearWeekdayLabelWidth: CGFloat = 12
+        static let yearLabelGap: CGFloat = 4
+        static let agentsStatsHeight: CGFloat = 208
+        static let statTileHeight: CGFloat = 30
+        static let agentsStatsRangeWidth: CGFloat = 190
+        static let agentsFilterWidth: CGFloat = 150
         static let activityGap: CGFloat = 2
         /// The Agents widget's ring, in the 2 by 1 and the 3 by 1.
         static let agentsRing: CGFloat = 36
@@ -265,7 +305,7 @@ enum Theme {
         /// Pointer gone before the island folds back in.
         static let closeDelay: Duration = .milliseconds(300)
         /// How long the volume HUD stays after the last key press. The pointer on it holds it.
-        static let volumeHUD: Duration = .milliseconds(1500)
+        static let levelHUD: Duration = .milliseconds(1500)
     }
 
     enum Motion {

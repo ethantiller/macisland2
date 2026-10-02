@@ -51,8 +51,10 @@ struct NowPlayingView: View {
     /// The island, when this is the Media tab: the Audio Output button's panel is kept there (so its height and Esc can see it), and
     /// it opens the Mixer instead of the output chips while the Mixer is on.
     var viewModel: IslandViewModel?
+    var peekOutputList: Binding<Bool>?
 
     @State private var localShowsOutputs = false
+    @State private var localShowsOutputList = false
 
     private var showsOutputs: Bool {
         get { viewModel?.showsMediaOutputs ?? localShowsOutputs }
@@ -64,6 +66,21 @@ struct NowPlayingView: View {
     /// The Mixer's panel is what the button opened.
     private var showsMixer: Bool { showsOutputs && !isCompact && viewModel?.isMixerOn == true }
 
+    private var showsOutputList: Bool {
+        get { peekOutputList?.wrappedValue ?? localShowsOutputList }
+        nonmutating set {
+            if isPeek, let peekOutputList {
+                peekOutputList.wrappedValue = newValue
+            } else {
+                localShowsOutputList = newValue
+            }
+        }
+    }
+
+    private var outputListBinding: Binding<Bool> {
+        Binding(get: { showsOutputList }, set: { showsOutputList = $0 })
+    }
+
     private var state: NowPlayingState { nowPlaying.state }
     private var isCompact: Bool { isPeek || inWidget }
     private var artworkSize: CGFloat { isCompact ? Theme.Metrics.playerPeekArtwork : Theme.Metrics.playerArtwork }
@@ -72,37 +89,77 @@ struct NowPlayingView: View {
         VStack(spacing: Theme.Metrics.playerSpacing) {
             header
 
-            if showsMixer, let viewModel {
-                MixerPanel(viewModel: viewModel, canHide: true)
+            if showsMixer, mixerListsPlayer {
+                // The Mixer's first row is this app's volume, so the slot above the transport goes back to the scrubber.
+                ScrubberRow(nowPlaying: nowPlaying)
+                    .transition(.opacity)
+            } else if showsMixer {
+                volumeRow
+            } else if isPeek {
+                VStack(spacing: Theme.Metrics.playerSpacing) {
+                    HStack(spacing: 12) {
+                        if nowPlaying.appVolume != nil {
+                            VolumeControl(nowPlaying: nowPlaying, style: .inline)
+                        }
+                        CurrentOutputChip(outputs: outputs, isOpen: outputListBinding)
+                            .layoutPriority(1)
+                    }
+                    .frame(height: Theme.Metrics.outputRowHeight)
+
+                    if showsOutputList {
+                        OutputList(outputs: outputs, bluetooth: bluetooth, isOpen: outputListBinding)
+                            .transition(.opacity)
+                    }
+                }
                     .transition(.opacity)
             } else if showsOutputs {
-                HStack(spacing: 12) {
-                    if nowPlaying.appVolume != nil {
-                        VolumeControl(nowPlaying: nowPlaying)
-                    }
-                    OutputPicker(outputs: outputs, bluetooth: bluetooth)
-                }
-                .frame(height: Theme.Metrics.playerScrubber)
-                .transition(.opacity)
+                volumeRow
             } else {
                 ScrubberRow(nowPlaying: nowPlaying)
                     .transition(.opacity)
             }
 
-            if !showsMixer {
+            if !showsOutputList {
                 transport
 
-                if !inWidget, !nowPlaying.lyrics.lines.isEmpty {
+                if !showsMixer, !inWidget, !nowPlaying.lyrics.lines.isEmpty {
                     LyricLineView(nowPlaying: nowPlaying)
                         .transition(.opacity)
                 }
             }
+
+            if showsMixer, let viewModel {
+                MixerPanel(viewModel: viewModel, canHide: true)
+                    .transition(.opacity)
+            }
         }
         .padding(.top, isCompact ? 0 : Theme.Metrics.playerTopInset)
+        .animation(Theme.Motion.resize, value: outputs.defaultDeviceID)
+        .animation(Theme.Motion.resize, value: showsOutputs)
         // Asked for while the view is visible, so a first Automation prompt comes from something the person opened.
         .task(id: LyricsModel.key(for: state) + (state.bundleIdentifier ?? "")) {
             await nowPlaying.refreshPlayerState()
         }
+    }
+
+    /// With the Mixer on, whether it already has a row for the playing app (and pins it first).
+    private var mixerListsPlayer: Bool {
+        guard let id = state.bundleIdentifier else { return false }
+        return viewModel?.mixer.rows.contains { $0.id == id } == true
+    }
+
+    /// The player's own volume in the scrubber's slot, as wide as a Mixer row.
+    @ViewBuilder
+    private var volumeRow: some View {
+        Group {
+            if nowPlaying.appVolume != nil {
+                VolumeControl(nowPlaying: nowPlaying, style: .row)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(height: Theme.Metrics.playerScrubber)
+        .transition(.opacity)
     }
 
     /// Art, then the song over the artist, then the sound bars.
@@ -190,16 +247,11 @@ struct NowPlayingView: View {
                         action: nowPlaying.toggleFavorite
                     )
                 }
-                if !inWidget {
-                    IconButton(
-                        systemName: "airplayaudio",
-                        label: "Audio Output and Volume",
-                        isSelected: showsOutputs
-                    ) {
-                        // Paired devices are read only when the picker opens.
-                        if !showsOutputs { bluetooth.refresh() }
-                        withAnimation(Theme.Motion.resize) { showsOutputs.toggle() }
-                    }
+                if !inWidget && !isPeek {
+                    AudioOutputButton(
+                        currentDeviceID: outputs.currentDevice?.id ?? outputs.defaultDeviceID,
+                        isSelected: showsOutputs,
+                        action: toggleOutputs)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -214,27 +266,66 @@ struct NowPlayingView: View {
         case .track: "Repeat One"
         }
     }
+
+    private func toggleOutputs() {
+        if let viewModel, !isPeek {
+            viewModel.toggleMediaOutputs()
+        } else {
+            if !showsOutputs { bluetooth.refresh() }
+            withAnimation(Theme.Motion.resize) { showsOutputs.toggle() }
+        }
+    }
 }
 
 /// The player's own volume, for Music and Spotify. Separate from the Mac's output volume.
-private struct VolumeControl: View {
+struct VolumeControl: View {
+    enum Style {
+        /// The Media tab: the app's name, a slider that fills the width, and the percent, in the Mixer's columns.
+        case row
+        /// The peek: a speaker glyph and a flexible slider, beside the output chip.
+        case inline
+    }
+
     let nowPlaying: NowPlayingModel
+    var style: Style = .inline
+
+    private var name: String { nowPlaying.player?.appName ?? "App" }
+    private var volume: Double { nowPlaying.appVolume ?? 0 }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "speaker.wave.2.fill")
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Palette.tertiary)
-                .accessibilityHidden(true)
-            IslandSlider(
-                value: nowPlaying.appVolume ?? 0,
-                tint: nowPlaying.accent,
-                label: "\(nowPlaying.player?.appName ?? "App") Volume",
-                onChange: { nowPlaying.previewAppVolume($0) },
-                onCommit: { nowPlaying.setAppVolume($0) }
-            )
+        switch style {
+        case .row:
+            HStack(spacing: 8) {
+                Text(name)
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Palette.primary)
+                    .lineLimit(1)
+                    .frame(width: Theme.Metrics.mixerNameWidth, alignment: .leading)
+                slider
+                Text("\(Int((volume * 100).rounded()))%")
+                    .font(Theme.Typography.numeral)
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .frame(width: Theme.Metrics.mixerPercentWidth, alignment: .trailing)
+            }
+        case .inline:
+            HStack(spacing: 6) {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.tertiary)
+                    .accessibilityHidden(true)
+                slider
+            }
         }
-        .frame(width: 130)
+    }
+
+    private var slider: some View {
+        IslandSlider(
+            value: volume,
+            tint: nowPlaying.accent,
+            label: "\(name) Volume",
+            onChange: { nowPlaying.previewAppVolume($0) },
+            onCommit: { nowPlaying.setAppVolume($0) }
+        )
     }
 }
 
@@ -281,55 +372,6 @@ private struct ScrubberRow: View {
             .font(Theme.Typography.numeral)
             .foregroundStyle(Theme.Palette.secondary)
         }
-    }
-}
-
-struct OutputPicker: View {
-    let outputs: AudioOutputs
-    let bluetooth: BluetoothDevices
-
-    /// The paired Bluetooth device behind an output, so it can be disconnected.
-    private func pairedDevice(for device: AudioOutputs.Device) -> PairedDevice? {
-        guard device.isBluetooth else { return nil }
-        return bluetooth.devices.first { $0.name == device.name && $0.isConnected }
-    }
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(outputs.devices) { device in
-                    ChipButton(
-                        title: device.name,
-                        systemImage: device.systemImage,
-                        isSelected: device.id == outputs.defaultDeviceID,
-                        accessibilityLabel: "Play Audio on \(device.name)"
-                    ) {
-                        outputs.select(device)
-                    }
-                    .contextMenu {
-                        if let paired = pairedDevice(for: device) {
-                            Button("Disconnect") { bluetooth.disconnect(paired) }
-                        }
-                    }
-                }
-                if !bluetooth.notConnected.isEmpty {
-                    Text("Not Connected")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                        .padding(.horizontal, 2)
-                    ForEach(bluetooth.notConnected) { device in
-                        ChipButton(
-                            title: device.name,
-                            systemImage: "headphones",
-                            accessibilityLabel: "Connect \(device.name)"
-                        ) {
-                            Task { await bluetooth.connect(device) }
-                        }
-                    }
-                }
-            }
-        }
-        .frame(height: Theme.Metrics.sliderHitHeight)
     }
 }
 

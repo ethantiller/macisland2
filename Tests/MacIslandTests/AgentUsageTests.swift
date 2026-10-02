@@ -114,9 +114,12 @@ struct AgentUsageDataTests {
 
     @Test func duplicatesAreCountedOnce() {
         var data = AgentUsageData()
-        #expect(data.add(record(at: now), cwd: nil, now: now, calendar: utc))
-        #expect(!data.add(record(at: now), cwd: nil, now: now, calendar: utc))
-        #expect(data.add(record(at: now, identity: "b"), cwd: nil, now: now, calendar: utc))
+        let first = data.add(record(at: now), cwd: nil, now: now, calendar: utc)
+        #expect(first)
+        let again = data.add(record(at: now), cwd: nil, now: now, calendar: utc)
+        #expect(!again)
+        let other = data.add(record(at: now, identity: "b"), cwd: nil, now: now, calendar: utc)
+        #expect(other)
         #expect(data.buckets.values.map(\.requests).reduce(0, +) == 2)
     }
 
@@ -135,14 +138,42 @@ struct AgentUsageDataTests {
         #expect(today?.tokens.input == 5 && today?.requests == 2)
     }
 
-    @Test func olderThan91DaysIsPruned() {
+    @Test func olderThanAYearIsPruned() {
         var data = AgentUsageData()
-        let old = now.addingTimeInterval(-100 * 86_400)
-        #expect(!data.add(record(at: old), cwd: nil, now: now, calendar: utc), "too old to count at all")
-        let recent = now.addingTimeInterval(-90 * 86_400)
-        #expect(data.add(record(at: recent, identity: "r"), cwd: nil, now: now, calendar: utc))
+        let old = now.addingTimeInterval(-400 * 86_400)
+        let tooOld = data.add(record(at: old), cwd: nil, now: now, calendar: utc)
+        #expect(!tooOld, "too old to count at all")
+        let recent = now.addingTimeInterval(-370 * 86_400)
+        let kept = data.add(record(at: recent, identity: "r"), cwd: nil, now: now, calendar: utc)
+        #expect(kept)
         data.prune(now: now.addingTimeInterval(5 * 86_400), calendar: utc)
         #expect(data.buckets.isEmpty && data.seen.isEmpty)
+    }
+
+    @Test func sessionsAndHoursFillAsRequestsCount() {
+        var data = AgentUsageData()
+        let noon = utc.date(bySettingHour: 12, minute: 0, second: 0, of: now)!
+        data.add(record(at: noon, identity: "1"), cwd: nil, session: "s1", now: now, calendar: utc)
+        data.add(record(at: noon.addingTimeInterval(1_800), identity: "2"), cwd: nil, session: "s1", now: now, calendar: utc)
+        data.add(record(at: noon.addingTimeInterval(1_800), identity: "2"), cwd: nil, session: "s1", now: now, calendar: utc)
+        let session = data.sessions["s1"]
+        #expect(session?.requests == 2 && session?.duration == 1_800 && session?.project == "proj")
+        let hours = data.hours["\(UsageDay.key(noon, calendar: utc))|Claude Code"]
+        #expect(hours?[12] == 2 && hours?.reduce(0, +) == 2)
+    }
+
+    @Test func aBackfilledRequestOnlyTouchesSessionsAndHours() {
+        var data = AgentUsageData()
+        data.addBackfill(record(at: now, identity: "x"), cwd: nil, session: "s", now: now, calendar: utc)
+        data.addBackfill(record(at: now, identity: "x"), cwd: nil, session: "s", now: now, calendar: utc)
+        #expect(data.buckets.isEmpty && data.seen.isEmpty)
+        #expect(data.sessions["s"]?.requests == 1, "a response counts once")
+        #expect(data.hours.values.flatMap { $0 }.reduce(0, +) == 1)
+    }
+
+    @Test func aSubagentsLogBelongsToItsParentSession() {
+        #expect(AgentUsageData.sessionKey(forPath: "/p/s1.jsonl") == "/p/s1.jsonl")
+        #expect(AgentUsageData.sessionKey(forPath: "/p/s1/subagents/agent-a.jsonl") == "/p/s1.jsonl")
     }
 
     @Test func projectsAreTheFolderWithoutTheWorktree() {
@@ -277,6 +308,33 @@ struct AgentUsageStoreTests {
         // Nothing of it is left in memory either: the folder is read afresh.
         let snapshot = await store.refresh(everything, now: now)
         #expect(tokens(snapshot) == 30)
+    }
+
+    @Test func aVersion1CacheMigratesWithoutCountingTwice() async throws {
+        let home = makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let noon = utc.date(bySettingHour: 12, minute: 0, second: 0, of: now)!
+        try write([claudeLine(at: noon, id: nil, request: nil), claudeLine(at: noon, id: nil, request: nil)], to: ".claude/projects/a/s1.jsonl", in: home)
+        _ = await store(home).refresh(everything, now: now)
+        // Make the cache what version 1 wrote: no sessions, no hours.
+        let cache = home.appendingPathComponent("cache/usage.json")
+        var object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: cache)) as? [String: Any])
+        object["version"] = 1
+        for key in ["sessions", "hours", "backfillSeen"] { object.removeValue(forKey: key) }
+        try JSONSerialization.data(withJSONObject: object).write(to: cache)
+
+        let migrated = store(home)
+        var snapshot = await migrated.refresh(everything, now: now)
+        #expect(tokens(snapshot) == 60, "the buckets are kept, and the backfill adds nothing to them")
+        #expect(snapshot.sessions.count == 1 && snapshot.sessions.first?.requests == 2)
+        #expect(snapshot.hours.values.flatMap { $0 }.reduce(0, +) == 2)
+        // A line written after the migration counts everywhere, once.
+        try write([claudeLine(at: noon, id: nil, request: nil)], to: ".claude/projects/a/s1.jsonl", in: home, append: true)
+        snapshot = await migrated.refresh(everything, now: now)
+        #expect(tokens(snapshot) == 90 && snapshot.sessions.first?.requests == 3)
+        // And a later launch reads only what is new.
+        snapshot = await store(home).refresh(everything, now: now)
+        #expect(tokens(snapshot) == 90 && snapshot.sessions.first?.requests == 3)
     }
 
     @Test func withoutTheFileItIsAnEstimate() async throws {
@@ -418,7 +476,7 @@ struct AgentLimitTests {
     }
 }
 
-struct AgentActivityMapTests {
+struct YearMapTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func bucket(daysAgo: Int, tokens: Int) -> UsageBucket {
@@ -430,7 +488,7 @@ struct AgentActivityMapTests {
 
     @Test func heatmapStepsAreQuartiles() {
         let buckets = (1...8).map { bucket(daysAgo: $0 * 2, tokens: $0) }
-        let map = ActivityMap.make(buckets: buckets, now: now, calendar: utc)
+        let map = YearMap.make(buckets: buckets, now: now, weeks: 13, calendar: utc)
         let levels = Dictionary(
             uniqueKeysWithValues: map.weeks.flatMap { $0 }.filter { $0.tokens > 0 }.map { ($0.tokens, $0.level) })
         #expect(levels[1] == 1 && levels[2] == 1)
@@ -442,7 +500,7 @@ struct AgentActivityMapTests {
     }
 
     @Test func theMapEndsWithTodayAndLeavesTheRestOfTheWeekEmpty() {
-        let map = ActivityMap.make(buckets: [bucket(daysAgo: 0, tokens: 5)], now: now, calendar: utc)
+        let map = YearMap.make(buckets: [bucket(daysAgo: 0, tokens: 5)], now: now, weeks: 13, calendar: utc)
         let cells = map.weeks.flatMap { $0 }
         let today = UsageDay.key(now, calendar: utc)
         let marked = cells.first { $0.date.map { UsageDay.key($0, calendar: utc) } == today }
@@ -453,12 +511,12 @@ struct AgentActivityMapTests {
 
     @Test func theStreakCountsDaysInARow() {
         let run = [0, 1, 2, 4].map { bucket(daysAgo: $0, tokens: 10) }
-        #expect(ActivityMap.make(buckets: run, now: now, calendar: utc).streak == 3)
+        #expect(YearMap.make(buckets: run, now: now, weeks: 13, calendar: utc).streak == 3)
         // Nothing yet today keeps yesterday's streak alive.
         let yesterday = [1, 2].map { bucket(daysAgo: $0, tokens: 10) }
-        #expect(ActivityMap.make(buckets: yesterday, now: now, calendar: utc).streak == 2)
-        #expect(ActivityMap.make(buckets: [bucket(daysAgo: 3, tokens: 10)], now: now, calendar: utc).streak == 0)
-        #expect(ActivityMap.make(buckets: [], now: now, calendar: utc).streak == 0)
+        #expect(YearMap.make(buckets: yesterday, now: now, weeks: 13, calendar: utc).streak == 2)
+        #expect(YearMap.make(buckets: [bucket(daysAgo: 3, tokens: 10)], now: now, weeks: 13, calendar: utc).streak == 0)
+        #expect(YearMap.make(buckets: [], now: now, weeks: 13, calendar: utc).streak == 0)
     }
 
     @Test func theRangesCoverTheirDays() {
@@ -559,5 +617,125 @@ struct AgentUsageModelTests {
         #expect(rest?.lines == ["bbbb", "cccc"])
         let none = AgentLogTail.read(url, from: 0, limit: 3)
         #expect(none?.lines == [] && none?.offset == 0, "no newline in the chunk: nothing yet")
+    }
+}
+
+struct AgentStatsTests {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private let pricing = price("claude-opus-4-5")
+
+    private func bucket(
+        daysAgo: Int, tokens: Int, agent: AgentKind = .claudeCode, model: String = "claude-opus-4-5-20251101"
+    ) -> UsageBucket {
+        let date = utc.date(byAdding: .day, value: -daysAgo, to: now)!
+        return UsageBucket(
+            day: UsageDay.key(date, calendar: utc), agent: agent, model: model, project: "p",
+            tokens: AgentTokens(input: tokens), requests: 1)
+    }
+
+    private func session(daysAgo: Int, hours: Double, agent: AgentKind = .claudeCode) -> AgentSession {
+        let last = utc.date(byAdding: .day, value: -daysAgo, to: now)!.timeIntervalSince1970
+        return AgentSession(agent: agent, first: last - hours * 3_600, last: last, requests: 3, project: "p")
+    }
+
+    private func make(
+        _ snapshot: AgentUsageSnapshot, agent: AgentKind? = nil, range: StatsRange = .all
+    ) -> AgentStats {
+        AgentStats.make(snapshot: snapshot, agent: agent, range: range, now: now, pricing: pricing, calendar: utc)
+    }
+
+    @Test func theFiguresAddUp() {
+        var snapshot = AgentUsageSnapshot()
+        snapshot.buckets = [
+            bucket(daysAgo: 0, tokens: 1_000_000), bucket(daysAgo: 1, tokens: 3_000_000),
+            bucket(daysAgo: 2, tokens: 2_000_000, model: "claude-sonnet-4-5-20250929"),
+            bucket(daysAgo: 10, tokens: 500_000, agent: .codex, model: "gpt-5-codex"),
+        ]
+        snapshot.sessions = [session(daysAgo: 0, hours: 2), session(daysAgo: 1, hours: 5), session(daysAgo: 10, hours: 1, agent: .codex)]
+        let stats = make(snapshot)
+        #expect(stats.tokens == 6_500_000 && stats.sessions == 3)
+        #expect(stats.favoriteModel == "Opus 4.5" && stats.longestSession == 5 * 3_600)
+        #expect(stats.activeDays == 4 && stats.rangeDays == 11, "since the first day with use")
+        #expect(stats.currentStreak == 3 && stats.longestStreak == 3)
+        #expect(stats.mostActiveDay?.tokens == 3_000_000)
+        #expect(stats.isLowerBound, "the sonnet and codex models have no price here")
+        #expect(stats.value > 0)
+    }
+
+    @Test func theRangeAndTheFilterNarrowEverything() {
+        var snapshot = AgentUsageSnapshot()
+        snapshot.buckets = [
+            bucket(daysAgo: 1, tokens: 100), bucket(daysAgo: 20, tokens: 1_000),
+            bucket(daysAgo: 3, tokens: 7, agent: .codex, model: "gpt-5-codex"),
+        ]
+        snapshot.sessions = [session(daysAgo: 1, hours: 1), session(daysAgo: 20, hours: 1), session(daysAgo: 3, hours: 1, agent: .codex)]
+        #expect(make(snapshot, range: .week).tokens == 107 && make(snapshot, range: .week).sessions == 2)
+        #expect(make(snapshot, range: .month).tokens == 1_107)
+        #expect(make(snapshot, agent: .codex).tokens == 7 && make(snapshot, agent: .codex).sessions == 1)
+        #expect(make(snapshot, range: .week).rangeDays == 7)
+    }
+
+    @Test func thePeakHourIsTheBusiestAndOnlyCountsTheRangeAndTheTool() {
+        var snapshot = AgentUsageSnapshot()
+        let today = UsageDay.key(now, calendar: utc)
+        let old = UsageDay.key(utc.date(byAdding: .day, value: -20, to: now)!, calendar: utc)
+        var morning = Array(repeating: 0, count: 24)
+        morning[9] = 5
+        morning[22] = 3
+        var night = Array(repeating: 0, count: 24)
+        night[22] = 4
+        snapshot.hours = ["\(today)|Claude Code": morning, "\(today)|Codex": night, "\(old)|Claude Code": night]
+        snapshot.buckets = [bucket(daysAgo: 0, tokens: 1)]
+        #expect(make(snapshot, range: .week).peakHour == 22, "9 PM-ish: 3 + 4 beats 5")
+        #expect(make(snapshot, agent: .claudeCode, range: .week).peakHour == 9)
+        #expect(make(snapshot, agent: .claudeCode, range: .all).peakHour == 22, "all time adds the old night")
+        #expect(AgentUsageFormat.hour(22) == "10 PM" && AgentUsageFormat.hour(0) == "12 AM" && AgentUsageFormat.hour(12) == "12 PM")
+    }
+
+    @Test func theFunFactFollowsItsRule() {
+        let night = AgentStats.nightOfSleep
+        #expect(AgentStats.funFact(longestSession: 13 * night, tokens: 0) == "Longest session \u{2248} 13 nights of sleep")
+        #expect(AgentStats.funFact(longestSession: 1.5 * night, tokens: 1) == nil)
+        #expect(AgentStats.funFact(longestSession: 2 * night, tokens: 99_000_000) != nil, "sleep first, at exactly two")
+        #expect(AgentStats.funFact(longestSession: night, tokens: 3 * AgentStats.warAndPeaceTokens) == "That is \u{2248} 3 \u{00D7} War and Peace")
+        #expect(AgentStats.funFact(longestSession: night, tokens: AgentStats.warAndPeaceTokens) == nil)
+    }
+
+    @Test func spansAndStreaksAreWorded() {
+        #expect(AgentUsageFormat.span(4 * 86_400 + 13 * 3_600) == "4d 13h")
+        #expect(AgentUsageFormat.span(3 * 3_600 + 20 * 60) == "3h 20m" && AgentUsageFormat.span(12 * 60) == "12m")
+        #expect(YearMap.longestStreak(of: [true, true, false, true, true, true, false]) == 3)
+        #expect(YearMap.streak(of: [true, false, true, true, false]) == 2, "today empty keeps yesterday's run")
+    }
+}
+
+struct YearMapFilterTests {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func bucket(daysAgo: Int, agent: AgentKind, tokens: Int) -> UsageBucket {
+        let date = utc.date(byAdding: .day, value: -daysAgo, to: now)!
+        return UsageBucket(
+            day: UsageDay.key(date, calendar: utc), agent: agent, model: "m", project: "p", tokens: AgentTokens(input: tokens),
+            requests: 1)
+    }
+
+    @Test func aYearIs53ColumnsOfSevenWithMonthNamesOverThem() {
+        let map = YearMap.make(buckets: [], now: now, calendar: utc)
+        #expect(map.weeks.count == 53 && map.weeks.allSatisfy { $0.count == 7 })
+        #expect(map.monthLabels.count >= 11 && map.monthLabels.count <= 13)
+        #expect(map.monthLabels.first?.column == 0)
+        let columns = map.monthLabels.map(\.column)
+        #expect(zip(columns, columns.dropFirst()).allSatisfy { $1 - $0 >= 3 }, "room for each name")
+        #expect(Set(map.monthLabels.map(\.title)).count == map.monthLabels.count - (map.monthLabels.count > 12 ? 1 : 0))
+    }
+
+    @Test func theFilterKeepsOneToolsDays() {
+        let buckets = [
+            bucket(daysAgo: 0, agent: .claudeCode, tokens: 10), bucket(daysAgo: 5, agent: .codex, tokens: 10),
+            bucket(daysAgo: 200, agent: .codex, tokens: 10),
+        ]
+        #expect(YearMap.make(buckets: buckets, now: now, agent: nil, calendar: utc).activeDays == 3)
+        #expect(YearMap.make(buckets: buckets, now: now, agent: .codex, calendar: utc).activeDays == 2)
+        #expect(YearMap.make(buckets: buckets, now: now, agent: .claudeCode, calendar: utc).streak == 1)
     }
 }

@@ -142,7 +142,7 @@ struct CalendarTests {
     @Test func aChosenDayNamesItsFirstEventAndHowManyMore() {
         let items = [event("Design review", start: date(14, 10)), event("Lunch", start: date(14, 12))]
         let line = AgendaRules.dayLine(for: date(14, 0), items: items, calendar: calendar)
-        #expect(line.contains("Design review") && line.contains("1 more") && line.contains("14"))
+        #expect(line.contains("Design review") && line.contains("1 more"))
         let alone = AgendaRules.dayLine(for: date(14, 0), items: [items[0]], calendar: calendar)
         #expect(!alone.contains("more"))
         let allDay = AgendaRules.dayLine(

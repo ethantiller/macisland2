@@ -54,7 +54,7 @@ final class MouseTracker {
             return
         }
         if event.type == .leftMouseDown {
-            dragStartedOnIsland = viewModel.hitRect.contains(NSEvent.mouseLocation)
+            dragStartedOnIsland = viewModel.isOverIsland(NSEvent.mouseLocation)
             if viewModel.closesOnClickOutside, !dragStartedOnIsland { viewModel.closePinned() }
             dragPasteboardCount = NSPasteboard(name: .drag).changeCount
             startDragPolling()
@@ -77,7 +77,7 @@ final class MouseTracker {
             isMomentum: !event.momentumPhase.isEmpty
         )
         let overDial = viewModel.timerDialRect?.contains(location) ?? false
-        switch scrolling.route(sample, overDial: overDial) {
+        switch scrolling.route(sample, overDial: overDial, scrollerAxis: viewModel.scrollAxis(at: location)) {
         case .scrubDial(let dx):
             viewModel.scrubDial(byFingerDX: dx)
             scheduleDialSettle()
@@ -132,7 +132,7 @@ final class MouseTracker {
         // even if the cursor wanders outside before the button is released.
         let location = NSEvent.mouseLocation
         let buttonDown = NSEvent.pressedMouseButtons & 1 != 0
-        let inside = (dragStartedOnIsland && buttonDown) || viewModel.hitRect.contains(location)
+        let inside = (dragStartedOnIsland && buttonDown) || viewModel.isOverIsland(location)
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }

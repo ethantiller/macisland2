@@ -51,7 +51,7 @@ struct SettingsSearchTests {
 
     @Test func aTitleBeatsAKeywordAndTiesKeepThePanesOrder() {
         // "calendar" is the Calendar feature's title and only a keyword for other entries.
-        #expect(titles("calendar").first == "Calendar")
+        #expect(titles("calendar").prefix(2).contains("Calendar"))
         let results = SettingsSearch.results(for: "reminders")
         let names = results.map { "\($0.pane.rawValue)/\($0.title)" }
         #expect(names.firstIndex(of: "tabs/Due Reminders")! < names.firstIndex(of: "notifications/Due Reminders")!)

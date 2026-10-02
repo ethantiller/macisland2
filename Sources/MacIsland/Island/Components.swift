@@ -255,15 +255,29 @@ struct ProgressRing: View {
 /// A symbol with a ring that draws once around it, starting from the top. Under Reduce Motion the ring is simply there. The
 /// charging bolt and the AirPods banner share it, so they arrive the same way.
 struct RingedGlyph: View {
-    let systemName: String
+    /// What is inside the ring: a symbol, or any glyph view (an agent's mark).
+    let content: AnyView
     /// The ring's color: a live meaning (green for good, red for low).
     let ringTint: Color
-    /// The symbol's color; the palette's primary ink when nil.
-    var glyphTint: Color?
     let size: CGFloat
     let label: String
 
     @State private var drawn = false
+
+    init(systemName: String, ringTint: Color, glyphTint: Color?, size: CGFloat, label: String) {
+        self.init(ringTint: ringTint, size: size, label: label) {
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.5, weight: .semibold))
+                .foregroundStyle(glyphTint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
+        }
+    }
+
+    init<Content: View>(ringTint: Color, size: CGFloat, label: String, @ViewBuilder content: () -> Content) {
+        self.content = AnyView(content())
+        self.ringTint = ringTint
+        self.size = size
+        self.label = label
+    }
 
     var body: some View {
         let animates = !Theme.Motion.reduceMotion
@@ -272,9 +286,7 @@ struct RingedGlyph: View {
                 .trim(from: 0, to: drawn || !animates ? 1 : 0)
                 .stroke(ringTint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Image(systemName: systemName)
-                .font(.system(size: size * 0.5, weight: .semibold))
-                .foregroundStyle(glyphTint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
+            content
         }
         .frame(width: size, height: size)
         .onAppear {

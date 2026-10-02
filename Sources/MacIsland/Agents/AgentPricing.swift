@@ -29,6 +29,26 @@ struct AgentTokens: Codable, Equatable {
     }
 
     static func += (lhs: inout AgentTokens, rhs: AgentTokens) { lhs = lhs + rhs }
+
+    /// What a request put in the model's context: everything it read, cached or not.
+    var contextUsed: Int { input + cacheRead + cacheWrite + cacheWrite1h }
+}
+
+extension AgentTokens {
+    /// What Claude Code's `message.usage` says: input, output, and the two caches (split into five-minute and one-hour writes when the
+    /// log says so).
+    init(claudeUsage usage: [String: Any]) {
+        func int(_ value: Any?) -> Int { (value as? NSNumber)?.intValue ?? 0 }
+        self.init(
+            input: int(usage["input_tokens"]), output: int(usage["output_tokens"]),
+            cacheRead: int(usage["cache_read_input_tokens"]))
+        if let split = usage["cache_creation"] as? [String: Any] {
+            cacheWrite = int(split["ephemeral_5m_input_tokens"])
+            cacheWrite1h = int(split["ephemeral_1h_input_tokens"])
+        } else {
+            cacheWrite = int(usage["cache_creation_input_tokens"])
+        }
+    }
 }
 
 /// What the agents' tokens would cost at API prices. The table is a bundled file (`Resources/agent-prices.json`), read at build time

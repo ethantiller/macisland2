@@ -30,11 +30,32 @@ final class AudioOutputs {
     private(set) var devices: [Device] = []
     private(set) var defaultDeviceID = AudioDeviceID(kAudioObjectUnknown)
 
+    var currentDevice: Device? {
+        Self.currentDevice(in: devices, defaultDeviceID: defaultDeviceID)
+    }
+
+    var otherDevices: [Device] {
+        Self.otherDevices(in: devices, defaultDeviceID: defaultDeviceID)
+    }
+
+    static func currentDevice(in devices: [Device], defaultDeviceID: AudioDeviceID) -> Device? {
+        devices.first { $0.id == defaultDeviceID }
+    }
+
+    static func otherDevices(in devices: [Device], defaultDeviceID: AudioDeviceID) -> [Device] {
+        devices.filter { $0.id != defaultDeviceID }
+    }
+
     @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?
     /// The devices or the default changed.
     @ObservationIgnored var onChange: (() -> Void)?
 
     private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
+
+    init(devices: [Device], defaultDeviceID: AudioDeviceID) {
+        self.devices = devices
+        self.defaultDeviceID = defaultDeviceID
+    }
 
     init() {
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in

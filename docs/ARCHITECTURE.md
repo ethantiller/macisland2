@@ -204,19 +204,20 @@ presentation and tab, and that driving it never writes the real Shelf.
 ### One panel
 
 `IslandPanel` is a borderless, non-activating `NSPanel` at level `mainMenu + 3`, on every Space and over full-screen apps.
-It is **always sized for the largest the island gets** (`ScreenGeometry.panelSize`, 560 x 276) and pinned to the top center
-of the screen. The SwiftUI content is top-aligned inside it, so the visible island is only as big as its `size`.
+Its island base view is `ScreenGeometry.panelSize` (560 x 276); the hosting `panelFrame` is 976 x 276 so the Media output
+satellites and their 200 pt hover pills fit on either side. The panel stays pinned to the top center of the screen. The SwiftUI
+content is top-aligned inside it, so the visible island is only as big as its `size`.
 
 ### Click-through
 
 Because the panel is bigger than the island, it would block clicks around it. So `ignoresMouseEvents` is **true except while
-the pointer is over the visible island**. `MouseTracker` flips it, from global and local `NSEvent` monitors (mouse moved,
-drags, clicks, scroll).
+the pointer is over the visible island or the output-satellite hit region**. `MouseTracker` flips it, from global and local
+`NSEvent` monitors (mouse moved, drags, clicks, scroll).
 
 `MouseTracker` also:
 
-- computes `inside` from the view model's `hitRect` (the island's screen-space rectangle), with one exception: a drag that
-  *started* on the island keeps it "inside" until released, so the scrubber keeps working if the pointer wanders;
+- computes `inside` from `isOverIsland(_:)`: the island's screen-space `hitRect` plus `outputSatellitesRect`, with one
+  exception: a drag that *started* on either region keeps it "inside" until released, so controls remain interactive;
 - detects **a file being dragged from another app** (the drag pasteboard's change count changed and holds a file URL), which
   makes the compact island grow into a bigger drop target. Other apps run their own drag loop, so it polls the cursor at 30 Hz
   from mouse-down until release;
@@ -224,10 +225,13 @@ drags, clicks, scroll).
   be clicked without opening the island;
 - routes scrolls with `ScrollRouting`. Two-finger swipes go through `SwipeRecognizer`: down opens, up closes, left and right
   change tabs, once per gesture; momentum after the fingers lift is ignored, and natural or traditional scrolling is honored.
-  While a timer is being set, a **horizontal** gesture that starts over the dial (`IslandViewModel.timerDialRect`) belongs to the
+-  While a timer is being set, a **horizontal** gesture that starts over the dial (`IslandViewModel.timerDialRect`) belongs to the
   dial for its whole life, momentum included (an `AxisLock` decides the axis in the first 4 pt), and a mouse wheel over it steps a
-  minute. Menu-bar and torn-off Clock windows install a `DialScrollCatcher` for the same calls;
-- closes a keyboard-pinned island on a click outside it.
+  minute. Overflowing SwiftUI scrollers publish their screen-space frame and axis through `ScrollAreaModifier`; when the locked
+  axis matches, `ScrollRouting` leaves that whole gesture, including momentum, to the scroller. A swipe on its other axis still
+  opens, closes, or changes tabs. Menu-bar and torn-off Clock windows install a `DialScrollCatcher` for the same calls;
+- closes a keyboard-pinned island on a click outside it. `DropTarget` is attached to `IslandContainer`, not the wider panel or
+  satellite overlay, so output controls neither accept drops nor shift the Shelf/AirDrop split coordinates.
 
 ### Screen geometry
 
@@ -442,9 +446,9 @@ The Agents module (`Agents/`, `IslandModule.agents`, feature `agents`, off by de
 
 **How it is read.** `AgentLogWatcher` (behind `AgentLogWatching`) is one FSEvents stream on the log folders: push, not a poll. A changed file is read from its last offset to its last newline off the main actor (`AgentLogTail`), and every file that exists when the stream starts begins at its end, so the watcher never reads history (the usage store below does). There is no repeating timer: while a turn is open, one task sleeps until the earliest turn would stop showing (ten minutes with no line; a later line shows it again). `FeatureRunner` starts the stream when AI Agents is on and tears it down, forgetting what it saw, when it is off.
 
-**On the island.** `CompactActivity.agent` ranks right after `working`: sparkles in `Tint.working` and the longest-running task's time (just the glyph in a pair); a click opens Agents. The peek is `AgentPeekView` (up to two tasks). `AgentsView` is the module, in three modes under a `SegmentedChoice` (`AgentsMode`, kept in the view model): **Now** (running tasks, or "Nothing is running.", and each agent's plan limits as `LevelBar`s), **Usage** and **Activity** (below). A task that ends normally after the minimum (30 s, 1, 2, or 5 min, default 1) and within five minutes of now flashes `Announcements.agentDone` ("Done 4:12", green) as the `agentDone` event, in its own group in Notifications while the feature is on.
+**On the island.** `CompactActivity.agent` ranks after music (`liveActivities`: working, transfer, music, agent): the marks (`AgentMarks`, vector `ClaudeMarkShape` and `CodexMarkShape` built with `Path.union` and `subtracting`) and the longest-running task's time (just the marks in a pair); a click opens Agents. `AgentLogEvent` also carries tokens, a message identity, the context used and its window, and the prompt; `AgentTask` keeps the title, this turn's tokens (a response written twice counts once, at its last size), and the latest context. The peek is `AgentPeekView`: one task in full or up to two rows, all `AgentTaskRow`. `AgentsView` is the module, in three modes under a `SegmentedChoice` (`AgentsMode`, kept in the view model): **Now** (running tasks, or "Nothing is running.", and each agent's plan limits as `LevelBar`s), **Usage** and **Stats** (below). A task that ends normally after the minimum (30 s, 1, 2, or 5 min, default 1) and within five minutes of now shows `Announcements.agentDone` (an alert `IslandBanner` with `agent` and a green `ringTint`, drawn by `RingedGlyph` around an `AgentMark`; `opensTab` takes the click to Agents) as the `agentDone` event, in its own group in Notifications while the feature is on.
 
-**Usage, limits, and the activity map (A2).** `AgentUsageStore` (an actor, so the first read of hundreds of megabytes is off the main actor; the model calls it at utility priority) reads every log changed in the last 91 days once, in 4 MB chunks (`AgentLogTail.read(limit:)`; a line longer than a chunk takes more, up to 64 MB), then only what was added, by offset. A file whose inode changed or that got shorter is read again from its start. A response is counted once: Claude lines by `message.id` plus `requestId`, Codex by `response_id` or, lacking it, its session and running total (a hash of the identity is kept with its day, so a response copied into another log, or a log read again, counts once; a line with no identity can't be told apart and counts each time). What is kept is per day, agent, model, and project (`UsageBucket`), plus when Claude Code requests were made in the last eight days and the newest Codex rate limits. The cache is `~/Library/Caches/com.ethantiller.MacIsland/Agents/usage.json` (file offsets and inodes, the buckets, the hashes): the next launch reads only what was added. It is deleted, and the history forgotten, when AI Agents is turned off (`AgentUsageModel.stop`, from `AgentActivity.reset`). `AgentUsageModel` (on `AgentActivity.usage`) holds the last `AgentUsageSnapshot` and asks for a fresh one when a view appears and three seconds after an agent's log changes (a debounce, not a timer); with Agents off it never touches the disk. The log folder walk repeats at most once a minute.
+**Usage, limits, and the activity map (A2).** `AgentUsageStore` (an actor, so the first read of hundreds of megabytes is off the main actor; the model calls it at utility priority) reads every log changed in the last 371 days once, in 4 MB chunks (`AgentLogTail.read(limit:)`; a line longer than a chunk takes more, up to 64 MB), then only what was added, by offset. A file whose inode changed or that got shorter is read again from its start. A response is counted once: Claude lines by `message.id` plus `requestId`, Codex by `response_id` or, lacking it, its session and running total (a hash of the identity is kept with its day, so a response copied into another log, or a log read again, counts once; a line with no identity can't be told apart and counts each time). What is kept is per day, agent, model, and project (`UsageBucket`), plus each session by its log's path (`AgentSession`: a Claude Code subagent's log belongs to its parent's), requests by hour by "day|agent", when Claude Code requests were made in the last eight days, and the newest Codex rate limits. **Cache version 2** (371 days) migrates a version 1 cache without counting twice: the buckets, hashes, and limits stay, and each log's offset is reset to 0 with its old offset kept as `backfillEnd`; the part before it is read again for sessions and hours only (`addBackfill`, with its own `backfillSeen` for Claude's identities), never for buckets, and from there on lines count everywhere. `YearMap` (53 columns) and `AgentStats` (pure; the figures, and a fun fact chosen by a fixed rule) are the Stats mode; `AgentStatsView` draws it. The cache is `~/Library/Caches/com.ethantiller.MacIsland/Agents/usage.json` (file offsets and inodes, the buckets, the hashes): the next launch reads only what was added. It is deleted, and the history forgotten, when AI Agents is turned off (`AgentUsageModel.stop`, from `AgentActivity.reset`). `AgentUsageModel` (on `AgentActivity.usage`) holds the last `AgentUsageSnapshot` and asks for a fresh one when a view appears and three seconds after an agent's log changes (a debounce, not a timer); with Agents off it never touches the disk. The log folder walk repeats at most once a minute.
 
 *Value* is the tokens times a bundled price table, `Resources/agent-prices.json` (US dollars per million tokens: input, output, cache read, cache write for five minutes, and for an hour). `AgentPricing` matches a model by the longest prefix of its name without `claude-` and a trailing date, at a dash (`opus-4-5` matches `claude-opus-4-5-20251101`). A model with no entry adds nothing and the total reads "at least"; the cache saving is cache-read tokens times (input − cache-read price). Nothing is downloaded. **To refresh it:** read Anthropic's pricing page (`platform.claude.com/docs/en/about-claude/pricing`; the columns are base input, 5-minute write, 1-hour write, cache hit, output), edit the file, and change `updated` (the module shows "Prices as of"). OpenAI's models are not in the table because the page wasn't reachable when it was written: add them (`input`, `output`, `cacheRead`, `cacheWrite` 0) and Codex's value appears.
 
@@ -636,19 +640,25 @@ change with nothing wired. A phase that is running, or paused, keeps `startedLen
 it); idle, the ring is the plan's length at once. The count of sessions is read at each decision, so a cycle under way is judged
 against the new number.
 
-### The volume HUD
+### The volume and brightness HUD
 
-`VolumeHUDController` (`System/VolumeHUD.swift`) owns an event tap only while Replace the Volume HUD is on (`applyVolumeHUD` in `AppDelegate`).
-`SystemMediaKeyTap` taps `NX_SYSDEFINED` (type 14) at the head of the session, reads the key from `data1` (sound up 0, down 1, mute 7; down when
-bits 8 to 15 are 0xA), and consumes the event only when the controller says so. `handle(_:)` consumes a press when the tap is active, Clean Keys
-is not locked (`isSuspended`), the island can show it (`canShow` → `IslandViewModel.canShowVolumeHUD`: folded, no banner, no alert that stays
-until seen), the default output can be set (`CoreAudioVolume.canSetVolume`), and the write succeeded; otherwise the key passes to the system and its
-HUD. `VolumeStep` is the math (16 steps, a quarter step with Option and Shift, mute toggles, a step unmutes). The HUD is an `IslandAlert` with a
-`volume` (`Announcements.volume`), drawn by `compactTrailing` as a `LevelBar` and the percent, with uneven sides (`volumeHUDLeading`, `volumeHUDTrailing`; `horizontalOffset` shifts the island and `hitRect`); `flash` times it
-out after `Timing.volumeHUD`, and `setHovering` holds it while the pointer is on it. The tap is turned back on after `tapDisabledByTimeout`; after
-`tapDisabledByUserInput` (what revoking Accessibility is expected to produce, unverified) the controller stops, the setting is turned off, and a banner
-says so. At launch and on becoming active it never asks for Accessibility; turning the setting on does, through `AccessCenter`, and leaves it off
-until granted. Not done: the feedback sound, a side-of-screen HUD, brightness. See [plans/volume-hud.md](plans/volume-hud.md).
+`LevelHUDController` (`System/LevelHUD.swift`) owns an event tap only while Replace the Volume and Brightness HUD is on (`applyVolumeHUD` in
+`AppDelegate`). `SystemMediaKeyTap` taps `NX_SYSDEFINED` (type 14) at the head of the session, reads the key from `data1` (`MediaKey`: sound up 0,
+down 1, brightness up 2, down 3, mute 7; down when bits 8 to 15 are 0xA), and consumes the event only when the controller says so. `handle(_:)`
+consumes a press when the tap is active, Clean Keys is not locked (`isSuspended`), the island can show it (`canShow` →
+`IslandViewModel.canShowLevelHUD`: no banner, no alert that stays until seen, no full-screen app; in **any** state), and the level can be set:
+for volume `CoreAudioVolume.canSetVolume`, for brightness `DisplayServicesBrightness.canSetBrightness`; and the write succeeded. Otherwise the key
+passes to the system and its HUD. `LevelStep.step` is the shared math (16 steps, a quarter step with Option and Shift); `VolumeStep` adds mute (a
+step unmutes). **Brightness uses a private API**, like MediaRemote: `DisplayServicesBrightness` `dlopen`s
+`/System/Library/PrivateFrameworks/DisplayServices.framework` and `dlsym`s `DisplayServicesGetBrightness`, `DisplayServicesSetBrightness`, and
+`DisplayServicesCanChangeBrightness` for the built-in display (`CGDisplayIsBuiltin`); a missing symbol or failed call means the key is the system's.
+That the brightness keys reach the tap as subtype-8 events 2 and 3 is **unverified on this Mac** (see ROADMAP). The HUD is `IslandViewModel.levels`
+(`LevelHUD`: a volume and a brightness, each with its own expiry task after `Timing.levelHUD`; `setHovering` holds both). Closed, it is
+`CompactActivity.levels` (it stands alone; `compactSideWidths` is 44/140 for one level and 140/140 for both, with `horizontalOffset` 0); open,
+`LevelBand` fades in over the tab strip in the notch-height band, and `peekActivity` (what a peek is about) leaves the levels out. The tap is turned
+back on after `tapDisabledByTimeout`; after `tapDisabledByUserInput` (what revoking Accessibility is expected to produce, unverified) the controller
+stops, the setting is turned off, and a banner says so. At launch and on becoming active it never asks for Accessibility; turning the setting on
+does, through `AccessCenter`, and leaves it off until granted. Not done: the feedback sound. See [plans/volume-hud.md](plans/volume-hud.md).
 
 ### Shortcut tools
 
@@ -702,6 +712,13 @@ reasons can't cancel each other. The keyboard pin (`isPinnedOpen`) is separate.
   A window another app or the system opens from the share menu (Mail's compose window) is not seen by any of this.
 
 ### Now Playing
+
+**The output satellites** (`OutputSatellites`, in `NowPlaying/OutputChoices.swift`) are Liquid Glass capsules (`glassEffect` with `Palette.satelliteTint`,
+`glassEffectID`, inside a `GlassEffectContainer`) in a column beside the island. Each button's width is `OutputPill.width(textWidth:)` (a circle, or
+its name's measured width up to 200 pt, measured by a hidden `Text`), so a pill is only as wide as its name. Which dots are out (`shownIDs`) and which are
+swollen (`expandedIDs`) live in `OutputSatellites`, staggered 0.035 s a dot; a dot that isn't out has `Glass.identity` and opacity 0, and the column is out of
+the tree once all are back (glass left in the tree still draws). An earlier version drew the island's black as a blurred, thresholded `Canvas` metaball;
+it made the island's edge bulge when a pill grew, and was dropped.
 
 Apple restricts MediaRemote to its own binaries since macOS 15.4, so the vendored `mediaremote-adapter` is compiled to a framework and
 loaded by `/usr/bin/perl`, which Apple *does* entitle. `MediaRemoteAdapter` runs its `stream` command and parses JSON lines (full

@@ -79,7 +79,7 @@ struct TabsPane: View {
             } header: {
                 Text("Notes").id(SettingsAnchor.options)
             }
-        case .agents: AgentsOptions(settings: settings)
+        case .agents: AgentsOptions(settings: settings, preview: preview)
         }
     }
 }
@@ -297,17 +297,45 @@ private struct MenuBarSection: View {
 /// gets a notice.
 struct AgentsOptions: View {
     let settings: AppSettings
+    let preview: IslandPreviewModel?
+
+    /// What the preview shows for one tool on its own: the view it is on when that shows the tool (Compact, Peek, Banner, or Expanded),
+    /// else Expanded, where Agents opens on Stats filtered to it.
+    static func previewContext(for agent: AgentKind, from current: PreviewContext) -> PreviewContext {
+        let keeps: [PreviewPresentation] = [.compact, .peek, .banner, .expanded]
+        let presentation = keeps.contains(current.presentation) ? current.presentation : .expanded
+        return PreviewContext(
+            presentation: presentation, tab: .agents, event: .agentDone, agent: agent, agentsMode: .stats,
+            lead: .activity("agent"))
+    }
 
     var body: some View {
         Section {
             FeatureOffNote(settings: settings, feature: .agents)
             ForEach(AgentKind.allCases) { agent in
-                Toggle(
-                    agent.rawValue,
-                    isOn: Binding(get: { settings.reads(agent) }, set: { settings.setReads(agent, $0) })
-                )
-                // At least one stays on.
-                .disabled(settings.reads(agent) && AgentKind.allCases.filter(settings.reads).count == 1)
+                HStack(spacing: 10) {
+                    // The name previews the tool on the island; the switch is for reading it.
+                    Button {
+                        guard let preview else { return }
+                        preview.show(Self.previewContext(for: agent, from: preview.context))
+                    } label: {
+                        HStack(spacing: 10) {
+                            AgentMark(agent: agent, size: 18)
+                            Text(agent.rawValue)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Previews \(agent.rawValue) on the island")
+                    Toggle(
+                        agent.rawValue,
+                        isOn: Binding(get: { settings.reads(agent) }, set: { settings.setReads(agent, $0) })
+                    )
+                    .labelsHidden()
+                    // At least one stays on.
+                    .disabled(settings.reads(agent) && AgentKind.allCases.filter(settings.reads).count == 1)
+                }
             }
             Toggle("Show a Working Agent Beside the Notch", isOn: Bindable(settings).showsAgentCompact)
             SettingsDropdown(
@@ -321,7 +349,7 @@ struct AgentsOptions: View {
             Text("AI Agents").id(SettingsAnchor.agents)
         } footer: {
             Text(
-                "Read from the logs Claude Code and Codex keep in your home folder, and from the Claude app\u{2019}s usage file when it has one. Nothing is sent."
+                "Click Claude Code or Codex to preview it. Read from the logs Claude Code and Codex keep in your home folder, and from the Claude app\u{2019}s usage file when it has one. Nothing is sent."
             )
         }
     }

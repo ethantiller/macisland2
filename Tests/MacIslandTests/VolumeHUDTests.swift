@@ -21,7 +21,7 @@ private final class StubVolume: SystemVolume {
 }
 
 @MainActor
-private final class StubTap: MediaKeyTapping {
+private final class StubKeyTap: MediaKeyTapping {
     var allowsStart = true
     private(set) var starts = 0
     private(set) var stops = 0
@@ -47,37 +47,58 @@ private final class StubTap: MediaKeyTapping {
     }
 
     /// A press, as the system would deliver it.
-    func press(_ key: VolumeKey, down: Bool = true, quarter: Bool = false) -> KeyDisposition? {
+    func press(_ key: MediaKey, down: Bool = true, quarter: Bool = false) -> KeyDisposition? {
         handler?(MediaKeyEvent(key: key, isDown: down, isRepeat: false, isQuarterStep: quarter))
     }
 
     func systemTurnsItOff() { onDisabled?() }
 }
 
+@MainActor
+private final class StubBrightness: DisplayBrightness {
+    var canSetBrightness = true
+    var level: Double? = 0.5
+    private(set) var writes: [Double] = []
+
+    func read() -> Double? { level }
+
+    func write(_ fraction: Double) -> Bool {
+        writes.append(fraction)
+        level = fraction
+        return true
+    }
+}
+
 struct VolumeMathTests {
+    @Test func theSharedStepMathIsOneSixteenthOrOneSixtyFourth() {
+        #expect(LevelStep.step(0.5, up: true, quarter: false) == 0.5625)
+        #expect(LevelStep.step(0.5, up: false, quarter: true) == 0.5 - 1.0 / 64)
+        #expect(LevelStep.step(1, up: true, quarter: false) == 1 && LevelStep.step(0, up: false, quarter: false) == 0)
+    }
+
     @Test func theVolumeHasSixteenStepsAndTheKeysMoveOneAtATime() {
         let half = VolumeLevel(fraction: 0.5, isMuted: false)
-        #expect(VolumeStep.apply(.up, to: half).fraction == 0.5625)
-        #expect(VolumeStep.apply(.down, to: half).fraction == 0.4375)
-        #expect(VolumeStep.apply(.up, to: VolumeLevel(fraction: 0, isMuted: false)).fraction == 1.0 / 16)
-        #expect(VolumeStep.apply(.up, to: VolumeLevel(fraction: 1, isMuted: false)).fraction == 1)
-        #expect(VolumeStep.apply(.down, to: VolumeLevel(fraction: 0, isMuted: false)).fraction == 0)
+        #expect(VolumeStep.apply(.volumeUp, to: half).fraction == 0.5625)
+        #expect(VolumeStep.apply(.volumeDown, to: half).fraction == 0.4375)
+        #expect(VolumeStep.apply(.volumeUp, to: VolumeLevel(fraction: 0, isMuted: false)).fraction == 1.0 / 16)
+        #expect(VolumeStep.apply(.volumeUp, to: VolumeLevel(fraction: 1, isMuted: false)).fraction == 1)
+        #expect(VolumeStep.apply(.volumeDown, to: VolumeLevel(fraction: 0, isMuted: false)).fraction == 0)
         // Sixteen presses from silence reach the top exactly.
         var level = VolumeLevel(fraction: 0, isMuted: false)
-        for _ in 0..<16 { level = VolumeStep.apply(.up, to: level) }
+        for _ in 0..<16 { level = VolumeStep.apply(.volumeUp, to: level) }
         #expect(level.fraction == 1)
     }
 
     @Test func aLevelSetBySomethingElseLandsOnTheGrid() {
         // 0.53 is nearest to step 8 (0.5), so up goes to step 9.
-        #expect(VolumeStep.apply(.up, to: VolumeLevel(fraction: 0.53, isMuted: false)).fraction == 0.5625)
-        #expect(VolumeStep.apply(.down, to: VolumeLevel(fraction: 0.53, isMuted: false)).fraction == 0.4375)
+        #expect(VolumeStep.apply(.volumeUp, to: VolumeLevel(fraction: 0.53, isMuted: false)).fraction == 0.5625)
+        #expect(VolumeStep.apply(.volumeDown, to: VolumeLevel(fraction: 0.53, isMuted: false)).fraction == 0.4375)
     }
 
     @Test func optionAndShiftMakeAQuarterStep() {
         let half = VolumeLevel(fraction: 0.5, isMuted: false)
-        #expect(VolumeStep.apply(.up, to: half, quarter: true).fraction == 0.5 + 1.0 / 64)
-        #expect(VolumeStep.apply(.down, to: half, quarter: true).fraction == 0.5 - 1.0 / 64)
+        #expect(VolumeStep.apply(.volumeUp, to: half, quarter: true).fraction == 0.5 + 1.0 / 64)
+        #expect(VolumeStep.apply(.volumeDown, to: half, quarter: true).fraction == 0.5 - 1.0 / 64)
     }
 
     @Test func muteTogglesAndKeepsTheLevelAndAStepUnmutes() {
@@ -85,7 +106,7 @@ struct VolumeMathTests {
         let muted = VolumeStep.apply(.mute, to: half)
         #expect(muted == VolumeLevel(fraction: 0.5, isMuted: true))
         #expect(VolumeStep.apply(.mute, to: muted) == half)
-        #expect(!VolumeStep.apply(.up, to: muted).isMuted && !VolumeStep.apply(.down, to: muted).isMuted)
+        #expect(!VolumeStep.apply(.volumeUp, to: muted).isMuted && !VolumeStep.apply(.volumeDown, to: muted).isMuted)
     }
 
     @Test func theSpeakerFollowsTheLevelAndIsSlashedWhenSilent() {
@@ -106,30 +127,33 @@ struct VolumeMathTests {
     }
 
     @Test func theKeyTypesAreTheSystemsOwn() {
-        #expect(VolumeKey(rawValue: 0) == .up && VolumeKey(rawValue: 1) == .down && VolumeKey(rawValue: 7) == .mute)
-        #expect(VolumeKey(rawValue: 2) == nil, "brightness and the rest are not this HUD's")
+        #expect(MediaKey(rawValue: 0) == .volumeUp && MediaKey(rawValue: 1) == .volumeDown && MediaKey(rawValue: 7) == .mute)
+        #expect(MediaKey(rawValue: 2) == .brightnessUp && MediaKey(rawValue: 3) == .brightnessDown)
+        #expect(MediaKey(rawValue: 4) == nil, "the other keys are not this HUD's")
     }
 }
 
 @MainActor
-struct VolumeHUDControllerTests {
+struct LevelHUDControllerTests {
     private struct Rig {
-        let controller: VolumeHUDController
-        let tap: StubTap
+        let controller: LevelHUDController
+        let tap: StubKeyTap
         let volume: StubVolume
+        let brightness: StubBrightness
         let shown: Box
     }
 
-    private final class Box { var levels: [VolumeLevel] = [] }
+    private final class Box { var levels: [LevelReading] = [] }
 
     private func makeRig(access: Bool = true) -> Rig {
-        let tap = StubTap()
+        let tap = StubKeyTap()
         let volume = StubVolume()
-        let controller = VolumeHUDController(tap: tap, volume: volume)
+        let brightness = StubBrightness()
+        let controller = LevelHUDController(tap: tap, volume: volume, brightness: brightness)
         controller.hasAccess = { access }
         let box = Box()
         controller.onShow = { box.levels.append($0) }
-        return Rig(controller: controller, tap: tap, volume: volume, shown: box)
+        return Rig(controller: controller, tap: tap, volume: volume, brightness: brightness, shown: box)
     }
 
     @Test func withoutAccessThereIsNoTap() {
@@ -157,9 +181,9 @@ struct VolumeHUDControllerTests {
     @Test func aKeyPressSetsTheVolumeShowsItAndIsTaken() {
         let rig = makeRig()
         rig.controller.start()
-        #expect(rig.tap.press(.up) == .consume)
+        #expect(rig.tap.press(.volumeUp) == .consume)
         #expect(rig.volume.writes == [VolumeLevel(fraction: 0.5625, isMuted: false)])
-        #expect(rig.shown.levels == rig.volume.writes)
+        #expect(rig.shown.levels == rig.volume.writes.map(LevelReading.volume))
         #expect(rig.tap.press(.mute) == .consume)
         #expect(rig.volume.level?.isMuted == true && rig.shown.levels.count == 2)
     }
@@ -167,14 +191,14 @@ struct VolumeHUDControllerTests {
     @Test func aKeyUpIsTakenTooButChangesNothing() {
         let rig = makeRig()
         rig.controller.start()
-        #expect(rig.tap.press(.up, down: false) == .consume)
+        #expect(rig.tap.press(.volumeUp, down: false) == .consume)
         #expect(rig.volume.writes.isEmpty && rig.shown.levels.isEmpty)
     }
 
     @Test func aQuarterStepIsPassedThrough() {
         let rig = makeRig()
         rig.controller.start()
-        _ = rig.tap.press(.up, quarter: true)
+        _ = rig.tap.press(.volumeUp, quarter: true)
         #expect(rig.volume.writes.first?.fraction == 0.5 + 1.0 / 64)
     }
 
@@ -182,33 +206,47 @@ struct VolumeHUDControllerTests {
         let rig = makeRig()
         rig.volume.canSetVolume = false
         rig.controller.start()
-        #expect(rig.tap.press(.up) == .passThrough)
+        #expect(rig.tap.press(.volumeUp) == .passThrough)
         #expect(rig.volume.writes.isEmpty && rig.shown.levels.isEmpty)
         rig.volume.canSetVolume = true
         rig.volume.level = nil
-        #expect(rig.tap.press(.up) == .passThrough, "a volume that can't be read is the system's too")
+        #expect(rig.tap.press(.volumeUp) == .passThrough, "a volume that can't be read is the system's too")
         rig.volume.level = VolumeLevel(fraction: 0.5, isMuted: false)
         rig.volume.accepts = false
-        #expect(rig.tap.press(.up) == .passThrough, "a write that failed is never swallowed")
+        #expect(rig.tap.press(.volumeUp) == .passThrough, "a write that failed is never swallowed")
     }
 
     @Test func itStepsAsideWhenTheIslandCantShowItOrCleanKeysHasTheKeys() {
         let rig = makeRig()
         rig.controller.start()
         rig.controller.canShow = { false }
-        #expect(rig.tap.press(.down) == .passThrough && rig.volume.writes.isEmpty)
+        #expect(rig.tap.press(.volumeDown) == .passThrough && rig.volume.writes.isEmpty)
         rig.controller.canShow = { true }
         rig.controller.isSuspended = { true }
-        #expect(rig.tap.press(.down) == .passThrough && rig.volume.writes.isEmpty)
+        #expect(rig.tap.press(.volumeDown) == .passThrough && rig.volume.writes.isEmpty)
         rig.controller.isSuspended = { false }
-        #expect(rig.tap.press(.down) == .consume)
+        #expect(rig.tap.press(.volumeDown) == .consume)
+    }
+
+    @Test func brightnessKeysAreTakenOnlyWhenTheDisplayCanBeSet() {
+        let rig = makeRig()
+        rig.controller.start()
+        #expect(rig.tap.press(.brightnessUp) == .consume)
+        #expect(rig.brightness.writes == [0.5625] && rig.shown.levels == [.brightness(0.5625)])
+        #expect(rig.tap.press(.brightnessDown, down: false) == .consume)
+        #expect(rig.brightness.writes.count == 1)
+        rig.brightness.canSetBrightness = false
+        #expect(rig.tap.press(.brightnessUp) == .passThrough, "an external display's keys are the system's")
+        rig.brightness.canSetBrightness = true
+        rig.brightness.level = nil
+        #expect(rig.tap.press(.brightnessUp) == .passThrough)
     }
 
     @Test func aStoppedControllerTakesNothing() {
         let rig = makeRig()
         rig.controller.start()
         rig.controller.stop()
-        #expect(rig.controller.handle(MediaKeyEvent(key: .up, isDown: true, isRepeat: false, isQuarterStep: false)) == .passThrough)
+        #expect(rig.controller.handle(MediaKeyEvent(key: .volumeUp, isDown: true, isRepeat: false, isQuarterStep: false)) == .passThrough)
     }
 
     @Test func whenTheSystemTurnsTheTapOffTheControllerStopsAndSaysSo() {
@@ -226,50 +264,91 @@ struct VolumeHUDControllerTests {
 
 @MainActor
 struct VolumeHUDIslandTests {
-    @Test func theAlertCarriesTheLevelAndIsRedOnlyWhenSilent() {
-        let level = VolumeLevel(fraction: 0.62, isMuted: false)
-        let alert = Announcements.volume(level)
-        #expect(alert.volume == level && alert.text == "62%" && alert.systemImage == "speaker.wave.2.fill")
-        #expect(alert.tint == Theme.Tint.neutral && !alert.tintsText && !alert.staysUntilSeen)
-        let muted = Announcements.volume(VolumeLevel(fraction: 0.62, isMuted: true))
-        #expect(muted.tint == Theme.Tint.attention && muted.tintsText && muted.text == "0%")
-        #expect(muted.systemImage == "speaker.slash.fill")
-    }
+    private let volume = VolumeLevel(fraction: 0.4, isMuted: false)
 
-    @Test func showingItFlashesAnAlertAndWidensTheIsland() {
+    @Test func showingVolumeWidensTheIslandAndKeepsTheNotchBetweenTheSides() {
         let viewModel = TestSupport.makeViewModel()
         viewModel.flash(IslandAlert(systemImage: "bell", tint: Theme.Tint.neutral, text: "Hi"), respectingFocus: false)
         let plain = viewModel.size.width
-        viewModel.showVolume(VolumeLevel(fraction: 0.4, isMuted: false))
-        #expect(viewModel.alert?.volume?.fraction == 0.4)
+        viewModel.clearAlert()
+        viewModel.showLevel(.volume(volume))
+        #expect(viewModel.levels.volume?.fraction == 0.4 && viewModel.levels.brightness == nil)
         #expect(viewModel.size.width == plain + Theme.Metrics.volumeHUDLeading + Theme.Metrics.volumeHUDTrailing - 2 * 64)
         #expect(viewModel.horizontalOffset == (Theme.Metrics.volumeHUDTrailing - Theme.Metrics.volumeHUDLeading) / 2)
     }
 
-    @Test func itNeverTakesTheStageFromSomethingThatNeedsYouOrWhileOpen() {
+    @Test func brightnessAloneUsesTheSameLayout() {
         let viewModel = TestSupport.makeViewModel()
-        #expect(viewModel.canShowVolumeHUD)
+        viewModel.showLevel(.brightness(0.8))
+        #expect(viewModel.levels.brightness == 0.8 && viewModel.levels.volume == nil)
+        #expect(viewModel.horizontalOffset == (Theme.Metrics.volumeHUDTrailing - Theme.Metrics.volumeHUDLeading) / 2)
+    }
+
+    @Test func bothAtOnceSplitAroundTheNotchWithEqualSides() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.showLevel(.volume(volume))
+        let single = viewModel.size.width
+        viewModel.showLevel(.brightness(0.8))
+        #expect(viewModel.levels.isBoth)
+        #expect(viewModel.horizontalOffset == 0)
+        #expect(viewModel.size.width == single - Theme.Metrics.volumeHUDLeading - Theme.Metrics.volumeHUDTrailing + 2 * Theme.Metrics.levelSideWidth)
+        #expect(viewModel.compactPair == nil, "the levels stand alone")
+    }
+
+    @Test func whenOneSideExpiresTheIslandReturnsToTheSingleLayout() async {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.showLevel(.volume(volume))
+        viewModel.showLevel(.brightness(0.8))
+        viewModel.setPreviewLevels(volume: volume, brightness: nil)
+        #expect(!viewModel.levels.isBoth)
+        #expect(viewModel.horizontalOffset == (Theme.Metrics.volumeHUDTrailing - Theme.Metrics.volumeHUDLeading) / 2)
+    }
+
+    @Test func itShowsOnAnOpenIslandWithoutChangingItsSize() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.open()
+        #expect(viewModel.canShowLevelHUD)
+        let before = viewModel.size
+        viewModel.showLevel(.volume(volume))
+        #expect(viewModel.levels.volume != nil)
+        #expect(viewModel.size == before)
+        viewModel.state = .peek
+        #expect(viewModel.canShowLevelHUD)
+    }
+
+    @Test func itNeverTakesTheStageFromSomethingThatNeedsYou() {
+        let viewModel = TestSupport.makeViewModel()
+        #expect(viewModel.canShowLevelHUD)
         viewModel.flash(
             IslandAlert(systemImage: "bell", tint: Theme.Tint.attention, text: "Done", staysUntilSeen: true),
             respectingFocus: false)
-        #expect(!viewModel.canShowVolumeHUD, "a needs-you alert is never queued behind or replaced")
-        let other = TestSupport.makeViewModel()
-        other.open()
-        #expect(!other.canShowVolumeHUD)
+        #expect(!viewModel.canShowLevelHUD, "a needs-you alert is never queued behind or replaced")
         let banner = TestSupport.makeViewModel()
         banner.showBanner(
             IslandBanner(systemImage: "bell", tint: Theme.Tint.neutral, title: "Hi"), respectingFocus: false)
-        #expect(!banner.canShowVolumeHUD)
+        #expect(!banner.canShowLevelHUD)
     }
 
     @Test func thePointerOnItHoldsItAndLeavingLetsItGo() async {
         let viewModel = TestSupport.makeViewModel()
-        viewModel.showVolume(VolumeLevel(fraction: 0.4, isMuted: false))
+        viewModel.showLevel(.volume(volume))
         viewModel.setHovering(true)
         try? await Task.sleep(for: .milliseconds(50))
-        #expect(viewModel.alert?.volume != nil)
+        #expect(viewModel.levels.volume != nil)
         viewModel.setHovering(false)
-        #expect(viewModel.alert?.volume != nil, "it leaves after its time, not at once")
+        #expect(viewModel.levels.volume != nil, "it leaves after its time, not at once")
+    }
+
+    @Test func aPeekIsStillAboutWhatIsLiveNotTheLevels() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.showLevel(.volume(volume))
+        viewModel.state = .peek
+        #expect(viewModel.peekActivity == .none)
+    }
+
+    @Test func theBrightnessSunFollowsTheLevel() {
+        #expect(LevelHUD.brightnessSymbol(0.2) == "sun.min.fill" && LevelHUD.brightnessSymbol(0.5) == "sun.max.fill")
+        #expect(LevelHUD.percent(of: 0.456) == 46)
     }
 }
 

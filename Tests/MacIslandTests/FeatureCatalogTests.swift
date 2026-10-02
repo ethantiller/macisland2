@@ -587,7 +587,8 @@ struct FeatureCatalogTests {
                 "\(feature)")
         }
         // Every feature is built now, so every one has its row.
-        #expect(Feature.allCases.allSatisfy(\.isBuilt))
+        let allBuilt = Feature.allCases.allSatisfy { $0.isBuilt }
+        #expect(allBuilt)
         // The two switches that moved are found where they now are.
         #expect(SettingsSearch.results(for: "replace volume").first?.pane == .features)
         #expect(SettingsSearch.results(for: "outlook").contains { $0.pane == .features && $0.title == "Calendar" })
@@ -646,7 +647,7 @@ struct FeatureCatalogTests {
         for feature in Feature.allCases where feature.isBuilt {
             #expect(feature.previewContext != nil, "\(feature)")
         }
-        #expect(Feature.volumeHUD.previewContext?.showsVolume == true)
+        #expect(Feature.volumeHUD.previewContext?.levels == [.volume, .brightness])
         #expect(Feature.calendar.previewContext?.event == .meeting)
         #expect(Feature.weather.previewContext?.presentation == .peek)
         #expect(Feature.shelf.previewContext?.fileDrag == true)
@@ -713,8 +714,8 @@ struct FeatureCatalogTests {
         ]
         for (title, module) in moved {
             let entry = SettingsSearch.entries.first { $0.pane == .tabs && $0.title == title }
-            #expect(entry?.module == module, title)
-            #expect(entry?.anchor?.hasPrefix("tabs.") == true, title)
+            #expect(entry?.module == module, Comment(rawValue: title))
+            #expect(entry?.anchor?.hasPrefix("tabs.") == true, Comment(rawValue: title))
         }
     }
 
@@ -726,7 +727,7 @@ struct FeatureCatalogTests {
         #expect(SettingsSearch.results(for: "launch at login").first?.module == nil)
         // Every anchor is still a place in its pane, and the moved ones are not left under the old panes.
         for entry in SettingsSearch.entries {
-            #expect(entry.anchor.map { $0.hasPrefix(entry.pane.rawValue + ".") } ?? true, entry.title)
+            #expect(entry.anchor.map { $0.hasPrefix(entry.pane.rawValue + ".") } ?? true, Comment(rawValue: entry.title))
         }
         #expect(SettingsAnchor.music == "tabs.media" && SettingsAnchor.toolsRow == "tabs.row")
     }

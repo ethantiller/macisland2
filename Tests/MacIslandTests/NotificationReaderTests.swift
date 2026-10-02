@@ -309,7 +309,7 @@ struct NotificationReaderTests {
         await reader.scan()
         let banner = FixtureNode.banner(app: "Messages", title: "Maya")
         mac.show(banner)
-        let notification = banner.notification()
+        let notification = BannerScanner.scan(FixtureNode.center([banner])).banners[0].notification()
 
         #expect(await reader.open(notification), "the banner is still there")
         #expect(banner.performed == [NotificationRoles.press])

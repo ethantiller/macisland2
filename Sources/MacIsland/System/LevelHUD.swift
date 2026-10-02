@@ -3,17 +3,52 @@ import AudioToolbox
 import CoreAudio
 import Observation
 
-// A volume HUD of MacIsland's own, in place of the system's. The system draws its HUD for the volume keys itself, so the only way
-// to replace it is to take the keys first: an event tap (Accessibility) consumes the media key, sets the volume through CoreAudio, and
-// the island shows its own alert. See docs/plans/volume-hud.md.
+// A volume and brightness HUD of MacIsland's own, in place of the system's. The system draws its HUD for these keys itself, so the only
+// way to replace it is to take the keys first: an event tap (Accessibility) consumes the media key, sets the volume through CoreAudio or
+// the brightness through DisplayServices, and the island shows its own indicator. See docs/plans/volume-hud.md.
 
 // MARK: The keys and the math
 
 /// The media keys this handles. The values are `NX_KEYTYPE_*`.
-enum VolumeKey: Int, Equatable {
-    case up = 0
-    case down = 1
+enum MediaKey: Int, Equatable {
+    case volumeUp = 0
+    case volumeDown = 1
+    case brightnessUp = 2
+    case brightnessDown = 3
     case mute = 7
+}
+
+/// What the HUD is asked to show: a volume (with its mute) or a brightness fraction.
+enum LevelReading: Equatable {
+    case volume(VolumeLevel)
+    case brightness(Double)
+}
+
+enum LevelKind: Hashable {
+    case volume, brightness
+}
+
+extension LevelReading {
+    var kind: LevelKind {
+        switch self {
+        case .volume: .volume
+        case .brightness: .brightness
+        }
+    }
+}
+
+/// The step math both levels share.
+enum LevelStep {
+    /// The system's levels have 16 steps, and Option and Shift together make a quarter of one.
+    static let steps = 16.0
+    static let quarterSteps = 64.0
+
+    /// The next step from `fraction`: from the nearest one, so a level set by a slider lands on the grid.
+    static func step(_ fraction: Double, up: Bool, quarter: Bool) -> Double {
+        let size = 1 / (quarter ? quarterSteps : steps)
+        let nearest = (fraction / size).rounded() * size
+        return up ? min(nearest + size, 1) : max(nearest - size, 0)
+    }
 }
 
 /// What the volume is: a level from 0 to 1, and whether it is muted.
@@ -40,26 +75,23 @@ struct VolumeLevel: Equatable {
 }
 
 enum VolumeStep {
-    /// The system's volume has 16 steps, and Option and Shift together make a quarter of one.
-    static let steps = 16.0
-    static let quarterSteps = 64.0
+    static let steps = LevelStep.steps
+    static let quarterSteps = LevelStep.quarterSteps
 
-    /// What a key does to `current`: up and down move to the next step (from the nearest one, so a level set by a slider lands on the
-    /// grid), either also unmutes, and mute toggles.
-    static func apply(_ key: VolumeKey, to current: VolumeLevel, quarter: Bool = false) -> VolumeLevel {
-        let size = 1 / (quarter ? quarterSteps : steps)
-        let nearest = (current.fraction / size).rounded() * size
+    /// What a key does to `current`: up and down move to the next step, either also unmutes, and mute toggles.
+    static func apply(_ key: MediaKey, to current: VolumeLevel, quarter: Bool = false) -> VolumeLevel {
         switch key {
-        case .up: return VolumeLevel(fraction: min(nearest + size, 1), isMuted: false)
-        case .down: return VolumeLevel(fraction: max(nearest - size, 0), isMuted: false)
-        case .mute: return VolumeLevel(fraction: current.fraction, isMuted: !current.isMuted)
+        case .volumeUp: VolumeLevel(fraction: LevelStep.step(current.fraction, up: true, quarter: quarter), isMuted: false)
+        case .volumeDown: VolumeLevel(fraction: LevelStep.step(current.fraction, up: false, quarter: quarter), isMuted: false)
+        case .mute: VolumeLevel(fraction: current.fraction, isMuted: !current.isMuted)
+        case .brightnessUp, .brightnessDown: current
         }
     }
 }
 
 /// One media key press, as the tap reads it.
 struct MediaKeyEvent: Equatable {
-    let key: VolumeKey
+    let key: MediaKey
     let isDown: Bool
     let isRepeat: Bool
     /// Option and Shift held together: a quarter step.
@@ -185,6 +217,67 @@ final class CoreAudioVolume: SystemVolume {
     }
 }
 
+// MARK: The brightness
+
+/// The built-in display's brightness.
+@MainActor
+protocol DisplayBrightness: AnyObject {
+    /// Whether the built-in display can be set at all. An external display cannot; the system handles those keys itself.
+    var canSetBrightness: Bool { get }
+    func read() -> Double?
+    func write(_ fraction: Double) -> Bool
+}
+
+/// DisplayServices, a private framework (see ARCHITECTURE, next to MediaRemote): loaded when first asked, and any missing symbol or failed
+/// call means the keys are left to the system.
+@MainActor
+final class DisplayServicesBrightness: DisplayBrightness {
+    private typealias GetBrightness = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private typealias SetBrightness = @convention(c) (CGDirectDisplayID, Float) -> Int32
+    private typealias CanChange = @convention(c) (CGDirectDisplayID) -> Bool
+
+    private struct Symbols {
+        let get: GetBrightness
+        let set: SetBrightness
+        let canChange: CanChange
+    }
+
+    private lazy var symbols: Symbols? = {
+        guard
+            let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY),
+            let get = dlsym(handle, "DisplayServicesGetBrightness"),
+            let set = dlsym(handle, "DisplayServicesSetBrightness"),
+            let can = dlsym(handle, "DisplayServicesCanChangeBrightness")
+        else { return nil }
+        return Symbols(
+            get: unsafeBitCast(get, to: GetBrightness.self), set: unsafeBitCast(set, to: SetBrightness.self),
+            canChange: unsafeBitCast(can, to: CanChange.self))
+    }()
+
+    private var display: CGDirectDisplayID? {
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(UInt32(ids.count), &ids, &count) == .success else { return nil }
+        return ids.prefix(Int(count)).first { CGDisplayIsBuiltin($0) != 0 }
+    }
+
+    var canSetBrightness: Bool {
+        guard let symbols, let display else { return false }
+        return symbols.canChange(display)
+    }
+
+    func read() -> Double? {
+        guard let symbols, let display else { return nil }
+        var value: Float = 0
+        return symbols.get(display, &value) == 0 ? Double(value) : nil
+    }
+
+    func write(_ fraction: Double) -> Bool {
+        guard let symbols, let display else { return false }
+        return symbols.set(display, Float(min(max(fraction, 0), 1))) == 0
+    }
+}
+
 // MARK: The tap
 
 /// Something that hears the volume keys and decides, for each press, whether it is consumed.
@@ -273,7 +366,7 @@ final class SystemMediaKeyTap: MediaKeyTapping {
             return nil
         }
         let data = system.data1
-        guard let key = VolumeKey(rawValue: (data & 0xFFFF_0000) >> 16) else { return nil }
+        guard let key = MediaKey(rawValue: (data & 0xFFFF_0000) >> 16) else { return nil }
         let flags = data & 0x0000_FFFF
         let quarter = event.flags.contains(.maskAlternate) && event.flags.contains(.maskShift)
         return MediaKeyEvent(
@@ -283,11 +376,11 @@ final class SystemMediaKeyTap: MediaKeyTapping {
 
 // MARK: The controller
 
-/// Takes the volume keys while it is on, sets the volume, and says what to show. It exists only while the setting is on, and holds an event tap
+/// Takes the volume and brightness keys while it is on, sets the level, and says what to show. It exists only while the setting is on, and holds an event tap
 /// only then: no timers, nothing polls.
 @MainActor
 @Observable
-final class VolumeHUDController {
+final class LevelHUDController {
     enum Outcome: Equatable {
         case started
         /// Accessibility isn't allowed, so there is no tap to make.
@@ -297,8 +390,8 @@ final class VolumeHUDController {
 
     private(set) var isActive = false
 
-    /// The volume changed and the HUD should show it.
-    @ObservationIgnored var onShow: ((VolumeLevel) -> Void)?
+    /// A level changed and the HUD should show it.
+    @ObservationIgnored var onShow: ((LevelReading) -> Void)?
     /// The system turned the tap off (the permission was taken away): the controller has stopped.
     @ObservationIgnored var onLostAccess: (() -> Void)?
     /// Whether the island can show the HUD now. When it can't (it is open, or an alert that needs the person is up), the key goes to the
@@ -310,10 +403,12 @@ final class VolumeHUDController {
 
     @ObservationIgnored private let tap: MediaKeyTapping
     @ObservationIgnored private let volume: SystemVolume
+    @ObservationIgnored private let brightness: DisplayBrightness
 
-    init(tap: MediaKeyTapping? = nil, volume: SystemVolume? = nil) {
+    init(tap: MediaKeyTapping? = nil, volume: SystemVolume? = nil, brightness: DisplayBrightness? = nil) {
         self.tap = tap ?? SystemMediaKeyTap()
         self.volume = volume ?? CoreAudioVolume()
+        self.brightness = brightness ?? DisplayServicesBrightness()
     }
 
     /// Makes the tap. Safe to call again.
@@ -342,14 +437,23 @@ final class VolumeHUDController {
 
     /// One key press. A key this does not take is left for the system, including every key while the device can't be set.
     func handle(_ event: MediaKeyEvent) -> KeyDisposition {
-        guard isActive, !isSuspended(), canShow(), volume.canSetVolume, let current = volume.read() else {
-            return .passThrough
+        guard isActive, !isSuspended(), canShow() else { return .passThrough }
+        switch event.key {
+        case .volumeUp, .volumeDown, .mute:
+            guard volume.canSetVolume, let current = volume.read() else { return .passThrough }
+            // A key up follows a key down that was taken: take it too, so nothing else sees half a press.
+            guard event.isDown else { return .consume }
+            let next = VolumeStep.apply(event.key, to: current, quarter: event.isQuarterStep)
+            guard volume.write(next) else { return .passThrough }
+            onShow?(.volume(next))
+            return .consume
+        case .brightnessUp, .brightnessDown:
+            guard brightness.canSetBrightness, let current = brightness.read() else { return .passThrough }
+            guard event.isDown else { return .consume }
+            let next = LevelStep.step(current, up: event.key == .brightnessUp, quarter: event.isQuarterStep)
+            guard brightness.write(next) else { return .passThrough }
+            onShow?(.brightness(next))
+            return .consume
         }
-        // A key up follows a key down that was taken: take it too, so nothing else sees half a press.
-        guard event.isDown else { return .consume }
-        let next = VolumeStep.apply(event.key, to: current, quarter: event.isQuarterStep)
-        guard volume.write(next) else { return .passThrough }
-        onShow?(next)
-        return .consume
     }
 }

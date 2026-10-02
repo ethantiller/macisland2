@@ -214,6 +214,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `IslandContainer.swift` | `IslandPresentation`, `IslandSurface`, and the container that draws the outline, surface, size, and swell |
 | `NotchShape.swift` | The island outline (flat top, concave flares, continuous bottom corners) |
 | `PeekContent.swift` | What each peek shows, and the idle peek |
+| `LevelHUDViews.swift` | The volume and brightness readouts and `LevelBand`, the open island's band beside the notch |
 | `ActivityChoice.swift` | Choose the Activity: each activity's name and identity, the choice, and the peek's row of chips |
 | `ModuleContent.swift` | The one module-to-view switch used everywhere |
 | `Theme.swift` | All design tokens: `Palette`, `SurfaceInk`, `Tint` (with `Tint.airDrop` for the AirDrop target), `Typography`, `Metrics`, `Timing`, `Motion`, `BlurFade`, the `\.islandSurface` key |
@@ -248,9 +249,12 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `AgentUsageStore.swift` | The usage line parser, the buckets and their cache (`AgentUsageData`), and the `AgentUsageStore` actor that reads the history |
 | `AgentPricing.swift` | `AgentTokens`, `AgentPrice`, and the price lookup over the bundled table |
 | `AgentLimits.swift` | `AgentLimit`, the Claude app's file and the reset rules, the estimated block, and Codex's windows |
-| `AgentUsageSummary.swift` | Pure: the ranges, the ranked models and projects, and the activity map with its streak |
+| `AgentUsageSummary.swift` | Pure: the Usage ranges and the ranked models and projects |
+| `AgentStats.swift` | Pure: `StatsRange`, `YearMap` (53 weeks, quartile steps, months, streaks), and `AgentStats` (the Stats figures and the fun fact) |
+| `AgentStatsView.swift` | The Stats mode: the year map, the range, the eight tiles, and the Claude/Codex filter |
+| `AgentMark.swift` | `AgentMark`, `AgentMarks`, and the vector shapes of Claude Code's critter and Codex's cloud |
 | `AgentUsageModel.swift` | The main-actor model that asks the store for a snapshot (on appearance, and after a log changes) |
-| `AgentUsageViews.swift` | `AgentsMode`, the number formats, the limit row, the Usage and Activity modes |
+| `AgentUsageViews.swift` | `AgentsMode`, the number formats, the limit row, and the Usage mode |
 
 ### `Home/`
 
@@ -273,6 +277,8 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `NowPlayingModel.swift` | State, artwork, accent color, transport (direct to Music/Spotify, else the adapter), shuffle, repeat, Favorite, app volume |
 | `NowPlayingState.swift` | The state struct, `RepeatMode`, and the parser for the adapter's JSON lines |
 | `MediaRemoteAdapter.swift` | Runs the perl adapter: the `stream` process (restarted if it exits) and one-shot commands |
+| `OutputChoices.swift` | The current-output chip, the output list, and the Liquid Glass satellites beside the island |
+| `OutputPill.swift` | How wide a satellite is for its name, and the column's measurements |
 | `MixerPanel.swift` | The Mixer's panel in the Media tab: the output chips, a row per app (slider, percent, output menu), and the permission lines |
 | `NowPlayingView.swift` | The player layout, scrubber, volume, output picker, lyric line, the compact play control, and the shared `mediaNamespace` |
 | `EqualizerView.swift` | The sound bars: a Core Animation loop (`EqualizerBarsView`), a still SwiftUI stand-in for snapshots, and `\.isSnapshot` |
@@ -356,7 +362,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | --- | --- |
 | `System/BatteryMonitor.swift` | Charger, 20% and 10%, and the full-charge level; the battery glyph |
 | `System/VolumeMonitor.swift` | External drive mounts, and eject |
-| `System/VolumeHUD.swift` | The volume HUD: the keys' math, CoreAudio volume, the media-key event tap, and the controller |
+| `System/LevelHUD.swift` | The volume and brightness HUD: the keys' math, CoreAudio volume, DisplayServices brightness, the media-key event tap, and the controller |
 | `System/AudioAccessoryMonitor.swift` | Bluetooth headphones connecting, and their battery |
 | `System/PrivacyMonitor.swift` | Which app is using the microphone, from CoreAudio property listeners (no polling) |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
@@ -455,7 +461,8 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardTests.swift` | Plain-text copy, Save as Snippet |
 | `AmbientTests.swift` | Rain rules and forecast, disk space rules, the Bluetooth device list |
 | `CaptureTests.swift` | The Mirror, two-action banners, screen and voice recording, the recording activity, the new tools |
-| `VolumeHUDTests.swift` | The volume keys' math and speaker, the controller over a stub tap and volume, the island alert, and the setting |
+| `VolumeHUDTests.swift` | The keys' math and symbols, the controller over a stub tap, volume, and brightness, the island's levels (alone, both, open), and the setting |
+| `PreviewAuditTests.swift` | Every Features row in every view it lists shows its feature; rows keep the view; Claude-only and Codex-only previews |
 | `KeepAwakeTests.swift` | Keep Awake's two assertions over a stub, the wake check, and the honest label |
 | `ShortcutToolTests.swift` | Shortcut tools: identity, storage and the cap, the pinned row, the archive, dimming, running and failing with a stub runner |
 | `PermissionStepTests.swift` | The permission steps (the footer per state, required permissions, Done blocked, Still needed, the order, the copy), Downloads and Automation read for real, and the Shelf not looking in protected folders at launch |

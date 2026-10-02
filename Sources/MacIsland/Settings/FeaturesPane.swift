@@ -161,6 +161,6 @@ struct FeaturesPane: View {
     }
 
     private func show(_ feature: Feature) {
-        if let context = feature.previewContext { preview?.show(context) }
+        if let preview, let context = feature.previewContext(from: preview.context) { preview.show(context) }
     }
 }

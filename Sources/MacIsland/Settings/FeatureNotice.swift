@@ -60,26 +60,55 @@ extension AppSettings {
 }
 
 extension Feature {
-    /// Where the feature lands on the island, for the preview while its row is chosen. Nil for one with nothing to show yet.
-    var previewContext: PreviewContext? {
+    /// Where the feature lands on the island, for the preview while its row is chosen: the first of its views. Nil for one with
+    /// nothing to show yet.
+    var previewContext: PreviewContext? { previewContexts.first }
+
+    /// Every view the feature can be seen in, the default first. A row keeps the view the preview is on when it is listed.
+    var previewContexts: [PreviewContext] {
         switch self {
-        case .music: PreviewContext(presentation: .expanded, tab: .media)
-        case .clock: PreviewContext(presentation: .expanded, tab: .clock)
-        case .reminders: PreviewContext(presentation: .expanded, tab: .reminders)
-        case .tools: PreviewContext(presentation: .expanded, tab: .tools)
-        case .notes: PreviewContext(presentation: .expanded, tab: .notes)
-        case .shelf: PreviewContext(presentation: .compact, tab: .shelf, fileDrag: true)
-        case .clipboard: PreviewContext(presentation: .expanded, tab: .shelf)
-        case .calendar: PreviewContext(presentation: .banner, event: .meeting)
-        case .weather: PreviewContext(presentation: .peek)
-        case .volumeHUD: PreviewContext(presentation: .banner, showsVolume: true)
-        case .system: PreviewContext(presentation: .expanded, tab: .home)
-        case .agents: PreviewContext(presentation: .expanded, tab: .agents)
-        case .mixer: PreviewContext(presentation: .expanded, tab: .media, showsMixer: true)
-        case .chooseActivity: PreviewContext(presentation: .peek, twoActivities: true)
-        case .downloads: PreviewContext(presentation: .expanded, tab: .shelf, shelfMode: .downloads)
-        case .notifications: PreviewContext(presentation: .banner, event: .notification)
+        case .music:
+            [
+                PreviewContext(presentation: .expanded, tab: .media),
+                PreviewContext(presentation: .peek, lead: .activity("media")),
+                PreviewContext(presentation: .compact, lead: .activity("media")),
+            ]
+        case .clock: [PreviewContext(presentation: .expanded, tab: .clock)]
+        case .reminders: [PreviewContext(presentation: .expanded, tab: .reminders)]
+        case .tools: [PreviewContext(presentation: .expanded, tab: .tools)]
+        case .notes: [PreviewContext(presentation: .expanded, tab: .notes)]
+        case .shelf: [PreviewContext(presentation: .compact, tab: .shelf, fileDrag: true)]
+        case .clipboard: [PreviewContext(presentation: .expanded, tab: .shelf, shelfMode: .clipboard)]
+        case .calendar:
+            [PreviewContext(presentation: .banner, event: .meeting), PreviewContext(presentation: .expanded, tab: .home)]
+        case .weather:
+            [PreviewContext(presentation: .peek, lead: .idle), PreviewContext(presentation: .expanded, tab: .home)]
+        case .volumeHUD:
+            [
+                PreviewContext(presentation: .compact, levels: [.volume, .brightness]),
+                PreviewContext(presentation: .expanded, tab: .home, levels: [.volume, .brightness]),
+                PreviewContext(presentation: .peek, levels: [.volume, .brightness], lead: .idle),
+            ]
+        case .system: [PreviewContext(presentation: .expanded, tab: .home, homeLayout: .showingSystem)]
+        case .agents:
+            [
+                PreviewContext(presentation: .expanded, tab: .agents),
+                PreviewContext(presentation: .peek, lead: .activity("agent")),
+                PreviewContext(presentation: .compact, lead: .activity("agent")),
+                PreviewContext(presentation: .banner, event: .agentDone),
+            ]
+        case .mixer: [PreviewContext(presentation: .expanded, tab: .media, showsMixer: true)]
+        case .chooseActivity: [PreviewContext(presentation: .peek, twoActivities: true)]
+        case .downloads: [PreviewContext(presentation: .expanded, tab: .shelf, shelfMode: .downloads)]
+        case .notifications: [PreviewContext(presentation: .banner, event: .notification)]
         }
+    }
+
+    /// The context for choosing this feature's row while the preview is on `current`: the same presentation when the feature is
+    /// shown there, otherwise its default.
+    func previewContext(from current: PreviewContext) -> PreviewContext? {
+        let all = previewContexts
+        return all.first { $0.presentation == current.presentation } ?? all.first
     }
 
     /// Other words for it, for search.
@@ -95,7 +124,7 @@ extension Feature {
         case .agents: ["claude code", "codex", "ai", "tokens", "usage"]
         case .calendar: ["up next", "meetings", "events", "outlook", "google", "exchange", "banner"]
         case .weather: ["forecast", "temperature", "rain", "city"]
-        case .volumeHUD: ["replace", "volume", "sound", "keys", "hud", "speaker", "mute", "accessibility"]
+        case .volumeHUD: ["replace", "volume", "brightness", "display", "screen", "sound", "keys", "hud", "speaker", "mute", "accessibility"]
         case .mixer: ["volume", "per app", "boost", "sound", "output", "audio"]
         case .system: ["cpu", "memory", "battery", "temperature", "thermal"]
         case .downloads: ["shelf", "files", "arriving", "browser"]

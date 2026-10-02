@@ -63,9 +63,9 @@ struct IslandContainer<Content: View>: View {
 }
 
 /// Black against the hardware notch; Liquid Glass only where there is no notch to match.
-private struct IslandSurfaceStyle: ViewModifier {
+struct IslandSurfaceStyle<S: Shape>: ViewModifier {
     let surface: IslandSurface
-    let shape: NotchShape
+    let shape: S
 
     func body(content: Content) -> some View {
         switch surface {

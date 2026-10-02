@@ -36,6 +36,15 @@ struct AgentLogEvent: Equatable {
     var cwd: String?
     var model: String?
     var date: Date?
+    /// What the request cost, when the line is one (Claude's `message.usage`, Codex's `last_token_usage`).
+    var tokens: AgentTokens?
+    /// What makes two lines the same streamed response: a response is written more than once, and counts once.
+    var messageID: String?
+    /// How much of the model's context the request filled, and how much there is.
+    var contextTokens: Int?
+    var contextWindow: Int?
+    /// What the person asked, on one line: the task's title.
+    var prompt: String?
 }
 
 enum AgentLogParser {
@@ -70,9 +79,21 @@ enum AgentLogParser {
                 event.kind = .turnEnded(.interrupted)
             } else if hasPromptText(content) {
                 event.kind = .turnStarted
+                event.prompt = promptLine(in: content)
             }
         case "assistant":
             event.model = message?["model"] as? String
+            if let usage = message?["usage"] as? [String: Any] {
+                let tokens = AgentTokens(claudeUsage: usage)
+                if tokens.total > 0 {
+                    event.tokens = tokens
+                    event.contextTokens = tokens.contextUsed
+                    event.contextWindow = claudeWindow(model: event.model, context: tokens.contextUsed)
+                    if let id = message?["id"] as? String {
+                        event.messageID = id + ":" + ((object["requestId"] as? String) ?? "")
+                    }
+                }
+            }
             guard !isSidechain else { return event }
             if object["isApiErrorMessage"] as? Bool == true {
                 event.kind = .turnEnded(.failed)
@@ -83,6 +104,28 @@ enum AgentLogParser {
             break
         }
         return event
+    }
+
+    /// Claude Code's window: a million tokens for a model marked `[1m]` (or a context already past 200K), else 200K.
+    static func claudeWindow(model: String?, context: Int) -> Int {
+        (model?.contains("[1m]") == true || context > 200_000) ? 1_000_000 : 200_000
+    }
+
+    /// The first text that is the person's own words (not a command or system note, which start with "<"), on one line, at most 80
+    /// characters.
+    static func promptLine(in content: Any?) -> String? {
+        var texts: [String] = []
+        if let text = content as? String {
+            texts = [text]
+        } else if let items = content as? [[String: Any]] {
+            texts = items.compactMap { ($0["type"] as? String) == "text" ? $0["text"] as? String : nil }
+        }
+        for text in texts {
+            let line = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            guard !line.isEmpty, !line.hasPrefix("<") else { continue }
+            return line.count > 80 ? String(line.prefix(79)) + "\u{2026}" : line
+        }
+        return nil
     }
 
     /// Text the person typed: a string, or a list with a text item. A list of only tool results is the agent's own loop.
@@ -116,6 +159,20 @@ enum AgentLogParser {
             case "task_started": event.kind = .turnStarted
             case "task_complete": event.kind = .turnEnded(.finished)
             case "turn_aborted": event.kind = .turnEnded(.interrupted)
+            case "user_message":
+                event.prompt = promptLine(in: payload?["message"])
+            case "token_count":
+                if let info = payload?["info"] as? [String: Any], let last = info["last_token_usage"] as? [String: Any] {
+                    func int(_ value: Any?) -> Int { (value as? NSNumber)?.intValue ?? 0 }
+                    let input = int(last["input_tokens"])
+                    let cached = min(int(last["cached_input_tokens"]), input)
+                    let tokens = AgentTokens(input: input - cached, output: int(last["output_tokens"]), cacheRead: cached)
+                    if tokens.total > 0 {
+                        event.tokens = tokens
+                        event.contextTokens = input
+                        event.contextWindow = (info["model_context_window"] as? NSNumber)?.intValue
+                    }
+                }
             default: break
             }
         default:
@@ -125,6 +182,24 @@ enum AgentLogParser {
     }
 
     // MARK: Helpers
+
+    /// "Opus 4.5" from "claude-opus-4-5-20251101", and "GPT-5 Codex" from "gpt-5-codex".
+    static func prettyModel(_ model: String) -> String {
+        var name = model
+        if let bracket = name.firstIndex(of: "[") { name = String(name[..<bracket]) }
+        if name.hasPrefix("claude-") { name.removeFirst("claude-".count) }
+        if let range = name.range(of: #"-\d{8}$"#, options: .regularExpression) { name.removeSubrange(range) }
+        let parts = name.split(separator: "-").map(String.init)
+        guard !parts.isEmpty else { return model }
+        if parts[0].lowercased() == "gpt" {
+            let rest = parts.dropFirst().map { $0.first?.isNumber == true ? $0 : $0.capitalized }
+            guard let first = rest.first else { return "GPT" }
+            return (["GPT-" + first] + rest.dropFirst()).joined(separator: " ")
+        }
+        let words = parts.filter { $0.first?.isLetter == true }.map(\.capitalized)
+        let numbers = parts.filter { $0.first?.isNumber == true }
+        return (words + (numbers.isEmpty ? [] : [numbers.joined(separator: ".")])).joined(separator: " ")
+    }
 
     private static let withFraction: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

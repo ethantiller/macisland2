@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: IslandPanel?
     private var mouseTracker: MouseTracker?
     private var menuHold: MenuHoldObserver?
-    private let volumeHUD = VolumeHUDController()
+    private let volumeHUD = LevelHUDController()
     private var sigtermSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -245,8 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             features.agents.usage.activity()
         }
         agentWatcher.onProcesses = { features.agents.setProcesses($0) }
-        features.agents.onFinish = { [viewModel] _, duration in
-            viewModel.flash(Announcements.agentDone(duration: duration), event: .agentDone)
+        features.agents.onFinish = { [viewModel] task, duration in
+            viewModel.showBanner(Announcements.agentDone(task: task, duration: duration), event: .agentDone)
         }
         agentWatcher.start()
 
@@ -420,10 +420,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hud = volumeHUD
         let features = features
         let viewModel = viewModel
-        hud.canShow = { viewModel.canShowVolumeHUD }
+        hud.canShow = { viewModel.canShowLevelHUD }
         // Clean Keys holds its own tap, and has the keys to itself while it does.
         hud.isSuspended = { features.keyboardCleaner.isLocked }
-        hud.onShow = { viewModel.showVolume($0) }
+        hud.onShow = { viewModel.showLevel($0) }
         hud.onLostAccess = { [weak self] in
             // The permission was taken away: the tap is gone and the system's HUD is back. The setting follows, and says so.
             self?.features.settings.replacesVolumeHUD = false

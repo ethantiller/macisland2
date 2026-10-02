@@ -9,6 +9,14 @@ struct MixerRow: Identifiable, Equatable {
     var name: String
     var isPlaying: Bool
     var isNeverTapped: Bool
+
+    /// The rows with the one for `bundleID` first, and the rest in their order; nothing is dropped.
+    static func pinning(_ rows: [MixerRow], first bundleID: String?) -> [MixerRow] {
+        guard let bundleID, let index = rows.firstIndex(where: { $0.id == bundleID }) else { return rows }
+        var result = rows
+        result.insert(result.remove(at: index), at: 0)
+        return result
+    }
 }
 
 /// Per-app volume (0 to 200%) and output, with no driver: an app that is adjusted is tapped and played again by MacIsland, and an app

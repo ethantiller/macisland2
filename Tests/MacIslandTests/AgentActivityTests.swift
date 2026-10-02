@@ -32,7 +32,7 @@ struct AgentActivityTests {
 
         for reason in ["end_turn", "stop_sequence", "max_tokens", "refusal"] {
             let done = line(["type": "assistant", "message": ["stop_reason": reason, "model": "m"]])
-            #expect(claude(done)?.kind == .turnEnded(.finished), reason)
+            #expect(claude(done)?.kind == .turnEnded(.finished), Comment(rawValue: reason))
         }
         let nullReason = line(["type": "assistant", "message": ["stop_reason": NSNull(), "model": "m"]])
         #expect(claude(nullReason)?.kind == .activity)
@@ -217,7 +217,7 @@ struct AgentActivityTests {
 
     // MARK: On the island
 
-    @Test func theAgentRanksRightAfterWorking() {
+    @Test func theAgentRanksAfterWorkingAndMusic() {
         let viewModel = TestSupport.makeViewModel()
         viewModel.settings.setOn(.agents, true)
         viewModel.agents.ingest(.init(kind: .turnStarted, date: Date()), agent: .claudeCode, session: "s")
@@ -232,7 +232,7 @@ struct AgentActivityTests {
         song.duration = 200
         song.timestamp = Date()
         viewModel.nowPlaying.apply(song)
-        #expect(viewModel.compactActivities == [.agent, .media])
+        #expect(viewModel.compactActivities == [.media, .agent], "music outranks a running agent")
         viewModel.settings.showsAgentCompact = false
         #expect(viewModel.compactActivities == [.media], "the option")
         viewModel.settings.showsAgentCompact = true
@@ -298,8 +298,123 @@ struct AgentActivityTests {
         #expect(NotificationsPane.requirement(for: .agentDone, settings: settings) == "Turn on AI Agents in Features.")
         settings.setOn(.agents, true)
         #expect(NotificationsPane.requirement(for: .agentDone, settings: settings) == nil)
-        let alert = Announcements.agentDone(duration: 252)
-        #expect(alert.text == "Done 4:12" && alert.systemImage == "sparkles")
+        let task = AgentTask(
+            id: "s", agent: .codex, project: "site", model: nil, startedAt: Date(), lastActivity: Date(), title: "Add stats",
+            tokens: AgentTokens(input: 1_000, output: 183_000))
+        let banner = Announcements.agentDone(task: task, duration: 252)
+        #expect(banner.title == "Add stats" && banner.detail == "Done in 4:12 \u{00B7} 184K tokens")
+        #expect(banner.isAlert && banner.agent == .codex && banner.ringTint == Theme.Tint.positive)
+        #expect(banner.opensTab == .agents)
+        let untitled = AgentTask(id: "s", agent: .claudeCode, project: "island", model: nil, startedAt: Date(), lastActivity: Date())
+        #expect(Announcements.agentDone(task: untitled, duration: 61).title == "island")
+        #expect(Announcements.agentDone(task: untitled, duration: 61).detail == "Done in 1:01")
+    }
+}
+
+@MainActor
+struct AgentLiveDataTests {
+    private func line(_ object: [String: Any]) -> String {
+        String(decoding: (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), as: UTF8.self)
+    }
+
+    private func assistant(id: String, output: Int, model: String = "claude-opus-4-5-20251101") -> String {
+        line([
+            "type": "assistant", "requestId": "r1",
+            "message": [
+                "id": id, "model": model, "stop_reason": "tool_use",
+                "usage": ["input_tokens": 10, "output_tokens": output, "cache_read_input_tokens": 90_000, "cache_creation_input_tokens": 2_000],
+            ],
+        ])
+    }
+
+    @Test func claudeAssistantLinesCarryTokensAndContext() {
+        let event = AgentLogParser.parse(assistant(id: "m1", output: 500), agent: .claudeCode)
+        #expect(event?.tokens == AgentTokens(input: 10, output: 500, cacheRead: 90_000, cacheWrite: 2_000))
+        #expect(event?.contextTokens == 92_010 && event?.contextWindow == 200_000)
+        #expect(event?.messageID == "m1:r1")
+        let big = AgentLogParser.parse(assistant(id: "m2", output: 1, model: "claude-opus-4-5[1m]"), agent: .claudeCode)
+        #expect(big?.contextWindow == 1_000_000)
+        #expect(AgentLogParser.claudeWindow(model: "claude-opus-4-5", context: 250_000) == 1_000_000)
+    }
+
+    @Test func aPromptIsOneShortLineAndCommandsAreSkipped() {
+        let long = String(repeating: "word ", count: 40)
+        let started = AgentLogParser.parse(
+            line(["type": "user", "message": ["content": "  fix\n the   build  "]]), agent: .claudeCode)
+        #expect(started?.prompt == "fix the build")
+        let cut = AgentLogParser.parse(line(["type": "user", "message": ["content": long]]), agent: .claudeCode)
+        #expect((cut?.prompt?.count ?? 0) <= 80)
+        let command = AgentLogParser.parse(
+            line(["type": "user", "message": ["content": "<command-name>/clear</command-name>"]]), agent: .claudeCode)
+        #expect(command?.kind == .turnStarted && command?.prompt == nil)
+        let listed = AgentLogParser.parse(
+            line(["type": "user", "message": ["content": [["type": "text", "text": "<ide>x</ide>"], ["type": "text", "text": "real ask"]]]]),
+            agent: .claudeCode)
+        #expect(listed?.prompt == "real ask")
+    }
+
+    @Test func codexCarriesItsPromptTokensAndContext() {
+        let prompt = AgentLogParser.parse(
+            line(["type": "event_msg", "payload": ["type": "user_message", "message": "add the stats view"]]), agent: .codex)
+        #expect(prompt?.prompt == "add the stats view")
+        let count = AgentLogParser.parse(
+            line([
+                "type": "event_msg",
+                "payload": [
+                    "type": "token_count",
+                    "info": [
+                        "last_token_usage": ["input_tokens": 60_000, "cached_input_tokens": 50_000, "output_tokens": 2_000],
+                        "model_context_window": 258_000,
+                    ],
+                ],
+            ]), agent: .codex)
+        #expect(count?.tokens == AgentTokens(input: 10_000, output: 2_000, cacheRead: 50_000))
+        #expect(count?.contextTokens == 60_000 && count?.contextWindow == 258_000)
+    }
+
+    @Test func theTaskTakesItsTitleTokensAndContextFromTheLines() {
+        let activity = AgentActivity()
+        let start = Date()
+        activity.ingest(
+            AgentLogEvent(kind: .turnStarted, sessionID: "s", cwd: "/code/island", model: nil, date: start, prompt: "fix the HUD"),
+            agent: .claudeCode, session: "s", announces: false)
+        // A streamed response is written twice: it counts once, at its final size.
+        for output in [100, 400] {
+            let event = AgentLogParser.parse(assistant(id: "m1", output: output), agent: .claudeCode)!
+            activity.ingest(event, agent: .claudeCode, session: "s", announces: false)
+        }
+        let second = AgentLogParser.parse(assistant(id: "m2", output: 50), agent: .claudeCode)!
+        activity.ingest(second, agent: .claudeCode, session: "s", announces: false)
+        let task = activity.liveTasks.first
+        #expect(task?.title == "fix the HUD" && task?.displayTitle == "fix the HUD")
+        #expect(task?.tokens.output == 450 && task?.tokens.input == 20)
+        #expect(task?.context?.used == 92_010 && task?.context?.window == 200_000)
+        #expect(task?.contextFraction ?? 0 > 0.45 && task?.contextFraction ?? 1 < 0.47)
+        #expect(task?.detailLine == "island \u{00B7} Opus 4.5")
+    }
+
+    @Test func aTaskWithoutAPromptIsNamedByItsFolderAndAFinishedOneIsHandedOver() {
+        let activity = AgentActivity()
+        activity.minimumDuration = { 0 }
+        var finished: AgentTask?
+        activity.onFinish = { task, _ in finished = task }
+        let start = Date().addingTimeInterval(-120)
+        activity.ingest(
+            AgentLogEvent(kind: .turnStarted, sessionID: "s", cwd: "/code/site", model: nil, date: start),
+            agent: .codex, session: "s")
+        #expect(activity.liveTasks.first?.displayTitle == "site")
+        activity.ingest(
+            AgentLogEvent(kind: .activity, prompt: "late prompt"), agent: .codex, session: "s")
+        activity.ingest(AgentLogEvent(kind: .turnEnded(.finished), date: Date()), agent: .codex, session: "s")
+        #expect(finished?.title == "late prompt")
+    }
+
+    @Test func modelNamesAreReadable() {
+        #expect(AgentLogParser.prettyModel("claude-opus-4-5-20251101") == "Opus 4.5")
+        #expect(AgentLogParser.prettyModel("claude-sonnet-4-5-20250929") == "Sonnet 4.5")
+        #expect(AgentLogParser.prettyModel("opus-4-5") == "Opus 4.5")
+        #expect(AgentLogParser.prettyModel("claude-opus-4-5[1m]") == "Opus 4.5")
+        #expect(AgentLogParser.prettyModel("gpt-5-codex") == "GPT-5 Codex")
     }
 }
 

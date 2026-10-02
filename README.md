@@ -123,8 +123,9 @@ flowchart TB
     P -- "hover, click, swipe" --> VM
 ```
 
-- **One panel, always there.** A borderless `NSPanel` is pinned to the top center of the screen, always as big as the
-  largest the island gets (560 x 276). It ignores the mouse except over the visible island, so it never blocks anything.
+- **One panel, always there.** A borderless `NSPanel` is pinned to the top center of the screen. The island's base view is
+  560 x 276; its 976 pt click-through host leaves room for the Media output satellites. It ignores the mouse except over
+  the visible island and those controls, so it never blocks anything else.
 - **State lives in `IslandViewModel`.** It holds the presentation (compact, banner, peek, expanded), which tab is
   selected, the alert and banner, and works out the ranked list of live activities and the size of everything. Views are
   thin and read from it.

@@ -10,6 +10,7 @@ enum TestSupport {
     static func makeViewModel(
         bluetooth: StubBluetooth? = nil, camera: StubCamera? = nil,
         screen: StubScreen? = nil, transcriber: StubTranscriber? = nil,
+        outputs: AudioOutputs? = nil,
         mixerApps: StubAppList? = nil, mixerTaps: StubTapper? = nil, mixerAccess: OptionalAccessState? = nil,
         notifications: ((AppSettings) -> NotificationMirror)? = nil
     ) -> IslandViewModel {
@@ -33,7 +34,7 @@ enum TestSupport {
         let viewModel = IslandViewModel(
             features: IslandFeatures(
                 nowPlaying: NowPlayingModel(adapter: nil),
-                outputs: AudioOutputs(),
+                outputs: outputs ?? AudioOutputs(),
                 shelf: shelf,
                 timer: TimerModel(),
                 stopwatch: StopwatchModel(),

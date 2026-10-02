@@ -52,7 +52,6 @@ struct URLCommandTests {
         #expect(parse("macisland://timer?minutes=0") == nil)
         #expect(parse("macisland://timer?minutes=99999") == nil)
         #expect(parse("macisland://timer") == nil)
-        #expect(parse("macisland://open?module=agents") == nil)
         #expect(parse("macisland://open?module=nope") == nil)
         #expect(parse("macisland://shelf/add?path=/no/such/file") == nil)
         #expect(parse("macisland://shelf/add?path=relative.txt") == nil)

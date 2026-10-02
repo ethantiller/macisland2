@@ -94,6 +94,34 @@ struct ScrollRoutingTests {
         #expect(!routing.ownsGesture)
     }
 
+    @Test func aScrollerOwnsItsAxisIncludingMomentum() {
+        var routing = ScrollRouting()
+        #expect(routing.route(trackpad(2, 0, began: true), overDial: false, scrollerAxis: .horizontal) == nil)
+        #expect(routing.route(trackpad(3, 0), overDial: false, scrollerAxis: .horizontal) == nil)
+        #expect(routing.ownsGesture)
+        #expect(routing.route(trackpad(8, 0, momentum: true), overDial: false, scrollerAxis: .horizontal) == nil)
+    }
+
+    @Test func aScrollerDoesNotOwnTheOtherAxis() {
+        var routing = ScrollRouting()
+        #expect(routing.route(trackpad(0, -30, began: true), overDial: false, scrollerAxis: .horizontal) == .swipe(.up))
+        #expect(!routing.ownsGesture)
+    }
+
+    @Test func verticalScrollerOwnsItsAxisIncludingMomentum() {
+        var routing = ScrollRouting()
+        #expect(routing.route(trackpad(0, -3, began: true), overDial: false, scrollerAxis: .vertical) == nil)
+        #expect(routing.route(trackpad(0, -4), overDial: false, scrollerAxis: .vertical) == nil)
+        #expect(routing.ownsGesture)
+        #expect(routing.route(trackpad(0, -8, momentum: true), overDial: false, scrollerAxis: .vertical) == nil)
+    }
+
+    @Test func noScrollerLeavesExistingSwipeRoutingUnchanged() {
+        var routing = ScrollRouting()
+        #expect(routing.route(trackpad(-70, 0, began: true), overDial: false) == .swipe(.left))
+        #expect(!routing.ownsGesture)
+    }
+
     @Test func aWheelOverTheDialStepsAMinute() {
         var routing = ScrollRouting()
         let notch = ScrollSample(
@@ -124,6 +152,28 @@ struct DialViewModelTests {
         viewModel.state = .expanded
         viewModel.selectedTab = .clock
         return viewModel
+    }
+
+    @Test func scrollAreasAreRegisteredAndRemovedByScreenFrame() {
+        let viewModel = TestSupport.makeViewModel()
+        let id = UUID()
+        let frame = CGRect(x: 20, y: 30, width: 100, height: 40)
+        #expect(viewModel.scrollAxis(at: CGPoint(x: 30, y: 40)) == nil)
+
+        viewModel.updateScrollArea(id, frame: frame, axis: .horizontal)
+        #expect(viewModel.scrollAxis(at: CGPoint(x: 30, y: 40)) == .horizontal)
+        #expect(viewModel.scrollAxis(at: CGPoint(x: 200, y: 40)) == nil)
+
+        viewModel.updateScrollArea(id, frame: nil, axis: .horizontal)
+        #expect(viewModel.scrollAxis(at: CGPoint(x: 30, y: 40)) == nil)
+    }
+
+    @Test func islandHitTestingIncludesItsShape() {
+        let viewModel = TestSupport.makeViewModel()
+        viewModel.state = .expanded
+        let rect = viewModel.hitRect
+        #expect(viewModel.isOverIsland(CGPoint(x: rect.midX, y: rect.midY)))
+        #expect(!viewModel.isOverIsland(CGPoint(x: rect.maxX + 100, y: rect.midY)))
     }
 
     @Test func timerDialRectOnlyWhileSettingATimer() throws {

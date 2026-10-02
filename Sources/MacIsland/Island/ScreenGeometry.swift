@@ -2,6 +2,9 @@ import AppKit
 
 struct ScreenGeometry: Equatable {
     static let panelSize = CGSize(width: 560, height: Theme.Metrics.panelHeight)
+    static var hostingPanelWidth: CGFloat {
+        panelSize.width + 2 * (Theme.Metrics.outputSatelliteGap + Theme.Metrics.outputPillMaxWidth)
+    }
     /// Width of the outward flare at each top corner of the island shape.
     static let topFlare: CGFloat = 6
 
@@ -15,10 +18,11 @@ struct ScreenGeometry: Equatable {
     }
 
     var panelFrame: CGRect {
-        CGRect(
-            x: screenFrame.midX - Self.panelSize.width / 2,
+        let width = Self.hostingPanelWidth
+        return CGRect(
+            x: screenFrame.midX - width / 2,
             y: screenFrame.maxY - Self.panelSize.height,
-            width: Self.panelSize.width,
+            width: width,
             height: Self.panelSize.height
         )
     }
