@@ -37,6 +37,9 @@ struct AgentMarks: View {
 
 /// The critter, in its 447 by 279 box scaled to the width of the square: a body, arms, four legs, and two eyes cut out.
 struct ClaudeMarkShape: Shape {
+    /// Which of the four legs are drawn half as long, for a stride (the runner). None for the mark.
+    var liftedLegs: Set<Int> = []
+
     func path(in rect: CGRect) -> Path {
         let scale = rect.width / 447
         let height = 279 * scale
@@ -45,7 +48,9 @@ struct ClaudeMarkShape: Shape {
             Path(CGRect(x: origin.x + x * scale, y: origin.y + y * scale, width: w * scale, height: h * scale))
         }
         var solid = box(56, 0, 334, 225).union(box(0, 112, 447, 55))
-        for x: CGFloat in [84, 139, 280, 335] { solid = solid.union(box(x, 225, 27, 54)) }
+        for (index, x) in ([84, 139, 280, 335] as [CGFloat]).enumerated() {
+            solid = solid.union(box(x, 225, 27, liftedLegs.contains(index) ? 27 : 54))
+        }
         return solid.subtracting(box(112, 57, 27, 54)).subtracting(box(307, 57, 27, 54))
     }
 }

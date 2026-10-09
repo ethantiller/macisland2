@@ -71,6 +71,13 @@ final class AppMixer {
     @ObservationIgnored private var taps: [String: (tap: AudioTap, output: String?)] = [:]
     /// Whether the person has adjusted something since the Mixer started: a permission that can't be checked is trusted after that.
     @ObservationIgnored private var hasActed = false
+    /// The outputs that existed, and the default, when the taps were last made: a device-list change that leaves them as they were (the
+    /// Mixer's own aggregate device appearing or going) is not a change, and must not touch the taps.
+    @ObservationIgnored private var lastDevices: DeviceSignature?
+    /// Levels being dragged: the sound follows them at once and nothing is stored until the drag ends.
+    @ObservationIgnored private var previews: [String: Double] = [:]
+    /// This app's own bundle ID, which never shows as a row: its own tap playing is not an app making sound.
+    @ObservationIgnored var ownBundleID: String? = Bundle.main.bundleIdentifier
 
     init(settings: AppSettings, listing: AppAudioListing, tapper: AudioTapping, defaults: UserDefaults = .standard) {
         self.settings = settings
@@ -81,6 +88,13 @@ final class AppMixer {
         listing.onChange = { [weak self] in self?.reconcile() }
     }
 
+    private struct DeviceSignature: Equatable {
+        var outputs: Set<String>
+        var defaultOutput: String?
+    }
+
+    private func currentDevices() -> DeviceSignature { DeviceSignature(outputs: availableOutputs(), defaultOutput: defaultOutput()) }
+
     /// For tests: the apps that have a tap now.
     var tappedApps: Set<String> { Set(taps.keys) }
 
@@ -90,6 +104,8 @@ final class AppMixer {
         guard !isRunning else { return }
         isRunning = true
         hasActed = false
+        previews = [:]
+        lastDevices = currentDevices()
         access = OptionalAccessRecord.state(of: .systemAudio, defaults: defaults)
         listing.start()
         apps = listing.current()
@@ -99,6 +115,7 @@ final class AppMixer {
     /// Off: every tap and device is given back, and the listeners stop.
     func stop() {
         isRunning = false
+        previews = [:]
         tearDown()
         listing.stop()
         apps = []
@@ -113,6 +130,9 @@ final class AppMixer {
     /// The output devices changed (one went away, or the default did): taps are made again against what exists now.
     func devicesChanged() {
         guard isRunning else { return }
+        let devices = currentDevices()
+        guard devices != lastDevices else { return }
+        lastDevices = devices
         tearDown()
         reconcile()
     }
@@ -123,7 +143,7 @@ final class AppMixer {
     var rows: [MixerRow] {
         guard isRunning else { return [] }
         let adjusted = Set(levels.keys).union(outputs.keys)
-        var result = apps.filter { $0.isPlaying || adjusted.contains($0.id) }
+        var result = apps.filter { $0.id != ownBundleID && ($0.isPlaying || adjusted.contains($0.id)) }
             .map { MixerRow(id: $0.id, name: $0.name, isPlaying: $0.isPlaying, isNeverTapped: $0.isNeverTapped) }
         let listed = Set(result.map(\.id))
         result += adjusted.subtracting(listed).map {
@@ -148,6 +168,9 @@ final class AppMixer {
 
     func level(for id: String) -> Double { levels[id] ?? 1 }
 
+    /// What the sound plays at now: the level being dragged, else the stored one.
+    private func effectiveLevel(for id: String) -> Double { previews[id] ?? level(for: id) }
+
     /// The chosen output's UID, or nil for the default. A device that is gone counts as the default.
     func output(for id: String) -> String? {
         guard let uid = outputs[id], availableOutputs().contains(uid), uid != defaultOutput() else { return nil }
@@ -161,16 +184,34 @@ final class AppMixer {
         guard !Self.neverTapped(bundleID: id) else { return }
         let clamped = min(max(level, Self.range.lowerBound), Self.range.upperBound)
         let value = abs(clamped - 1) < 0.005 ? 1 : clamped
-        guard value != self.level(for: id) else { return }
-        if value == 1 { settings.mixerLevels[id] = nil } else { settings.mixerLevels[id] = value }
-        hasActed = true
+        previews[id] = nil
+        if value != self.level(for: id) {
+            if value == 1 { settings.mixerLevels[id] = nil } else { settings.mixerLevels[id] = value }
+            hasActed = true
+        }
+        // Always: a drag that ends where it began still has a tap to let go of.
         reconcile()
     }
 
-    /// While a slider is dragged: the running tap follows at once, and nothing is stored until the level is committed.
+    /// While a slider is dragged: the sound follows at once (a tap is made if the app has none yet), and nothing is stored until the
+    /// level is committed. The dragged level is kept, so a refresh mid-drag does not put the stored one back.
     func previewLevel(_ level: Double, for id: String) {
-        guard !Self.neverTapped(bundleID: id) else { return }
-        taps[id]?.tap.setLevel(Float(min(max(level, Self.range.lowerBound), Self.range.upperBound)))
+        guard isRunning, !Self.neverTapped(bundleID: id) else { return }
+        let clamped = min(max(level, Self.range.lowerBound), Self.range.upperBound)
+        previews[id] = clamped
+        hasActed = true
+        if let tap = taps[id]?.tap {
+            tap.setLevel(Float(clamped))
+        } else {
+            reconcile()
+        }
+    }
+
+    /// The slider went away without finishing its drag: the sound goes back to the stored level.
+    func endPreviews() {
+        guard !previews.isEmpty else { return }
+        previews = [:]
+        reconcile()
     }
 
     func setOutput(_ uid: String?, for id: String) {
@@ -191,7 +232,7 @@ final class AppMixer {
     /// Whether an app's sound should go through a tap now.
     func wantsTap(_ app: MixerApp) -> Bool {
         guard isRunning, canTap, app.isPlaying, !app.isNeverTapped else { return false }
-        return level(for: app.id) != 1 || output(for: app.id) != nil
+        return effectiveLevel(for: app.id) != 1 || output(for: app.id) != nil
     }
 
     /// Whether the permission lets a tap be made. At launch only an answer already seen counts; once the person has adjusted something
@@ -221,7 +262,7 @@ final class AppMixer {
             let output = output(for: app.id)
             if let entry = taps[app.id] {
                 if entry.output == output {
-                    entry.tap.setLevel(Float(level(for: app.id)))
+                    entry.tap.setLevel(Float(effectiveLevel(for: app.id)))
                     continue
                 }
                 entry.tap.stop()
@@ -237,7 +278,7 @@ final class AppMixer {
 
     /// False if the permission failed and every tap was torn down.
     private func start(_ app: MixerApp, output: String?) -> Bool {
-        guard let tap = tapper.start(processObjects: app.processObjects, outputUID: output, level: Float(level(for: app.id))) else {
+        guard let tap = tapper.start(processObjects: app.processObjects, outputUID: output, level: Float(effectiveLevel(for: app.id))) else {
             failed()
             return false
         }

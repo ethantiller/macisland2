@@ -6,7 +6,7 @@ extension LevelHUD {
         fraction < 0.5 ? "sun.min.fill" : "sun.max.fill"
     }
 
-    static func percent(of fraction: Double) -> Int { Int((fraction * 100).rounded()) }
+    static func percent(of fraction: Double) -> Int { safeInt((fraction * 100).rounded()) }
 }
 
 /// A level as the island draws it beside the notch: the bar and its percent, with the glyph when it has the side to itself.

@@ -27,6 +27,7 @@ struct MixerPanel: View {
             content
         }
         .onAppear { viewModel.bluetooth.refresh() }
+        .onDisappear { mixer.endPreviews() }
     }
 
     /// The line the panel says in place of the apps while the permission isn't there; nil when it is (or can't be checked).
@@ -100,7 +101,10 @@ private struct MixerRowView: View {
     let mixer: AppMixer
     let outputs: AudioOutputs
 
-    private var level: Double { mixer.level(for: row.id) }
+    /// The level being dragged, so the percent follows the slider instead of waiting for the drag to end.
+    @State private var dragLevel: Double?
+
+    private var level: Double { dragLevel ?? mixer.level(for: row.id) }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -118,10 +122,16 @@ private struct MixerRowView: View {
             } else {
                 IslandSlider(
                     value: level / 2, label: "\(row.name) Volume",
-                    valueDescription: "\(Int((level * 100).rounded())) percent",
-                    onChange: { mixer.previewLevel(AppMixer.snapped($0 * 2), for: row.id) },
-                    onCommit: { mixer.setLevel(AppMixer.snapped($0 * 2), for: row.id) })
-                Text("\(Int((level * 100).rounded()))%")
+                    valueDescription: "\(safeInt((level * 100).rounded())) percent",
+                    onChange: {
+                        dragLevel = AppMixer.snapped($0 * 2)
+                        mixer.previewLevel(AppMixer.snapped($0 * 2), for: row.id)
+                    },
+                    onCommit: {
+                        mixer.setLevel(AppMixer.snapped($0 * 2), for: row.id)
+                        dragLevel = nil
+                    })
+                Text("\(safeInt((level * 100).rounded()))%")
                     .font(Theme.Typography.numeral)
                     .foregroundStyle(Theme.Palette.secondary)
                     .frame(width: Theme.Metrics.mixerPercentWidth, alignment: .trailing)

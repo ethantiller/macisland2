@@ -338,7 +338,7 @@ struct IslandView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         case .transfer:
-            Text("\(Int((viewModel.transfers.overallFraction * 100).rounded()))%")
+            Text("\(safeInt((viewModel.transfers.overallFraction * 100).rounded()))%")
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(Theme.Palette.primary)
                 .contentTransition(.numericText())
@@ -550,8 +550,8 @@ struct ElapsedText: View {
     var tint: Color?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(formatTime(context.date.timeIntervalSince(since)))
+        Ticking(interval: 1) { date in
+            Text(formatTime(date.timeIntervalSince(since)))
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(Theme.Palette.primary))
         }

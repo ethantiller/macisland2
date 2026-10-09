@@ -60,6 +60,8 @@ final class DownloadsFolder {
     /// False when the folder could not be listed (Downloads is not allowed), so the mode can say so.
     private(set) var canRead = true
     private(set) var isWatching = false
+    /// Between `start()` and `stop()`, even when the folder could not be watched, so a listing in flight knows to land.
+    @ObservationIgnored private var isStarted = false
 
     @ObservationIgnored let folder: URL
     @ObservationIgnored private var source: DispatchSourceFileSystemObject?
@@ -73,8 +75,20 @@ final class DownloadsFolder {
         self.folder = folder
     }
 
-    func reload() {
-        if let found = DownloadsScan.newest(in: folder) {
+    func reload() { apply(DownloadsScan.newest(in: folder)) }
+
+    /// The same, with the folder listed off the main thread: a big Downloads folder, or one on a slow volume, would stall the tap.
+    private func reloadInBackground() {
+        let folder = folder
+        Task {
+            let found = await Task.detached(priority: .userInitiated) { DownloadsScan.newest(in: folder) }.value
+            guard isStarted else { return }
+            apply(found)
+        }
+    }
+
+    private func apply(_ found: [DownloadItem]?) {
+        if let found {
             if found != items { items = found }
             if !canRead { canRead = true }
         } else {
@@ -85,7 +99,8 @@ final class DownloadsFolder {
 
     /// Lists the folder now and again whenever it changes.
     func start() {
-        reload()
+        isStarted = true
+        reloadInBackground()
         guard source == nil else { return }
         let descriptor = open(folder.path, O_EVTONLY)
         guard descriptor >= 0 else { return }
@@ -101,6 +116,7 @@ final class DownloadsFolder {
     }
 
     func stop() {
+        isStarted = false
         source?.cancel()
         source = nil
         pending?.cancel()
@@ -114,7 +130,7 @@ final class DownloadsFolder {
         pending = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            self?.reload()
+            self?.reloadInBackground()
         }
     }
 }

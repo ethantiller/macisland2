@@ -1,8 +1,16 @@
 import AppKit
 import SwiftUI
 
+/// An `Int` from a floating-point value that may be NaN, infinite, or huge, which `Int(_:)` would trap on. NaN is 0, and the
+/// rest is held to about a quadrillion so arithmetic on the result cannot overflow.
+func safeInt<T: BinaryFloatingPoint>(_ value: T) -> Int {
+    guard !value.isNaN else { return 0 }
+    let limit: T = 1e15
+    return Int(min(max(value, -limit), limit))
+}
+
 func formatTime(_ seconds: TimeInterval) -> String {
-    let total = Int(max(seconds, 0))
+    let total = safeInt(max(seconds, 0))
     let hours = total / 3600
     let minutes = (total % 3600) / 60
     let secs = total % 60
@@ -193,7 +201,7 @@ struct IslandSlider: View {
         .frame(height: Theme.Metrics.sliderHitHeight)
         .accessibilityElement()
         .accessibilityLabel(label)
-        .accessibilityValue(valueDescription ?? "\(Int((value * 100).rounded())) percent")
+        .accessibilityValue(valueDescription ?? "\(safeInt((value * 100).rounded())) percent")
         .accessibilityAdjustableAction { direction in
             let step = 0.05
             let newValue = min(max(value + (direction == .increment ? step : -step), 0), 1)

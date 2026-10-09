@@ -32,9 +32,15 @@ enum AgentUsageFormat {
         value >= 100 ? String(format: "%.0f", value) : String(format: "%.1f", value).replacingOccurrences(of: ".0", with: "")
     }
 
+    /// "94%", or "<1%" for a sliver that would round to nothing.
+    static func share(_ fraction: Double) -> String {
+        let value = safeInt((fraction * 100).rounded())
+        return value == 0 && fraction > 0 ? "<1%" : "\(value)%"
+    }
+
     /// "62%" used, or "38% left".
     static func percent(_ used: Double, showsLeft: Bool) -> String {
-        let value = Int((showsLeft ? 100 - used : used).rounded())
+        let value = safeInt((showsLeft ? 100 - used : used).rounded())
         return showsLeft ? "\(max(value, 0))% left" : "\(value)%"
     }
 
@@ -52,6 +58,7 @@ enum AgentUsageFormat {
         if let resets = limit.resetsAt { parts.append("Resets " + reset(resets, now: now)) }
         if let asOf = limit.asOf { parts.append("as of " + asOf.formatted(date: .omitted, time: .shortened)) }
         if limit.isEstimate { parts.append("estimated") }
+        if parts.isEmpty { return "No reading yet" }
         return parts.joined(separator: ", ")
     }
 
@@ -85,26 +92,24 @@ struct AgentLimitRow: View {
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Palette.secondary)
                 .frame(width: 92, alignment: .leading)
-            if let percent = limit.percent {
-                LevelBar(fraction: percent / 100, tint: isOver ? Theme.Tint.attention : nil)
-                if isOver {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Tint.attention)
-                        .accessibilityHidden(true)
-                }
-                Text(AgentUsageFormat.percent(percent, showsLeft: showsLeft))
-                    .font(Theme.Typography.compactNumeral)
-                    .foregroundStyle(isOver ? AnyShapeStyle(Theme.Tint.attention) : AnyShapeStyle(Theme.Palette.primary))
-                    .frame(width: 58, alignment: .trailing)
-            } else {
-                Spacer(minLength: 0)
+            // The bar is always drawn: with no reading it is empty, and the words say why.
+            LevelBar(fraction: (limit.percent ?? 0) / 100, tint: isOver ? Theme.Tint.attention : nil)
+            if isOver {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Tint.attention)
+                    .accessibilityHidden(true)
             }
+            Text(limit.percent.map { AgentUsageFormat.percent($0, showsLeft: showsLeft) } ?? "\u{2013}")
+                .font(Theme.Typography.compactNumeral)
+                .foregroundStyle(isOver ? AnyShapeStyle(Theme.Tint.attention) : AnyShapeStyle(Theme.Palette.primary))
+                .frame(width: 58, alignment: .trailing)
             Text(AgentUsageFormat.resetLine(limit))
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Palette.secondary)
                 .lineLimit(1)
-                .frame(width: limit.percent == nil ? nil : 128, alignment: .trailing)
+                .minimumScaleFactor(0.9)
+                .frame(width: Theme.Metrics.limitResetWidth, alignment: .trailing)
         }
         .frame(height: 20)
         .accessibilityElement(children: .combine)
@@ -113,7 +118,7 @@ struct AgentLimitRow: View {
 
 // MARK: Usage
 
-/// What the agents used over a range: the value at API prices, tokens, what the cache saved, and the top models and projects.
+/// What the agents used over a range: the value at API prices, what the cache saved, how the tokens split (a donut), and the top models and projects.
 struct AgentUsageView: View {
     let usage: AgentUsageModel
     let range: UsageRange
@@ -122,33 +127,16 @@ struct AgentUsageView: View {
         if let snapshot = usage.snapshot {
             let summary = AgentUsageSummary.make(
                 buckets: snapshot.buckets, range: range, now: Date(), pricing: usage.pricing)
-            HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(AgentUsageFormat.dollars(summary.value, atLeast: summary.isLowerBound))
-                        .font(Theme.Typography.largeNumeral)
-                        .foregroundStyle(Theme.Palette.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text("at API prices")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                    Text("\(AgentUsageFormat.tokens(summary.tokens)) tokens")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                    if summary.cacheSaving > 0 {
-                        Text("Cache saved " + AgentUsageFormat.dollars(summary.cacheSaving))
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Palette.secondary)
-                    }
-                    if let line = AgentUsageFormat.pricesLine(usage.pricing) {
-                        Text(line)
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Palette.secondary)
-                    }
+            VStack(alignment: .leading, spacing: Theme.Metrics.rowSpacing) {
+                HStack(alignment: .center, spacing: 18) {
+                    valueColumn(summary)
+                    TokenDonut(shares: summary.shares, total: summary.tokens)
+                    TokenLegend(shares: summary.shares)
                 }
-                .frame(width: 140, alignment: .leading)
-                RankColumn(title: "Models", rows: summary.models)
-                RankColumn(title: "Projects", rows: summary.projects)
+                HStack(alignment: .top, spacing: 18) {
+                    RankColumn(title: "Models", rows: summary.models)
+                    RankColumn(title: "Projects", rows: summary.projects)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
@@ -157,6 +145,31 @@ struct AgentUsageView: View {
                 .foregroundStyle(Theme.Palette.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// The value at API prices, what the cache saved, and when the prices are from.
+    private func valueColumn(_ summary: AgentUsageSummary) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(AgentUsageFormat.dollars(summary.value, atLeast: summary.isLowerBound))
+                .font(Theme.Typography.largeNumeral)
+                .foregroundStyle(Theme.Palette.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("at API prices")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Palette.secondary)
+            if summary.cacheSaving > 0 {
+                Text("Cache saved " + AgentUsageFormat.dollars(summary.cacheSaving))
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+            if let line = AgentUsageFormat.pricesLine(usage.pricing) {
+                Text(line)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+        }
+        .frame(width: 150, alignment: .leading)
     }
 }
 
@@ -190,5 +203,98 @@ struct RankColumn: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: The token mix
+
+extension TokenKind {
+    /// Three steps of white, so the legend and the ring agree without color.
+    var style: AnyShapeStyle {
+        switch self {
+        case .input: AnyShapeStyle(Theme.Palette.activitySteps[4])
+        case .output: AnyShapeStyle(Theme.Palette.activitySteps[3])
+        case .cache: AnyShapeStyle(Theme.Palette.activitySteps[2])
+        }
+    }
+}
+
+/// A ring cut into the token kinds, with the total in the middle.
+struct TokenDonut: View {
+    let shares: [TokenShare]
+    let total: Int
+
+    private var size: CGFloat { Theme.Metrics.tokenDonutSize }
+    private var lineWidth: CGFloat { Theme.Metrics.tokenDonutWidth }
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Theme.Palette.fill, lineWidth: lineWidth)
+            ForEach(arcs, id: \.kind) { arc in
+                Circle()
+                    .trim(from: arc.start, to: arc.end)
+                    .stroke(arc.kind.style, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+                    .rotationEffect(.degrees(-90))
+            }
+            VStack(spacing: 0) {
+                Text(AgentUsageFormat.tokens(total))
+                    .font(Theme.Typography.statValue)
+                    .foregroundStyle(Theme.Palette.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text("tokens")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+            }
+            .frame(width: size - 2 * lineWidth - 6)
+        }
+        .padding(lineWidth / 2)
+        .frame(width: size, height: size)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Tokens by kind")
+        .accessibilityValue(
+            shares.map { "\($0.kind.rawValue) \(AgentUsageFormat.share($0.fraction))" }.joined(separator: ", "))
+    }
+
+    /// Each kind's start and end around the ring, with a hairline gap between kinds that are there.
+    private var arcs: [(kind: TokenKind, start: Double, end: Double)] {
+        let present = shares.filter { $0.tokens > 0 }
+        let gap = present.count > 1 ? 0.012 : 0
+        var from = 0.0
+        return present.map { share in
+            defer { from += share.fraction }
+            return (share.kind, from + gap / 2, max(from + share.fraction - gap / 2, from + gap / 2 + 0.001))
+        }
+    }
+}
+
+/// The kinds beside the donut: a swatch, the name, its share, and its tokens.
+struct TokenLegend: View {
+    let shares: [TokenShare]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(shares) { share in
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(share.kind.style)
+                        .frame(width: 8, height: 8)
+                    Text(share.kind.rawValue)
+                        .font(Theme.Typography.body)
+                        .foregroundStyle(Theme.Palette.primary)
+                    Spacer(minLength: 4)
+                    Text(AgentUsageFormat.share(share.fraction))
+                        .font(Theme.Typography.compactNumeral)
+                        .foregroundStyle(Theme.Palette.primary)
+                    Text(AgentUsageFormat.tokens(share.tokens))
+                        .font(Theme.Typography.numeral)
+                        .foregroundStyle(Theme.Palette.secondary)
+                        .frame(width: 44, alignment: .trailing)
+                }
+                .frame(height: 18)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
     }
 }

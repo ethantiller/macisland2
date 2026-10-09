@@ -70,6 +70,11 @@ final class AgentActivity {
     @ObservationIgnored private let clock: () -> Date
     /// Changes when a deadline passes, so what shows is looked at again.
     private var tick = 0
+    /// The sessions shown as working, as of the last change. Only a session starting or stopping changes it, so what asks only whether
+    /// anything is working (the closed island) is not drawn again for every line a task writes.
+    private var liveIDs: [String] = []
+
+    var liveCount: Int { liveIDs.count }
 
     init(clock: @escaping () -> Date = Date.init, usage: AgentUsageModel? = nil) {
         self.clock = clock
@@ -169,6 +174,7 @@ final class AgentActivity {
         deadline?.cancel()
         deadline = nil
         tick += 1
+        liveIDs = []
         usage.stop()
     }
 
@@ -176,6 +182,8 @@ final class AgentActivity {
 
     private func changed() {
         tick += 1
+        let ids = liveTasks.map(\.id)
+        if ids != liveIDs { liveIDs = ids }
         scheduleDeadline()
     }
 
@@ -187,7 +195,7 @@ final class AgentActivity {
         let now = clock()
         let upcoming = open.values.map { $0.lastActivity.addingTimeInterval(Self.idleLimit) }.filter { $0 > now }
         guard let earliest = upcoming.min() else { return }
-        let wait = earliest.timeIntervalSince(now) + 0.5
+        let wait = min(earliest.timeIntervalSince(now) + 0.5, 86_400)
         deadline = Task { [weak self] in
             try? await Task.sleep(for: .seconds(wait))
             guard !Task.isCancelled, let self else { return }

@@ -23,14 +23,28 @@ final class DiskSpace {
     private(set) var isArmed = true
     @ObservationIgnored var onLow: ((Int64) -> Void)?
 
-    private let readFree: () -> Int64?
+    private let readFree: @Sendable () -> Int64?
 
-    init(readFree: @escaping () -> Int64? = DiskSpace.freeBytes) {
+    init(readFree: @escaping @Sendable () -> Int64? = { DiskSpace.freeBytes() }) {
         self.readFree = readFree
     }
 
     func check() {
         guard let free = readFree() else { return }
+        apply(free)
+    }
+
+    /// The same, with the read made off the main thread: the system call can take tens of milliseconds, and this runs just as someone
+    /// starts using the Mac again.
+    func checkLater() {
+        let read = readFree
+        Task {
+            guard let free = await Task.detached(priority: .utility, operation: { read() }).value else { return }
+            apply(free)
+        }
+    }
+
+    private func apply(_ free: Int64) {
         if DiskRule.shouldWarn(free: free, armed: isArmed) {
             isArmed = false
             onLow?(free)

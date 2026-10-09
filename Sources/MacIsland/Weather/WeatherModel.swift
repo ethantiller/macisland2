@@ -167,7 +167,7 @@ final class WeatherModel {
         let isDay = (current["is_day"] as? Int ?? 1) == 1
         let description = describe(code: code, isDay: isDay)
         return WeatherConditions(
-            temperature: Int(temperature.rounded()), symbol: description.symbol, summary: description.summary,
+            temperature: safeInt(temperature.rounded()), symbol: description.symbol, summary: description.summary,
             place: place.name, hours: parseHours(root), days: parseDays(root)
         )
     }
@@ -189,7 +189,7 @@ final class WeatherModel {
             let day = isDay.indices.contains(index) ? ((isDay[index] as? NSNumber)?.intValue ?? 1) == 1 : true
             hours.append(
                 WeatherHour(
-                    hour: hour, temperature: Int(temperature.rounded()),
+                    hour: hour, temperature: safeInt(temperature.rounded()),
                     symbol: describe(code: code, isDay: day).symbol))
         }
         return hours
@@ -211,8 +211,8 @@ final class WeatherModel {
             days.append(
                 WeatherDay(
                     label: days.isEmpty ? "Today" : weekdayName(ofDate: text),
-                    symbol: describe(code: code, isDay: true).symbol, high: Int(high.rounded()),
-                    low: Int(low.rounded())))
+                    symbol: describe(code: code, isDay: true).symbol, high: safeInt(high.rounded()),
+                    low: safeInt(low.rounded())))
         }
         return days
     }

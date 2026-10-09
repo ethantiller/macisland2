@@ -101,27 +101,33 @@ final class AVCameraProvider: CameraSessionProviding {
     }
 
     func start() async throws -> AVCaptureSession {
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .continuityCamera, .external], mediaType: .video,
-            position: .unspecified
-        )
-        // The built-in camera first, then Continuity and external ones.
-        guard
-            let device = discovery.devices.first(where: { $0.deviceType == .builtInWideAngleCamera })
-                ?? discovery.devices.first
-        else { throw CameraError.noCamera }
-        let session = AVCaptureSession()
-        session.sessionPreset = .high
-        let input = try AVCaptureDeviceInput(device: device)
-        guard session.canAddInput(input) else { throw CameraError.noCamera }
-        session.addInput(input)
-        self.session = session
-        await withCheckedContinuation { continuation in
+        // Finding the camera and opening it take about a quarter of a second, so they happen on the camera's own queue.
+        let queue = queue
+        let session: AVCaptureSession = try await withCheckedThrowingContinuation { continuation in
             queue.async {
-                session.startRunning()
-                continuation.resume()
+                do {
+                    let discovery = AVCaptureDevice.DiscoverySession(
+                        deviceTypes: [.builtInWideAngleCamera, .continuityCamera, .external], mediaType: .video,
+                        position: .unspecified
+                    )
+                    // The built-in camera first, then Continuity and external ones.
+                    guard
+                        let device = discovery.devices.first(where: { $0.deviceType == .builtInWideAngleCamera })
+                            ?? discovery.devices.first
+                    else { throw CameraError.noCamera }
+                    let session = AVCaptureSession()
+                    session.sessionPreset = .high
+                    let input = try AVCaptureDeviceInput(device: device)
+                    guard session.canAddInput(input) else { throw CameraError.noCamera }
+                    session.addInput(input)
+                    session.startRunning()
+                    continuation.resume(returning: session)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
         }
+        self.session = session
         return session
     }
 

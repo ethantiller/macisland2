@@ -34,6 +34,9 @@ final class NotesModel {
     var selectedNoteID: UUID?
     var selectedSnippetID: UUID?
 
+    /// True when the last write failed (a full disk, a read-only folder), so what is on screen is not on disk.
+    private(set) var saveFailed = false
+
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
@@ -46,9 +49,16 @@ final class NotesModel {
 
     init(directory: URL? = nil) {
         fileURL = directory?.appendingPathComponent("notes.json") ?? Self.defaultFileURL
-        if let data = try? Data(contentsOf: fileURL), let stored = try? JSONDecoder().decode(Stored.self, from: data) {
-            notes = stored.notes
-            snippets = stored.snippets
+        if let data = try? Data(contentsOf: fileURL) {
+            if let stored = try? JSONDecoder().decode(Stored.self, from: data) {
+                notes = stored.notes
+                snippets = stored.snippets
+            } else {
+                // A file that will not load is set aside, so the next save cannot replace it with an empty list.
+                let stamp = Int(Date().timeIntervalSince1970)
+                let aside = fileURL.deletingLastPathComponent().appendingPathComponent("notes.unreadable-\(stamp).json")
+                try? FileManager.default.moveItem(at: fileURL, to: aside)
+            }
         }
         selectedNoteID = notes.first?.id
         selectedSnippetID = snippets.first?.id
@@ -147,8 +157,13 @@ final class NotesModel {
         saveTask?.cancel()
         let stored = Stored(notes: notes, snippets: snippets)
         guard let data = try? JSONEncoder().encode(stored) else { return }
-        try? FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: fileURL, options: .atomic)
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: fileURL, options: .atomic)
+            saveFailed = false
+        } catch {
+            saveFailed = true
+        }
     }
 }

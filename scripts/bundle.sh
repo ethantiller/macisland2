@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ./scripts/check-toolchain.sh
-CONFIG="${1:-debug}"
+CONFIG="${1:-release}"
 
 swift build -c "$CONFIG"
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"

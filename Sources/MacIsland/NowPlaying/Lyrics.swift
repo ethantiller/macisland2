@@ -85,7 +85,7 @@ final class LyricsModel {
     }
 
     nonisolated static func key(for state: NowPlayingState) -> String {
-        "\(state.title)\u{1F}\(state.artist)\u{1F}\(state.album)\u{1F}\(Int(state.duration.rounded()))"
+        "\(state.title)\u{1F}\(state.artist)\u{1F}\(state.album)\u{1F}\(safeInt(state.duration.rounded()))"
     }
 
     /// `GET /api/get`, which matches on name, artist, album, and length.
@@ -98,7 +98,7 @@ final class LyricsModel {
         ]
         if !state.album.isEmpty { items.append(URLQueryItem(name: "album_name", value: state.album)) }
         if state.duration > 0 {
-            items.append(URLQueryItem(name: "duration", value: String(Int(state.duration.rounded()))))
+            items.append(URLQueryItem(name: "duration", value: String(safeInt(state.duration.rounded()))))
         }
         components?.queryItems = items
         return components?.url

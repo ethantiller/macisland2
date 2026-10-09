@@ -23,6 +23,7 @@ with changes, and run `./scripts/docs-images.sh` after a UI change.
 - Tests: `./scripts/test.sh`
 - Visual review: `ISLAND_SNAPSHOT_DIR=/tmp/island ./scripts/test.sh --filter IslandSnapshots`
 - Refresh the docs pictures: `./scripts/docs-images.sh`
+- Problems building or running: `make doctor` (the Mac, the toolchain, the checkout and the built app, changing nothing; `./scripts/check-toolchain.sh` runs first in `bundle.sh` and `test.sh` and says how to fix an old toolchain). Runs on macOS 15 or later; building needs Command Line Tools 26 (Swift 6.2+).
 - Style: `./scripts/lint.sh` (reports; `--strict` fails) and `./scripts/format.sh` (never run over the whole codebase yet)
 
 ## Layout

@@ -50,9 +50,9 @@ struct SystemWidget: View {
     /// CPU and memory, then the battery, or how hot the Mac is on one that has none.
     static func cells(_ reading: SystemReading, includeBattery: Bool) -> [Cell] {
         var cells = [
-            Cell(value: reading.cpu.map { "\(Int(($0 * 100).rounded()))%" } ?? "\u{2013}", caption: "CPU"),
+            Cell(value: reading.cpu.map { "\(safeInt(($0 * 100).rounded()))%" } ?? "\u{2013}", caption: "CPU"),
             Cell(
-                value: "\(Int((reading.memoryFraction * 100).rounded()))%", caption: "Memory",
+                value: "\(safeInt((reading.memoryFraction * 100).rounded()))%", caption: "Memory",
                 needsAttention: reading.memoryNeedsAttention),
         ]
         guard includeBattery else { return cells }

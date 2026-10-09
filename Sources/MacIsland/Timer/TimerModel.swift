@@ -21,7 +21,7 @@ final class TimerModel {
 
     var isActive: Bool { phase != .idle }
 
-    var durationMinutes: Int { Int((duration / 60).rounded()) }
+    var durationMinutes: Int { safeInt((duration / 60).rounded()) }
 
     var isRunning: Bool {
         if case .running = phase { return true }
@@ -41,7 +41,7 @@ final class TimerModel {
     }
 
     func start(minutes: Int) {
-        duration = TimeInterval(minutes * 60)
+        duration = TimeInterval(min(max(minutes, 0), 10_080) * 60)
         run(for: duration)
     }
 

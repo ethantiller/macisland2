@@ -192,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         features.transfers.onFinish = { [diskSpace] _ in
             viewModel.flash(Announcements.downloadSaved, event: .download)
-            diskSpace.check()
+            diskSpace.checkLater()
         }
 
         DistributedNotificationCenter.default().addObserver(
@@ -202,14 +202,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [diskSpace] _ in
             MainActor.assumeIsolated {
                 viewModel.flash(Announcements.unlocked, for: .seconds(2), event: .unlocked)
-                diskSpace.check()
+                diskSpace.checkLater()
             }
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [diskSpace] _ in
-            MainActor.assumeIsolated { diskSpace.check() }
+            MainActor.assumeIsolated { diskSpace.checkLater() }
         }
 
         connectAgenda()
@@ -259,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         usage.onLimit = { [viewModel] limit in
             guard let percent = limit.percent else { return }
             viewModel.showBanner(
-                Announcements.agentLimit(agent: limit.agent, percent: Int(percent.rounded()), resetsAt: limit.resetsAt),
+                Announcements.agentLimit(agent: limit.agent, percent: safeInt(percent.rounded()), resetsAt: limit.resetsAt),
                 event: .agentLimit)
         }
         usage.start()
@@ -494,7 +494,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         features.fileTools.onDone = { [diskSpace] word in
             viewModel.flash(IslandAlert(systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: word))
-            diskSpace.check()
+            diskSpace.checkLater()
         }
         // A stale staging folder from a run that didn't quit cleanly goes now; nothing pending survives a launch.
         features.fileTools.cleanUpStaging()
@@ -505,7 +505,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     systemImage: "checkmark.circle.fill", tint: Theme.Tint.positive, text: result.verb,
                     staysUntilSeen: true, opensTab: .shelf),
                 respectingFocus: false)
-            diskSpace.check()
+            diskSpace.checkLater()
         }
         features.fileTools.onNote = { note in viewModel.flash(note, respectingFocus: false) }
         features.fileTools.onFail = { reason in
@@ -611,12 +611,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshSetupGate() }
+            // Clicking into the island activates the app too, and the ten reads are made on the main thread: once setup is
+            // complete, a look in the last half minute is recent enough.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.gate.isOpen, let last = self.lastSetupRefresh, Date().timeIntervalSince(last) < 30 { return }
+                self.refreshSetupGate()
+            }
         }
     }
 
     /// Reads every permission again, the slow ones too, then settles the gate.
+    private var lastSetupRefresh: Date?
+
     private func refreshSetupGate() {
+        lastSetupRefresh = Date()
         Task { @MainActor in
             await AccessCenter.model?.refreshed()
             updateSetupGate()

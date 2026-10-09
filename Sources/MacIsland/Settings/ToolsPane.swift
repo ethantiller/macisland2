@@ -49,7 +49,7 @@ struct ToolsOptions: View {
                 Text("Shortcut Tools").id(SettingsAnchor.shortcutTools)
             } footer: {
                 Text(
-                    "Make a tool from one of your Shortcuts: pressing it runs the Shortcut. Up to \(AppSettings.maxShortcutTools), which with the nine built in and Less fill the Tools tab. Its icon is one you choose here; MacIsland can\u{2019}t read the one Shortcuts shows."
+                    "Make a tool from one of your Shortcuts: pressing it runs the Shortcut. Up to \(AppSettings.maxShortcutTools), which with the nine built in and Less fill the Tools tab (a third row opens while AI Agents is on). Its icon is one you choose here; MacIsland can\u{2019}t read the one Shortcuts shows."
                 )
             }
             Section {

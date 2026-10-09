@@ -1,6 +1,7 @@
 import AudioToolbox
 import CoreAudio
 import Foundation
+import Synchronization
 
 /// A running tap: one app's sound, taken out of the system mix and played again, at a level, on an output.
 @MainActor
@@ -23,59 +24,94 @@ protocol AudioTapping: AnyObject {
 
 /// The audio thread's side of a tap. Everything it touches is made before the tap starts: it allocates nothing while running.
 final class TapState: @unchecked Sendable {
-    /// Written on the main thread, read on the audio thread: a 32-bit store, which is atomic on every Mac.
-    var level: Float
-    private(set) var heard = false
-    private var limiter: BoostLimiter?
+    /// The most output streams that are limited; any more play silence.
+    private static let maxStreams = 4
+    private static let scratchSamples = 16_384
+
+    /// Written on the main thread, read on the audio thread, so both go through atomics.
+    private let levelBits: Atomic<UInt32>
+    private let heardFlag = Atomic<Bool>(false)
+    /// One limiter for each output stream, because each remembers the last few milliseconds of its own sound.
+    private var limiters: [BoostLimiter]
     private var scratch: [Float]
     private var sampleRate: Double
 
+    var level: Float {
+        get { Float(bitPattern: levelBits.load(ordering: .relaxed)) }
+        set { levelBits.store(newValue.bitPattern, ordering: .relaxed) }
+    }
+    var heard: Bool { heardFlag.load(ordering: .relaxed) }
+
     init(level: Float, sampleRate: Double) {
-        self.level = level
+        levelBits = Atomic(level.bitPattern)
         self.sampleRate = sampleRate
-        scratch = [Float](repeating: 0, count: 4096)
-        limiter = BoostLimiter(channels: 2, sampleRate: sampleRate)
+        scratch = [Float](repeating: 0, count: Self.scratchSamples)
+        limiters = Self.makeLimiters(sampleRate: sampleRate)
+    }
+
+    private static func makeLimiters(sampleRate: Double) -> [BoostLimiter] {
+        (0..<maxStreams).map { _ in BoostLimiter(channels: 2, sampleRate: sampleRate) }
     }
 
     /// Before the tap starts: the output's real rate, so the limiter's look-ahead and release are right.
     func configure(sampleRate: Double) {
         self.sampleRate = sampleRate
-        limiter = BoostLimiter(channels: 2, sampleRate: sampleRate)
+        limiters = Self.makeLimiters(sampleRate: sampleRate)
     }
 
-    /// Copies the tap's input to the output times the level, buffer by buffer.
+    /// Copies the tap's sound to every output stream times the level. The tap is the last input stream: an output device with a
+    /// microphone (a headset) puts its own input streams before it, and those must never be played back.
     func process(_ input: UnsafePointer<AudioBufferList>, _ output: UnsafeMutablePointer<AudioBufferList>) {
         let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outputs = UnsafeMutableAudioBufferListPointer(output)
-        let level = self.level
+        let requested = level
+        let level = requested.isFinite ? requested : 1
         for index in 0..<outputs.count {
-            guard index < inputs.count, let from = inputs[index].mData, let to = outputs[index].mData else {
-                if let to = outputs[index].mData { memset(to, 0, Int(outputs[index].mDataByteSize)) }
+            guard let to = outputs[index].mData else { continue }
+            let byteCount = Int(outputs[index].mDataByteSize)
+            guard inputs.count > 0, index < Self.maxStreams, let from = inputs[inputs.count - 1].mData else {
+                memset(to, 0, byteCount)
                 continue
             }
-            let inChannels = max(Int(inputs[index].mNumberChannels), 1)
+            let tap = inputs[inputs.count - 1]
+            let inChannels = max(Int(tap.mNumberChannels), 1)
             let outChannels = max(Int(outputs[index].mNumberChannels), 1)
             let frames = min(
-                Int(inputs[index].mDataByteSize) / (MemoryLayout<Float>.size * inChannels),
-                Int(outputs[index].mDataByteSize) / (MemoryLayout<Float>.size * outChannels))
+                Int(tap.mDataByteSize) / (MemoryLayout<Float>.size * inChannels),
+                byteCount / (MemoryLayout<Float>.size * outChannels))
             let source = from.assumingMemoryBound(to: Float.self)
             let target = to.assumingMemoryBound(to: Float.self)
-            if limiter?.channels != inChannels { limiter = BoostLimiter(channels: inChannels, sampleRate: sampleRate) }
-            if !heard { heard = Self.hasSound(source, count: frames * inChannels) }
+            if limiters[index].channels != inChannels {
+                // Not the stereo mixdown that was expected: the one case that allocates.
+                limiters[index] = BoostLimiter(channels: inChannels, sampleRate: sampleRate)
+            }
+            if !heard && Self.hasSound(source, count: frames * inChannels) { heardFlag.store(true, ordering: .relaxed) }
             if inChannels == outChannels {
-                limiter?.process(source, into: target, frames: frames, level: level)
+                limiters[index].process(source, into: target, frames: frames, level: level)
             } else {
                 // A different layout (a mono output): the first channels through, the rest silent.
-                if scratch.count < frames * inChannels { scratch = [Float](repeating: 0, count: frames * inChannels) }
+                let chunk = max(Self.scratchSamples / inChannels, 1)
                 scratch.withUnsafeMutableBufferPointer { buffer in
                     guard let base = buffer.baseAddress else { return }
-                    limiter?.process(source, into: base, frames: frames, level: level)
-                    for frame in 0..<frames {
-                        for channel in 0..<outChannels {
-                            target[frame * outChannels + channel] = channel < inChannels ? base[frame * inChannels + channel] : 0
+                    var done = 0
+                    while done < frames {
+                        let count = min(chunk, frames - done)
+                        limiters[index].process(source + done * inChannels, into: base, frames: count, level: level)
+                        for frame in 0..<count {
+                            for channel in 0..<outChannels {
+                                target[(done + frame) * outChannels + channel] =
+                                    channel < inChannels ? base[frame * inChannels + channel] : 0
+                            }
                         }
+                        done += count
                     }
                 }
+            }
+            // A sample that is not a number would be heard as a pop: silence instead.
+            for sample in 0..<frames * outChannels where !target[sample].isFinite { target[sample] = 0 }
+            if frames * outChannels * MemoryLayout<Float>.size < byteCount {
+                memset(
+                    to + frames * outChannels * MemoryLayout<Float>.size, 0, byteCount - frames * outChannels * MemoryLayout<Float>.size)
             }
         }
     }

@@ -60,7 +60,7 @@ final class ClipboardHistory {
         guard timer == nil, capacity > 0 else { return }
         // The pasteboard has no change notification, so compare its change count.
         let timer = Timer(timeInterval: 0.7, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.poll() }
+            MainActor.assumeIsolated { if ScreenActivity.shared.isActive { self?.poll() } }
         }
         // Lets macOS fire it with other wakeups instead of on its own.
         timer.tolerance = 0.2

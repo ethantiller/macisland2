@@ -83,7 +83,7 @@ final class AudioOutputs {
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(Self.systemObject, &address, 0, nil, &size, &ids) == noErr else { return }
 
-        devices = ids.compactMap { id in
+        let found: [Device] = ids.compactMap { id in
             let transport = Self.transportType(of: id)
             guard Self.hasOutput(id),
                 transport != kAudioDeviceTransportTypeVirtual,
@@ -93,13 +93,19 @@ final class AudioOutputs {
             return Device(id: id, name: name, transportType: transport, uid: CoreAudioTapper.deviceUID(id))
         }
 
+        var changed = found != devices
+        if changed { devices = found }
         var defaultID = AudioDeviceID(kAudioObjectUnknown)
         var defaultSize = UInt32(MemoryLayout<AudioDeviceID>.size)
         var defaultAddress = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
         if AudioObjectGetPropertyData(Self.systemObject, &defaultAddress, 0, nil, &defaultSize, &defaultID) == noErr {
-            defaultDeviceID = defaultID
+            if defaultID != defaultDeviceID {
+                defaultDeviceID = defaultID
+                changed = true
+            }
         }
-        onChange?()
+        // The Mixer's own aggregate device makes the device list notify too; with the same real outputs and default, nothing changed.
+        if changed { onChange?() }
     }
 
     private static func address(

@@ -45,7 +45,7 @@ enum DialScrubber {
 
     /// The whole minute a position settles on.
     static func snap(_ position: Double) -> Int {
-        Int(min(max(position, minimum), maximum).rounded())
+        safeInt(min(max(position, minimum), maximum).rounded())
     }
 
     /// The minute whose tick is at `x`, for a ruler whose marker is at `markerX` with `position` under it.
@@ -61,8 +61,8 @@ enum DialScrubber {
         position: Double, width: CGFloat, spacing: CGFloat = Theme.Metrics.dialMinuteSpacing
     ) -> ClosedRange<Int> {
         let half = Double(width / 2 / spacing)
-        let lower = max(Int((position - half).rounded(.up)), TimerModel.minimumDialMinutes)
-        let upper = min(Int((position + half).rounded(.down)), TimerModel.maximumDialMinutes)
+        let lower = max(safeInt((position - half).rounded(.up)), TimerModel.minimumDialMinutes)
+        let upper = min(safeInt((position + half).rounded(.down)), TimerModel.maximumDialMinutes)
         return lower...max(lower, upper)
     }
 }

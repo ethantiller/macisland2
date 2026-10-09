@@ -56,20 +56,37 @@ struct ReminderRow: Identifiable, Equatable {
 
 /// Finds the video-call link in an event's location, notes, or URL.
 enum MeetingLink {
-    private static let pattern = try! NSRegularExpression(
-        pattern:
-            #"https?://[^\s<>"']*(?:zoom\.us|zoom\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com|webex\.com|whereby\.com)[^\s<>"']*"#,
-        options: [.caseInsensitive]
-    )
+    private static let hosts = [
+        "zoom.us", "zoom.com", "meet.google.com", "teams.microsoft.com", "teams.live.com", "webex.com", "whereby.com",
+    ]
+    private static let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "<>\"'"))
+    /// Event text comes from whoever sent the invite, so only this much of it, and of one word, is searched.
+    private static let maxText = 100_000
+    private static let maxWord = 2_048
 
+    /// The first http(s) address in `texts` that contains a meeting host. One pass over each text with no backtracking.
     static func find(in texts: [String?]) -> URL? {
         for case let text? in texts {
-            let range = NSRange(text.startIndex..., in: text)
-            guard let match = pattern.firstMatch(in: text, range: range),
-                let matched = Range(match.range, in: text)
-            else { continue }
-            let link = String(text[matched]).trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)>]"))
-            if let url = URL(string: link) { return unwrap(url) }
+            for word in text.prefix(maxText).components(separatedBy: separators) where word.utf8.count <= maxWord {
+                guard let link = link(in: word) else { continue }
+                let trimmed = link.trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)>]"))
+                if let url = URL(string: trimmed) { return unwrap(url) }
+            }
+        }
+        return nil
+    }
+
+    /// The part of `word` from an `http://` or `https://` that has a meeting host after it.
+    private static func link(in word: String) -> String? {
+        let lower = word.lowercased()
+        guard lower.utf8.count == word.utf8.count else { return nil }
+        var from = lower.startIndex
+        while let scheme = lower.range(of: "http", range: from..<lower.endIndex) {
+            let tail = lower[scheme.lowerBound...]
+            if tail.hasPrefix("http://") || tail.hasPrefix("https://"), hosts.contains(where: { tail.contains($0) }) {
+                return String(word[scheme.lowerBound...])
+            }
+            from = scheme.upperBound
         }
         return nil
     }
@@ -335,7 +352,7 @@ final class AgendaMonitor {
     func start() {
         guard timer == nil else { return }
         let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated { if ScreenActivity.shared.isActive { self?.refresh() } }
         }
         // Lets macOS fire it with other wakeups instead of on its own.
         timer.tolerance = 5
@@ -472,7 +489,7 @@ final class AgendaMonitor {
         var items: [AgendaItem] = []
         var denied = false
         if wantsCalendar {
-            if await hasAccess(.event, asking: mayAsk) { items += events() } else { denied = true }
+            if await hasAccess(.event, asking: mayAsk) { items += await events() } else { denied = true }
         }
         if wantsReminders {
             if await hasAccess(.reminder, asking: mayAsk) { items += await reminders() } else { denied = true }
@@ -509,13 +526,22 @@ final class AgendaMonitor {
         }
     }
 
-    /// The calendars that count: nil is all of them, which is what no calendar being left out means.
-    private func allowedCalendars() -> [EKCalendar]? {
-        guard !hiddenCalendars.isEmpty else { return nil }
-        return store.calendars(for: .event).filter { !hiddenCalendars.contains($0.calendarIdentifier) }
+    /// The events between two dates, for the calendars that count (nil is all of them, which is what none being left out means). The
+    /// fetch and the link search for every event are made off the main thread, and the 30 second refresh runs them again and again.
+    private func fetchEvents(
+        from start: Date, to end: Date, keeping keep: @escaping @Sendable (EKEvent) -> Bool
+    ) async -> [AgendaItem] {
+        nonisolated(unsafe) let store = store
+        let hidden = hiddenCalendars
+        return await Task.detached(priority: .userInitiated) {
+            let calendars =
+                hidden.isEmpty ? nil : store.calendars(for: .event).filter { !hidden.contains($0.calendarIdentifier) }
+            let predicate = store.predicateForEvents(withStart: start, end: end, calendars: calendars)
+            return store.events(matching: predicate).filter(keep).map(Self.item(for:))
+        }.value
     }
 
-    private func item(for event: EKEvent) -> AgendaItem {
+    nonisolated private static func item(for event: EKEvent) -> AgendaItem {
         AgendaItem(
             id: "\(event.eventIdentifier ?? event.title ?? "event")@\(event.startDate.timeIntervalSince1970)",
             kind: .event,
@@ -528,17 +554,13 @@ final class AgendaMonitor {
         )
     }
 
-    private func events() -> [AgendaItem] {
+    private func events() async -> [AgendaItem] {
         let now = Date()
-        let predicate = store.predicateForEvents(
-            withStart: now.addingTimeInterval(-600), end: now.addingTimeInterval(86_400), calendars: allowedCalendars())
         let showsTimeLeft = showsTimeLeft
-        return store.events(matching: predicate)
-            .filter {
-                !$0.isAllDay && $0.status != .canceled
-                    && AgendaRules.keepsEvent(start: $0.startDate, end: $0.endDate, now: now, showsTimeLeft: showsTimeLeft)
-            }
-            .map(item(for:))
+        return await fetchEvents(from: now.addingTimeInterval(-600), to: now.addingTimeInterval(86_400)) {
+            !$0.isAllDay && $0.status != .canceled
+                && AgendaRules.keepsEvent(start: $0.startDate, end: $0.endDate, now: now, showsTimeLeft: showsTimeLeft)
+        }
     }
 
     /// The accounts and their calendars, for choosing which count. Empty until Calendars is allowed.
@@ -559,9 +581,7 @@ final class AgendaMonitor {
     func eventDays(in interval: DateInterval) async -> [Int: [AgendaItem]] {
         if let sampleDays { return sampleDays }
         guard wantsCalendar, await hasAccess(.event, asking: false) else { return [:] }
-        let predicate = store.predicateForEvents(
-            withStart: interval.start, end: interval.end, calendars: allowedCalendars())
-        let items = store.events(matching: predicate).filter { $0.status != .canceled }.map(item(for:))
+        let items = await fetchEvents(from: interval.start, to: interval.end) { $0.status != .canceled }
         return AgendaRules.eventDays(items, inMonthOf: interval.start)
     }
 

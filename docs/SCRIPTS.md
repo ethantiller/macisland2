@@ -20,7 +20,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Build and restart the app | `make build-and-restart` |
 | Build and restart the app | `make build-and-restart` |
 | Build signed ad hoc, leaving the keychain alone | `MACISLAND_ADHOC=1 make bundle` |
-| Build a release bundle | `./scripts/bundle.sh release` |
+| Build a debug bundle | `./scripts/bundle.sh debug` (`make bundle-debug`) |
 | Run the tests | `./scripts/test.sh` |
 | Check the Swift toolchain is new enough | `./scripts/check-toolchain.sh` (bundle.sh and test.sh run it first) |
 | Print the Mac, toolchain and build for a bug report | `make doctor` |
@@ -34,7 +34,7 @@ fit: [ARCHITECTURE.md](ARCHITECTURE.md).
 | Show the first-run guide again | `open macisland://guide` |
 | Test the guide on a dev Mac from a true first run | `make first-run` (after `make bundle`): quits MacIsland, `tccutil reset All`, writes `onboarding.install fresh` and the guide and tour as never seen, forgets which permissions were asked, the optional permissions seen, the Features catalog, the last Automation answers, and the step the guide stopped at, and opens the app |
 | Open Settings on its tour | `open macisland://tour` |
-| See the guide as a fresh install would (debug builds) | `open 'macisland://guide?reset=1'` |
+| See the guide as a fresh install would (debug builds: `./scripts/bundle.sh debug`) | `open 'macisland://guide?reset=1'` |
 | Forget the app's macOS permissions | `tccutil reset All com.ethantiller.MacIsland` |
 | Measure idle CPU | `ps -o cputime= -p $(pgrep -x MacIsland)`, ten seconds apart |
 | Read a crash report | `ls -t ~/Library/Logs/DiagnosticReports \| grep MacIsland` |
@@ -62,7 +62,7 @@ Changes nothing; prints what is needed to work out why a build or launch fails: 
 Builds the app and wraps the binary in a bundle you can open.
 
 ```
-./scripts/bundle.sh [debug|release]      # default: debug
+./scripts/bundle.sh [debug|release]      # default: release
 ```
 
 1. `check-toolchain.sh`.
@@ -168,7 +168,7 @@ Formats in place with `swift format format`, using [`.swift-format`](#config-fil
 
 | File | Contains |
 | --- | --- |
-| `Package.swift` | Tools version 6.2, `platforms: [.macOS(.v26)]`, an executable target `MacIsland` (`Sources/MacIsland`) and a test target `MacIslandTests` (`Tests/MacIslandTests`), both in **Swift 5 language mode**. No dependencies |
+| `Package.swift` | Tools version 6.2, `platforms: [.macOS(.v15)]` (built against the macOS 26 SDK; 26-only APIs sit behind `#available`), an executable target `MacIsland` (`Sources/MacIsland`) and a test target `MacIslandTests` (`Tests/MacIslandTests`), both in **Swift 5 language mode**. No dependencies |
 | `Makefile` | Shortcuts for linting, formatting, bundling, restarting, and building then restarting the app |
 | `Support/Info.plist` | The bundle's identity (`com.ethantiller.MacIsland`, version 0.1.0), `LSUIElement` (no Dock icon), `LSMinimumSystemVersion`, and the permission reasons: Calendars, Reminders, Bluetooth, Focus status, Downloads folder, Apple Events, Camera, Microphone, Speech recognition, and the `macisland` URL scheme |
 | `.swift-format` | 4-space indent, 120-column lines, at most one blank line, existing line breaks respected; rules that would fight this codebase's style (force unwraps, naming, doc comments) are off; imports must be ordered |
@@ -256,16 +256,17 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `AgentLogParser.swift` | `AgentKind`, `AgentLogEvent`, and the pure parser for both tools' lines |
 | `AgentActivity.swift` | `AgentTask` and `AgentActivity`: open turns, the idle deadline, the finish notice |
 | `AgentLogWatcher.swift` | `AgentLogWatching`, the FSEvents watcher, `AgentLogTail` (a file's new whole lines), and where the logs are |
-| `AgentsView.swift` | The module (its header and modes), the Now view, a task row, and the peek |
+| `AgentsView.swift` | The module (its header and modes), the Now view (a task or one quiet line, "Plan limits" with Claude's two bars always, the runner, and `contentHeight`), a task row, and the peek |
 | `AgentUsageStore.swift` | The usage line parser, the buckets and their cache (`AgentUsageData`), and the `AgentUsageStore` actor that reads the history |
 | `AgentPricing.swift` | `AgentTokens`, `AgentPrice`, and the price lookup over the bundled table |
 | `AgentLimits.swift` | `AgentLimit`, the Claude app's file and the reset rules, the estimated block, and Codex's windows |
-| `AgentUsageSummary.swift` | Pure: the Usage ranges and the ranked models and projects |
+| `AgentUsageSummary.swift` | Pure: the Usage ranges, the ranked models and projects, and the token mix (`TokenKind`, `TokenShare`) |
 | `AgentStats.swift` | Pure: `StatsRange`, `YearMap` (53 weeks, quartile steps, months, streaks), and `AgentStats` (the Stats figures and the fun fact) |
-| `AgentStatsView.swift` | The Stats mode: the year map, the range, the eight tiles, and the Claude/Codex filter |
+| `AgentStatsView.swift` | The Stats mode: the year map (orange for Claude Code), the range, the eight tiles, and `AgentFilterMenu`, the always-visible All / Claude Code / Codex dropdown |
 | `AgentMark.swift` | `AgentMark`, `AgentMarks`, and the vector shapes of Claude Code's critter and Codex's cloud |
 | `AgentUsageModel.swift` | The main-actor model that asks the store for a snapshot (on appearance, and after a log changes) |
-| `AgentUsageViews.swift` | `AgentsMode`, the number formats, the limit row, and the Usage mode |
+| `AgentUsageViews.swift` | `AgentsMode`, the number formats, the limit row (a bar always), and the Usage mode with its token donut (`TokenDonut`, `TokenLegend`) |
+| `ClaudeRunner.swift` | The Now tab's runner: `RunnerScene` (the game as a function of time, pure), `ClaudeRunnerView`, its Core Animation form `RunnerLayerView`, and the pixel cactus, cloud and bird shapes |
 
 ### `Home/`
 
@@ -327,7 +328,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 
 | File | Contains |
 | --- | --- |
-| `ToolID.swift` | `ToolID` (a built-in tool or a Shortcut tool, stored by name), `ShortcutTool`, and the default pins |
+| `ToolID.swift` | `ToolID` (a built-in tool or a Shortcut tool, stored by name; `.agents` is built in but only a tool while AI Agents is on), `ShortcutTool`, and the default pins |
 | `ToolCatalog.swift` | What each tool is and does (shared by the Tools tab, Home, and the peek) |
 | `ToolsView.swift` | The Tools tab: row (or the Mirror), grid, Ring Light sliders, Keep Awake chips; `ControlButton` |
 | `CameraMirror.swift` | `CameraMirror`, `CameraSessionProviding`, the AVFoundation provider, and the preview layer view |
@@ -337,7 +338,7 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `RingLight.swift` | The screen-edge glow (a click-through window) |
 | `MicrophoneMute.swift` | Mutes the default input device |
 | `KeyboardCleaner.swift` | The event tap that swallows keys for 30 seconds |
-| `AudioOutputs.swift` | Output devices and the default one |
+| `AudioOutputs.swift` | Output devices and the default one; it reports a change only when the real outputs or default changed |
 | `SystemActions.swift` | Eyedropper, hex strings, clipboard, area screenshot |
 
 ### `Agenda/`
@@ -378,10 +379,10 @@ Every Swift file in `Sources/MacIsland/` (170 files, about 32,000 lines). One fo
 | `System/PrivacyMonitor.swift` | Which app is using the microphone, from CoreAudio property listeners (no polling) |
 | `System/NetworkMonitor.swift` | Personal Hotspot detection |
 | `System/SystemSampler.swift` | `SystemMath` (pure), `LiveSystemSampler` (Mach calls, memory pressure), and `SystemModel` (samples only while the widget runs it) |
-| `System/AppMixer.swift` | The Mixer's rules: which apps are tapped, levels and outputs, and the permission evidence |
+| `System/AppMixer.swift` | The Mixer's rules: which apps are tapped, levels and outputs (a level being dragged is previewed live), what counts as a device change, and the permission evidence |
 | `System/AppAudio.swift` | `MixerApp`, `AppGrouping` (pure), and the Core Audio process list behind `AppAudioListing` |
 | `System/AppAudioTap.swift` | `AudioTap` and `AudioTapping`, the audio thread's `TapState`, and the live process tap and aggregate device |
-| `System/BoostLimiter.swift` | The look-ahead peak limiter for gain above 100% (pure) |
+| `System/BoostLimiter.swift` | The gain and the look-ahead peak limiter for above 100% (pure): level changes ramp, and crossing 100% crossfades |
 | `System/FocusMode.swift` | Whether a Focus is on, read when needed or while the Focus button shows; switching through Shortcuts |
 | `System/DiskSpace.swift` | `DiskRule` (warn under 10 GB, re-arm above 15 GB) and `DiskSpace`, checked on events |
 | `System/BluetoothDevices.swift` | Paired audio devices, connecting, and `IOBluetoothProvider` behind `BluetoothDeviceProviding` |
@@ -420,7 +421,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 
 ## Tests
 
-`Tests/MacIslandTests/`: 60 files, about 14,500 lines, 983 tests. Swift Testing.
+`Tests/MacIslandTests/`: 65 files, about 15,700 lines, 1,062 tests. Swift Testing.
 
 | File | Covers |
 | --- | --- |
@@ -451,7 +452,7 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `ClipboardSearchTests.swift` | Clipboard search (every word, case and accents, ranges), the paste keys over a stub, the Accessibility fallback, key caps, Esc |
 | `CalendarTests.swift` | Countdowns (the hour before, chosen or every, pruned, the rank), time left (kept until the end, the words, the event on now first), calendars left out and grouped by account, and the month's event days and day line |
 | `SystemSamplerTests.swift` | The System card: CPU maths (wrap, empty interval), memory, thermal words, red only for needs-you, the cells, offered only with its feature, sampling only while shown |
-| `MixerTests.swift` | The limiter on buffers, helper grouping, and the Mixer's rules with a stub list and stub taps |
+| `MixerTests.swift` | The limiter on buffers (ramps, crossing 100%), helper grouping, and the Mixer's rules with a stub list and stub taps (device-change loop, live drag, its own sound) |
 | `InputChoicesTests.swift` | Show Media From (and keeping it), Peek After, Hide Until You Point at It, Hide in Full Screen, Open On and each activity's module, Esc stepping back one level (and never past Mirror), and Keep Awake's time left (worded by the minute, only with an end, ranked last) |
 | `NotificationReaderTests.swift` | A fixture accessibility tree: a banner's fields, an alert and a banner, the first scan recording, the caps, the inbox, lock, Open, and nothing starting without Accessibility |
 | `NotificationMirrorTests.swift` | In the Island and In the Corner, a persistent alert never closed, a banner that can't be closed, Focus, the widget, and the feature switch |
@@ -460,6 +461,9 @@ Note for `swift run`: without an app bundle there is no bundle identifier, so de
 | `DownloadsTests.swift` | The newest twenty, arriving files, the mode and the feature, and watching only while shown |
 | `ChooseActivityTests.swift` | The chosen activity leading the pair and the peek, alerts first, the choice ending, and the peek's height |
 | `AgentUsageTests.swift` | Prices, the buckets and their dedupe and pruning, the store on a temporary home (resume, rewrite, cache, Codex), the Claude app's file and the reset rules, the activity map, and the notice |
+| `AgentsToolTests.swift` | Agents as a tool: only while the feature is on, before the person's own, a third grid row when needed, and it opens the module |
+| `AgentFilterTests.swift` | The Stats dropdown's titles and Claude's orange steps |
+| `ClaudeRunnerTests.swift` | The runner: it always clears a cactus, the loop repeats without a seam, its layers and looping animations, and the layer render |
 | `AgentActivityTests.swift` | Agent logs: the Claude Code and Codex lines, turns and their ends, the finish notice rules, dead sessions, the rank, the options, and reading a file's tail |
 | `FeatureTests.swift`, `ToolsTests.swift` | Timer, stopwatch, tools, clipboard |
 | `NowPlayingStateTests.swift`, `ArtworkAccentTests.swift` | The stream parser, elapsed time, accent color |

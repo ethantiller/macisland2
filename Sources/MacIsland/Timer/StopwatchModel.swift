@@ -44,6 +44,6 @@ final class StopwatchModel {
 
 /// "m:ss.t" for the stopwatch.
 func formatStopwatch(_ seconds: TimeInterval) -> String {
-    let tenths = Int((max(seconds, 0) * 10).rounded(.down))
+    let tenths = safeInt((max(seconds, 0) * 10).rounded(.down))
     return formatTime(TimeInterval(tenths / 10)) + ".\(tenths % 10)"
 }

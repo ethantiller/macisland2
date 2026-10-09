@@ -163,14 +163,14 @@ enum AgentLogParser {
                 event.prompt = promptLine(in: payload?["message"])
             case "token_count":
                 if let info = payload?["info"] as? [String: Any], let last = info["last_token_usage"] as? [String: Any] {
-                    func int(_ value: Any?) -> Int { (value as? NSNumber)?.intValue ?? 0 }
+                    func int(_ value: Any?) -> Int { AgentTokens.count(value) }
                     let input = int(last["input_tokens"])
                     let cached = min(int(last["cached_input_tokens"]), input)
                     let tokens = AgentTokens(input: input - cached, output: int(last["output_tokens"]), cacheRead: cached)
                     if tokens.total > 0 {
                         event.tokens = tokens
                         event.contextTokens = input
-                        event.contextWindow = (info["model_context_window"] as? NSNumber)?.intValue
+                        event.contextWindow = (info["model_context_window"] as? NSNumber).map { AgentTokens.count($0) }
                     }
                 }
             default: break

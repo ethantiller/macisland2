@@ -114,6 +114,47 @@ struct BoostLimiterTests {
         }
     }
 
+    /// Runs the same limiter over successive buffers, one level each, and returns channel 0 of everything it played.
+    private func runBuffers(levels: [Float], input: [Float], frames: Int = 480, channels: Int = 2) -> [Float] {
+        var limiter = BoostLimiter(channels: channels, sampleRate: 48_000)
+        var played: [Float] = []
+        var position = 0
+        for level in levels {
+            var chunk = Array(input[(position * channels)..<((position + frames) * channels)])
+            let source = chunk
+            source.withUnsafeBufferPointer { from in
+                chunk.withUnsafeMutableBufferPointer { to in
+                    limiter.process(from.baseAddress!, into: to.baseAddress!, frames: frames, level: level)
+                }
+            }
+            played += stride(from: 0, to: chunk.count, by: channels).map { chunk[$0] }
+            position += frames
+        }
+        return played
+    }
+
+    private func largestStep(_ samples: [Float]) -> Float {
+        zip(samples, samples.dropFirst()).map { abs($1 - $0) }.max() ?? 0
+    }
+
+    @Test func aLevelChangeRampsInsteadOfStepping() {
+        // A steady 0.5 played at 20% then 100%: the second buffer climbs smoothly, with no jump of the whole difference.
+        let input = [Float](repeating: 0.5, count: 480 * 2 * 2)
+        let played = runBuffers(levels: [0.2, 1], input: input)
+        #expect(largestStep(played) < 0.01, "a step of 0.4 would be a click")
+        #expect(abs(played[479] - 0.1) < 0.02 && abs(played[959] - 0.5) < 0.000_1, "it still lands on the new level")
+    }
+
+    @Test func draggingAcrossFullVolumeDoesNotClick() {
+        // A 530 Hz tone with the level swept over 100% and back, one level per buffer: no sample jumps more than the tone does.
+        let frames = 480
+        let levels: [Float] = [0.8, 0.9, 0.97, 1.05, 1.2, 1.4, 1.2, 1.05, 0.97, 0.9, 0.8]
+        let input = sine(frames: frames * levels.count, amplitude: 0.5)
+        let played = runBuffers(levels: levels, input: input)
+        #expect(largestStep(played) < 0.12, "a hard splice would jump by up to the whole amplitude")
+        #expect(played.allSatisfy { abs($0) <= 1 })
+    }
+
     @Test func theLookAheadScalesWithTheSampleRate() {
         let slow = BoostLimiter(channels: 2, sampleRate: 44_100).lookahead
         let fast = BoostLimiter(channels: 2, sampleRate: 88_200).lookahead
@@ -269,6 +310,63 @@ struct AppMixerTests {
         rig.mixer.setLevel(1, for: music.id)
         rig.mixer.setOutput("speakers", for: music.id)
         #expect(rig.mixer.tappedApps.isEmpty)
+    }
+
+    // The mixer's own aggregate device changes Core Audio's device list when it is made or destroyed. Treating that as "the outputs
+    // changed" tore every tap down and made it again, forever: crunching sound, a slider that would not move, a jumping layout.
+    @Test func aDeviceChangeThatChangedNothingLeavesTheTapsAlone() {
+        let rig = rig(apps: [music])
+        rig.mixer.availableOutputs = { ["speakers"] }
+        rig.mixer.defaultOutput = { "speakers" }
+        rig.mixer.start()
+        rig.mixer.setLevel(0.5, for: music.id)
+        #expect(rig.tapper.taps.count == 1)
+        for _ in 0..<5 { rig.mixer.devicesChanged() }
+        #expect(rig.tapper.taps.count == 1 && !rig.tapper.taps[0].isStopped, "the same tap is still running")
+        rig.mixer.defaultOutput = { "headphones" }
+        rig.mixer.availableOutputs = { ["speakers", "headphones"] }
+        rig.mixer.devicesChanged()
+        #expect(rig.tapper.taps[0].isStopped && rig.tapper.taps.count == 2, "a real change still makes the taps again")
+    }
+
+    @Test func draggingStartsTheSoundFollowingAtOnceAndASweepOfListChangesDoesNotUndoIt() {
+        let rig = rig(apps: [music])
+        rig.mixer.start()
+        #expect(rig.tapper.taps.isEmpty)
+        rig.mixer.previewLevel(0.4, for: music.id)
+        #expect(rig.tapper.taps.count == 1, "no need to let go before the sound follows")
+        rig.mixer.previewLevel(0.6, for: music.id)
+        rig.list.publish([music])
+        rig.list.publish([music])
+        #expect(rig.tapper.taps.count == 1 && rig.tapper.taps[0].levels.last == 0.6, "a list change mid-drag keeps the dragged level")
+        #expect(rig.settings.mixerLevels.isEmpty, "nothing is stored until the drag ends")
+        rig.mixer.setLevel(0.6, for: music.id)
+        #expect(rig.mixer.level(for: music.id) == 0.6 && rig.tapper.taps.count == 1)
+    }
+
+    @Test func draggingBackToFullVolumeLetsTheTapGo() {
+        let rig = rig(apps: [music])
+        rig.mixer.start()
+        rig.mixer.previewLevel(0.4, for: music.id)
+        rig.mixer.previewLevel(1, for: music.id)
+        rig.mixer.setLevel(1, for: music.id)
+        #expect(rig.mixer.tappedApps.isEmpty && rig.tapper.taps[0].isStopped, "100% on the default output has no tap, even if the level did not change")
+    }
+
+    @Test func anEndedDragThatWasNeverCommittedGivesTheSoundBack() {
+        let rig = rig(apps: [music])
+        rig.mixer.start()
+        rig.mixer.previewLevel(0.4, for: music.id)
+        rig.mixer.endPreviews()
+        #expect(rig.mixer.tappedApps.isEmpty && rig.tapper.taps[0].isStopped)
+    }
+
+    @Test func theMixersOwnSoundIsNotARow() {
+        let own = MixerApp(id: "com.ethantiller.MacIsland", name: "MacIsland", processObjects: [9], isPlaying: true)
+        let rig = rig(apps: [own, music])
+        rig.mixer.ownBundleID = own.id
+        rig.mixer.start()
+        #expect(rig.mixer.rows.map(\.id) == [music.id], "its own tap playing must not add a row and make the island taller")
     }
 
     @Test func nothingIsTappedAtLaunchUnlessAllowed() {

@@ -25,6 +25,11 @@ enum AgentLogTail {
     /// for the next read. A file that got shorter was replaced: it is read from its start. With a `limit`, at most that many bytes are
     /// read, so a long file is taken in chunks; a chunk with no newline in it comes back empty at the same offset.
     static func read(_ url: URL, from offset: UInt64, limit: Int = .max) -> (lines: [String], offset: UInt64)? {
+        // The buffers `FileHandle` hands back are autoreleased and nothing drains them on a background thread: one pool for each read.
+        autoreleasepool { readChunk(url, from: offset, limit: limit) }
+    }
+
+    private static func readChunk(_ url: URL, from offset: UInt64, limit: Int) -> (lines: [String], offset: UInt64)? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return nil }
@@ -41,7 +46,10 @@ enum AgentLogTail {
         guard let data, !data.isEmpty else { return ([], start) }
         guard let lastNewline = data.lastIndex(of: 0x0A) else { return ([], start) }
         let complete = data[data.startIndex...lastNewline]
-        let lines = String(decoding: complete, as: UTF8.self).split(separator: "\n").map(String.init)
+        // Split on the byte, not the Character: Swift reads "\r\n" as one Character, so a CRLF log would never split.
+        let lines = complete.split(separator: 0x0A).map { line -> String in
+            String(decoding: line.last == 0x0D ? line.dropLast() : line, as: UTF8.self)
+        }
         return (lines, start + UInt64(complete.count))
     }
 }
@@ -75,9 +83,9 @@ enum AgentLogLocations {
         for file in files where file.pathExtension == "json" {
             guard let data = try? Data(contentsOf: file),
                 let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                let session = object["sessionId"] as? String, let pid = object["pid"] as? Int
+                let session = object["sessionId"] as? String, let pid = (object["pid"] as? Int).flatMap({ Int32(exactly: $0) })
             else { continue }
-            result[session] = Int32(pid)
+            result[session] = pid
         }
         return result
     }
@@ -179,7 +187,7 @@ final class AgentLogWatcher: AgentLogWatching {
         }
         if sawSessions {
             let found = AgentLogLocations.processes(in: URL(fileURLWithPath: sessionsFolder))
-            Task { @MainActor [weak self] in self?.onProcesses?(found) }
+            Task { @MainActor [weak self] in if self?.stream != nil { self?.onProcesses?(found) } }
         }
     }
 
@@ -197,7 +205,8 @@ final class AgentLogWatcher: AgentLogWatching {
             session = id
         }
         let batch = AgentLogBatch(agent: agent, session: session, events: events)
-        Task { @MainActor [weak self] in self?.onBatch?(batch) }
+        // A batch that was already queued when `stop()` ran is dropped.
+        Task { @MainActor [weak self] in if self?.stream != nil { self?.onBatch?(batch) } }
     }
 }
 

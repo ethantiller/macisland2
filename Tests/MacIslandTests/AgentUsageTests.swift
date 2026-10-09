@@ -86,6 +86,40 @@ struct AgentPricingTests {
         #expect(!alone.isLowerBound)
     }
 
+    @Test func nowGrowsByWhatRunningTasksTakeSoTheRunnerKeepsItsRoom() {
+        let usual = Theme.Metrics.agentsHeight
+        #expect(AgentsNowView.contentHeight(tasks: 0, limits: 2) == usual)
+        let one = AgentsNowView.contentHeight(tasks: 1, limits: 2)
+        #expect(one == usual + Theme.Metrics.agentMarkBox - Theme.Metrics.agentIdleLineHeight)
+        #expect(AgentsNowView.contentHeight(tasks: 2, limits: 4) == one, "with four bars only one task shows")
+        #expect(
+            AgentsNowView.contentHeight(tasks: 2, limits: 2) <= Theme.Metrics.homeMaxContentHeight,
+            "never taller than an island gets")
+    }
+
+    @Test func nowAlwaysShowsClaudesSessionAndWeekBars() {
+        let week = AgentLimit(agent: .claudeCode, kind: .week, percent: 40, resetsAt: nil, asOf: nil)
+        let codex = AgentLimit(agent: .codex, kind: .session, percent: 10, resetsAt: nil, asOf: nil)
+        let shown = AgentsNowView.shownLimits([codex, week], readsClaude: true)
+        #expect(shown.map(\.id) == ["Claude Code-session", "Claude Code-week", "Codex-session"])
+        #expect(shown[0].percent == nil && shown[1].percent == 40, "the missing window is an empty placeholder")
+        #expect(AgentUsageFormat.resetLine(shown[0]) == "No reading yet")
+        #expect(AgentsNowView.shownLimits([], readsClaude: false).isEmpty, "Claude off, nothing invented")
+    }
+
+    @Test func theTokenMixSplitsIntoInputOutputAndCache() {
+        let day = UsageDay.key(Date(), calendar: utc)
+        let bucket = UsageBucket(
+            day: day, agent: .claudeCode, model: "claude-opus-4-5-20251101", project: "p",
+            tokens: AgentTokens(input: 100, output: 300, cacheRead: 500, cacheWrite: 60, cacheWrite1h: 40), requests: 1)
+        let summary = AgentUsageSummary.make(buckets: [bucket], range: .today, now: Date(), pricing: price(""), calendar: utc)
+        #expect(summary.shares.map(\.kind) == [.input, .output, .cache])
+        #expect(summary.shares.map(\.tokens) == [100, 300, 600])
+        #expect(summary.shares.map(\.fraction) == [0.1, 0.3, 0.6])
+        #expect(AgentUsageSummary().shares.isEmpty, "nothing used, nothing to draw")
+        #expect(AgentUsageFormat.share(0.004) == "<1%" && AgentUsageFormat.share(0) == "0%" && AgentUsageFormat.share(0.984) == "98%")
+    }
+
     @Test func cacheSavingIsReadTimesTheDifference() {
         let pricing = price("")
         #expect(pricing.cacheSaving(of: AgentTokens(cacheRead: 2_000_000), model: "claude-opus-4-5-20251101") == 9)

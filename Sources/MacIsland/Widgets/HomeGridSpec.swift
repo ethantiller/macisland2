@@ -121,8 +121,8 @@ enum HomeGridSpec {
 
     /// The cell whose top left is nearest a point (a widget's top left in grid space), clamped so it fits.
     static func cell(nearest topLeft: CGPoint, size: GridSize, maxRows: Int = Theme.Metrics.homeMaxRows) -> GridCell {
-        let column = Int((topLeft.x / columnPitch).rounded())
-        let row = Int((topLeft.y / rowPitch).rounded())
+        let column = safeInt((topLeft.x / columnPitch).rounded())
+        let row = safeInt((topLeft.y / rowPitch).rounded())
         return GridCell(
             column: min(max(column, 0), max(columns - size.columns, 0)),
             row: min(max(row, 0), max(maxRows - size.rows, 0)))

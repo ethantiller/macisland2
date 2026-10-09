@@ -383,7 +383,7 @@ final class IslandViewModel {
             list.append(.media)
         }
         // Music outranks a running agent: an agent can run for an hour, and the song is what is being listened to.
-        if features.settings.isOn(.agents), features.settings.showsAgentCompact, !features.agents.liveTasks.isEmpty {
+        if features.settings.isOn(.agents), features.settings.showsAgentCompact, features.agents.liveCount > 0 {
             list.append(.agent)
         }
         if features.settings.isOn(.tools), features.settings.showsKeepAwakeCompact, features.keepAwake.isOn,
@@ -628,12 +628,23 @@ final class IslandViewModel {
         case .tools:
             features.mirror.isOn
                 ? Theme.Metrics.mirrorHeight
-                : (toolsExpanded ? Theme.Metrics.toolsGridHeight : Theme.Metrics.toolsRowHeight)
+                : (toolsExpanded
+                    ? Theme.Metrics.toolsGridHeight(rows: features.settings.toolsGridRows) : Theme.Metrics.toolsRowHeight)
                     + (features.ringLight.isOn ? Theme.Metrics.ringLightControlsHeight : 0)
                     + (features.keepAwake.isOn ? Theme.Metrics.keepAwakeChipsHeight : 0)
         case .notes: Theme.Metrics.notesHeight
         case .reminders: Theme.Metrics.remindersHeight
-        case .agents: agentsMode == .stats ? Theme.Metrics.agentsStatsHeight : Theme.Metrics.agentsHeight
+        case .agents:
+            switch agentsMode {
+            case .now:
+                AgentsNowView.contentHeight(
+                    tasks: features.agents.liveCount,
+                    limits: AgentsNowView.shownLimits(
+                        features.agents.usage.snapshot?.limits ?? [], readsClaude: features.settings.readsClaudeCode
+                    ).count)
+            case .usage: Theme.Metrics.agentsUsageHeight
+            case .stats: Theme.Metrics.agentsStatsHeight
+            }
         }
     }
 
@@ -769,7 +780,7 @@ final class IslandViewModel {
         dialRaw = raw
         let resolved = DialScrubber.resolve(raw)
         let before = features.timer.durationMinutes
-        features.timer.setDuration(minutes: Int(resolved.clamped.rounded()))
+        features.timer.setDuration(minutes: safeInt(resolved.clamped.rounded()))
         dialPosition = resolved.display
         dialOverscroll = resolved.overscroll
         let atEnd = resolved.overscroll > 0
@@ -857,9 +868,11 @@ final class IslandViewModel {
     func editHome(selecting id: UUID?) { onOpenSettings?(.home, id) }
 
     /// Opens the island on a module, whether or not it is one of the tabs.
-    func show(_ module: IslandModule) {
+    /// `pinned` is for a caller that has no pointer on the island (a link), which would otherwise never close.
+    func show(_ module: IslandModule, pinned: Bool = false) {
         selectedTab = module
-        open()
+        if pinned { isPinnedOpen = true }
+        open(applyingOpenOn: false)
     }
 
     /// The names of the Shortcuts that exist, or nil until they have been listed. A Shortcut tool whose Shortcut isn't in it is dimmed.
@@ -958,7 +971,7 @@ final class IslandViewModel {
     func startMirror() {
         guard !features.mirror.isOn else { return }
         selectedTab = .tools
-        open()
+        open(applyingOpenOn: false)
         Task {
             await self.features.mirror.toggle()
             // A camera that failed or was denied holds nothing: the normal rules return.

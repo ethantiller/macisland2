@@ -113,7 +113,7 @@ final class NowPlayingModel {
     func setAppVolume(_ fraction: Double) {
         guard let player else { return }
         appVolume = fraction
-        PlayerScripting.setVolume(Int((fraction * 100).rounded()), of: player)
+        PlayerScripting.setVolume(safeInt((fraction * 100).rounded()), of: player)
     }
 
     func seek(to seconds: TimeInterval) {

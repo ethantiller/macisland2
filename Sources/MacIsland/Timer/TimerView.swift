@@ -77,8 +77,6 @@ private struct PomodoroRing: View {
                 Text(formatTime(remaining))
                     .font(Theme.Typography.largeNumeral)
                     .foregroundStyle(Theme.Palette.primary)
-                    .contentTransition(.numericText(countsDown: true))
-                    .animation(.default, value: remaining)
             }
             .frame(width: Theme.Metrics.clockRing, height: Theme.Metrics.clockRing)
             .accessibilityElement(children: .ignore)
@@ -177,8 +175,6 @@ private struct TimerRing: View {
                 Text(formatTime(remaining))
                     .font(Theme.Typography.largeNumeral)
                     .foregroundStyle(Theme.Palette.primary)
-                    .contentTransition(.numericText(countsDown: true))
-                    .animation(.default, value: remaining)
             }
             .frame(width: Theme.Metrics.clockRing, height: Theme.Metrics.clockRing)
             .accessibilityElement(children: .ignore)
@@ -236,7 +232,7 @@ private struct TimerSetter: View {
 
     var body: some View {
         let timer = viewModel.timer
-        let minutes = Int((timer.duration / 60).rounded())
+        let minutes = safeInt((timer.duration / 60).rounded())
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 ClockModePicker(viewModel: viewModel)
@@ -486,13 +482,11 @@ struct CompactTimerText: View {
     let timer: TimerModel
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = timer.remaining(at: context.date).rounded(.up)
+        Ticking(interval: 1) { date in
+            let remaining = timer.remaining(at: date).rounded(.up)
             Text(formatTime(remaining))
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(Theme.Tint.clock)
-                .contentTransition(.numericText(countsDown: true))
-                .animation(.default, value: remaining)
         }
         .accessibilityLabel("Timer")
     }
@@ -505,13 +499,11 @@ struct CompactCountdownText: View {
     let agenda: AgendaMonitor
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = max(item.date.timeIntervalSince(context.date), 0).rounded(.up)
+        Ticking(interval: 1) { date in
+            let remaining = max(item.date.timeIntervalSince(date), 0).rounded(.up)
             Text(formatTime(remaining))
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(Theme.Tint.clock)
-                .contentTransition(.numericText(countsDown: true))
-                .animation(.default, value: remaining)
         }
         .task(id: item.id) {
             let wait = item.date.timeIntervalSinceNow
@@ -528,8 +520,8 @@ struct CompactTimerRing: View {
     let timer: TimerModel
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            ProgressRing(progress: timer.progress(at: context.date), tint: Theme.Tint.clock, lineWidth: 2.5)
+        Ticking(interval: 1) { date in
+            ProgressRing(progress: timer.progress(at: date), tint: Theme.Tint.clock, lineWidth: 2.5)
                 .frame(width: 14, height: 14)
         }
     }
@@ -539,13 +531,11 @@ struct CompactStopwatchText: View {
     let stopwatch: StopwatchModel
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let elapsed = stopwatch.elapsed(at: context.date).rounded(.down)
+        Ticking(interval: 1) { date in
+            let elapsed = stopwatch.elapsed(at: date).rounded(.down)
             Text(formatTime(elapsed))
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(Theme.Tint.clock)
-                .contentTransition(.numericText())
-                .animation(.default, value: elapsed)
         }
         .accessibilityLabel("Stopwatch")
     }
@@ -556,8 +546,8 @@ struct CompactPomodoroRing: View {
     let pomodoro: PomodoroModel
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            ProgressRing(progress: pomodoro.progress(at: context.date), tint: Theme.Tint.clock, lineWidth: 2.5)
+        Ticking(interval: 1) { date in
+            ProgressRing(progress: pomodoro.progress(at: date), tint: Theme.Tint.clock, lineWidth: 2.5)
                 .frame(width: 14, height: 14)
         }
         .accessibilityLabel("Pomodoro")
@@ -568,13 +558,11 @@ struct CompactPomodoroText: View {
     let pomodoro: PomodoroModel
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = pomodoro.remaining(at: context.date).rounded(.up)
+        Ticking(interval: 1) { date in
+            let remaining = pomodoro.remaining(at: date).rounded(.up)
             Text(formatTime(remaining))
                 .font(Theme.Typography.compactNumeral)
                 .foregroundStyle(Theme.Tint.clock)
-                .contentTransition(.numericText(countsDown: true))
-                .animation(.default, value: remaining)
         }
         .accessibilityLabel("Pomodoro \(pomodoro.phase.title)")
     }

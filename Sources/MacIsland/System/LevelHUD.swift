@@ -71,7 +71,7 @@ struct VolumeLevel: Equatable {
         }
     }
 
-    var percent: Int { Int((shown * 100).rounded()) }
+    var percent: Int { safeInt((shown * 100).rounded()) }
 }
 
 enum VolumeStep {

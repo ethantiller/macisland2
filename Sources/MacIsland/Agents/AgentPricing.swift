@@ -20,12 +20,20 @@ struct AgentTokens: Codable, Equatable {
     /// Written to the one-hour cache.
     var cacheWrite1h = 0
 
-    var total: Int { input + output + cacheRead + cacheWrite + cacheWrite1h }
+    var total: Int { input &+ output &+ cacheRead &+ cacheWrite &+ cacheWrite1h }
+
+    /// A token count from a log: never negative, and no more than a trillion, so sums of them cannot overflow.
+    static func count(_ value: Any?) -> Int {
+        guard let number = value as? NSNumber else { return 0 }
+        let double = number.doubleValue
+        guard double.isFinite else { return 0 }
+        return Int(min(max(double, 0), 1e12))
+    }
 
     static func + (lhs: AgentTokens, rhs: AgentTokens) -> AgentTokens {
         AgentTokens(
-            input: lhs.input + rhs.input, output: lhs.output + rhs.output, cacheRead: lhs.cacheRead + rhs.cacheRead,
-            cacheWrite: lhs.cacheWrite + rhs.cacheWrite, cacheWrite1h: lhs.cacheWrite1h + rhs.cacheWrite1h)
+            input: lhs.input &+ rhs.input, output: lhs.output &+ rhs.output, cacheRead: lhs.cacheRead &+ rhs.cacheRead,
+            cacheWrite: lhs.cacheWrite &+ rhs.cacheWrite, cacheWrite1h: lhs.cacheWrite1h &+ rhs.cacheWrite1h)
     }
 
     static func += (lhs: inout AgentTokens, rhs: AgentTokens) { lhs = lhs + rhs }
@@ -38,7 +46,7 @@ extension AgentTokens {
     /// What Claude Code's `message.usage` says: input, output, and the two caches (split into five-minute and one-hour writes when the
     /// log says so).
     init(claudeUsage usage: [String: Any]) {
-        func int(_ value: Any?) -> Int { (value as? NSNumber)?.intValue ?? 0 }
+        func int(_ value: Any?) -> Int { AgentTokens.count(value) }
         self.init(
             input: int(usage["input_tokens"]), output: int(usage["output_tokens"]),
             cacheRead: int(usage["cache_read_input_tokens"]))

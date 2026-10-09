@@ -591,7 +591,7 @@ private struct ShelfItemView: View {
         } preview: {
             preview.frame(width: Theme.Metrics.shelfThumbnail, height: Theme.Metrics.shelfThumbnail)
         }
-        .task(id: ShelfThumbnails.key(for: url, size: Theme.Metrics.shelfThumbnail)) {
+        .task(id: url) {
             thumbnail = await ShelfThumbnails.shared.image(for: url, size: Theme.Metrics.shelfThumbnail)
         }
         .contextMenu {

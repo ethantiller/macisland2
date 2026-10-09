@@ -128,8 +128,8 @@ final class SCKScreenRecorder: NSObject, ScreenRecording, SCRecordingOutputDeleg
         let configuration = SCStreamConfiguration()
         configuration.sourceRect = area
         // H.264 wants even dimensions.
-        configuration.width = max(2, Int(area.width * scale) / 2 * 2)
-        configuration.height = max(2, Int(area.height * scale) / 2 * 2)
+        configuration.width = max(2, safeInt(area.width * scale) / 2 * 2)
+        configuration.height = max(2, safeInt(area.height * scale) / 2 * 2)
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         configuration.showsCursor = true
 

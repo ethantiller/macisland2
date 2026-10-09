@@ -16,7 +16,9 @@ final class ShelfThumbnails {
 
     /// A preview at `size` points, or nil when the system has none (the caller draws the file's icon instead).
     func image(for url: URL, size: CGFloat, scale: CGFloat = NSScreen.main?.backingScaleFactor ?? 2) async -> NSImage? {
-        let key = Self.key(for: url, size: size)
+        // The stat is made off the main thread: a file on a network or iCloud volume can take a while to answer.
+        let key = await Task.detached(priority: .userInitiated) { Self.key(for: url, size: size) as String }.value as NSString
+        guard !Task.isCancelled else { return nil }
         if let cached = cache.object(forKey: key) { return cached }
         let request = QLThumbnailGenerator.Request(
             fileAt: url, size: CGSize(width: size, height: size), scale: scale, representationTypes: .thumbnail)
@@ -29,7 +31,7 @@ final class ShelfThumbnails {
     }
 
     /// The path, the modification date, and the size.
-    static func key(for url: URL, size: CGFloat) -> NSString {
+    nonisolated static func key(for url: URL, size: CGFloat) -> NSString {
         // Read fresh: a `URL` caches its resource values, so an edited file would keep its old key and its old preview.
         let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         let stamp = modified.map { String($0.timeIntervalSinceReferenceDate) } ?? "-"

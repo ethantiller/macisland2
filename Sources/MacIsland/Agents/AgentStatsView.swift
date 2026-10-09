@@ -8,6 +8,9 @@ enum StatsFilter: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    /// What the dropdown says: "All", "Claude Code", or "Codex".
+    var title: String { agent?.rawValue ?? "All" }
+
     var agent: AgentKind? {
         switch self {
         case .all: nil
@@ -28,7 +31,7 @@ enum StatsFilter: String, CaseIterable, Identifiable {
 extension AgentUsageFormat {
     /// "4d 13h", "3h 20m", or "12m".
     static func span(_ seconds: TimeInterval) -> String {
-        let minutes = Int(seconds / 60)
+        let minutes = safeInt(seconds / 60)
         if minutes >= 24 * 60 { return "\(minutes / (24 * 60))d \((minutes / 60) % 24)h" }
         if minutes >= 60 { return "\(minutes / 60)h \(minutes % 60)m" }
         return "\(minutes)m"
@@ -40,7 +43,8 @@ extension AgentUsageFormat {
     }
 }
 
-/// Stats: a year of days to a cell, and what the agents did over a range as eight numbers. White only: this is history, not live.
+/// Stats: a year of days to a cell, and what the agents did over a range as eight numbers. White, except the map in Claude Code's orange
+/// while it is filtered to Claude Code: this is history, not live, and the orange says whose.
 struct AgentStatsView: View {
     let usage: AgentUsageModel
     let agent: AgentKind?
@@ -97,7 +101,13 @@ struct AgentStatsView: View {
                 SegmentedChoice(options: StatsRange.allCases, selection: range, title: \.rawValue, onSelect: onRange)
                     .frame(width: Theme.Metrics.agentsStatsRangeWidth)
                 Spacer(minLength: 0)
-                if let fact = stats.funFact {
+                if let day = hovered, let date = day.date {
+                    let amount = day.tokens == 0 ? "no use" : AgentUsageFormat.tokens(day.tokens) + " tokens"
+                    Text("\(AgentUsageFormat.day(date)) \u{00B7} \(amount)")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Palette.secondary)
+                        .lineLimit(1)
+                } else if let fact = stats.funFact {
                     Text(fact)
                         .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.Palette.secondary)
@@ -174,7 +184,9 @@ struct AgentStatsView: View {
 
     private func style(for cell: YearMap.Cell) -> AnyShapeStyle {
         if cell.date == nil { return AnyShapeStyle(Theme.Palette.none) }
-        return AnyShapeStyle(cell.level == 0 ? Theme.Palette.fill : Theme.Palette.activitySteps[cell.level])
+        if cell.level == 0 { return AnyShapeStyle(Theme.Palette.fill) }
+        return agent == .claudeCode
+            ? AnyShapeStyle(Theme.Mark.claudeActivitySteps[cell.level]) : AnyShapeStyle(Theme.Palette.activitySteps[cell.level])
     }
 
     /// A day before the range starts: drawn dim, so the range reads on the map.
@@ -216,5 +228,48 @@ struct AgentStatsView: View {
     private func summary(_ stats: AgentStats, map: YearMap) -> String {
         "Stats, \(range.rawValue): \(AgentUsageFormat.tokens(stats.tokens)) tokens, \(stats.sessions) sessions, "
             + "\(stats.activeDays) of \(stats.rangeDays) days active, \(stats.currentStreak) day streak"
+    }
+}
+
+/// Which tool the Stats count, as a dropdown that always says: the agent's mark (the critter, the cloud, or sparkles for both) and its name.
+struct AgentFilterMenu: View {
+    let filter: StatsFilter
+    let onSelect: (StatsFilter) -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Menu {
+            ForEach(StatsFilter.allCases) { option in
+                Button { onSelect(option) } label: {
+                    if option == filter { Label(option.title, systemImage: "checkmark") } else { Text(option.title) }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if let agent = filter.agent {
+                    AgentMark(agent: agent, size: 14)
+                } else {
+                    Image(systemName: "sparkles")
+                }
+                Text(filter.title)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.tertiary)
+            }
+            .font(Theme.Typography.bodyEmphasized)
+            .foregroundStyle(Theme.Palette.primary)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 24)
+            .background(isHovering ? Theme.Palette.fillHover : Theme.Palette.fill, in: Capsule())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { isHovering = $0 }
+        .accessibilityLabel("Stats For")
+        .accessibilityValue(filter.title)
     }
 }

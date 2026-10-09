@@ -253,6 +253,19 @@ struct IslandSnapshots {
 
     private func makeViewModel() -> IslandViewModel { TestSupport.makeViewModel() }
 
+    /// The Tools grid with Agents on and two Shortcut tools of the person's own: thirteen slots, so three rows.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
+    func renderToolsWithAgents() {
+        let viewModel = makeViewModel()
+        viewModel.settings.setOn(.agents, true)
+        viewModel.settings.saveShortcutTool(ShortcutTool(shortcut: "Wind Down", title: "Wind Down"))
+        viewModel.settings.saveShortcutTool(ShortcutTool(shortcut: "Start Day", title: "Start Day", systemImage: "sun.max.fill"))
+        viewModel.state = .expanded
+        viewModel.selectedTab = .tools
+        viewModel.setToolsExpanded(true)
+        render(viewModel, "08f-expanded-tools-agents")
+    }
+
     /// The Mixer's panel in the Media tab (M2): with the access, and without it.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))
     func renderMixer() {
@@ -363,6 +376,32 @@ struct IslandSnapshots {
         render(viewModel, "30b-stats-claude-30days")
         viewModel.setStatsAgent(.codex)
         render(viewModel, "30c-stats-codex")
+        viewModel.setAgentsMode(.now)
+        render(viewModel, "30f-now-idle")
+        var claudeOnly = PreviewSamples.usageSnapshot()
+        claudeOnly.limits = [
+            AgentLimit(
+                agent: .claudeCode, kind: .session, percent: nil, resetsAt: Date().addingTimeInterval(7200), asOf: nil,
+                isEstimate: true),
+            AgentLimit(
+                agent: .claudeCode, kind: .week, percent: 79, resetsAt: Date().addingTimeInterval(86_400 * 3),
+                asOf: Date().addingTimeInterval(-3600 * 17)),
+        ]
+        viewModel.agents.usage.show(claudeOnly)
+        viewModel.agents.ingest(
+            AgentLogEvent(
+                kind: .turnStarted, sessionID: "now", cwd: "/code/island", model: "claude-opus-4-5-20251101",
+                date: Date().addingTimeInterval(-252), prompt: "Fix the volume HUD"),
+            agent: .claudeCode, session: "now", announces: false)
+        viewModel.agents.usage.show(claudeOnly)
+        render(viewModel, "30i-now-running")
+        render(viewModel, "30g-now-claude-only")
+        viewModel.agents.usage.show(PreviewSamples.usageSnapshot())
+        viewModel.setAgentsMode(.usage)
+        viewModel.setUsageRange(.week)
+        render(viewModel, "30d-usage-week")
+        viewModel.setUsageRange(.today)
+        render(viewModel, "30e-usage-today")
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_SNAPSHOT_DIR"] != nil))

@@ -55,7 +55,7 @@ final class MediaRemoteAdapter {
     }
 
     func seek(to seconds: TimeInterval) {
-        run(["seek", String(Int64(max(seconds, 0) * 1_000_000))])
+        run(["seek", String(safeInt(max(seconds, 0) * 1_000_000))])
     }
 
     private func launchStream() {

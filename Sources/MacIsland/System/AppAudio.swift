@@ -50,6 +50,12 @@ final class CoreAudioAppList: AppAudioListing {
 
     private var listener: AudioObjectPropertyListenerBlock?
     private var watched: Set<AudioObjectID> = []
+    /// The app that owns each process, which the parent walk and the running-app lookup find. It does not change while the process
+    /// lives, and the list is read at every change, so the answer is kept until the process is gone.
+    private var owners: [Int32: AppOwner] = [:]
+    private struct AppOwner {
+        var application: NSRunningApplication?
+    }
     private static let system = AudioObjectID(kAudioObjectSystemObject)
 
     func start() {
@@ -99,6 +105,8 @@ final class CoreAudioAppList: AppAudioListing {
         }
         let entries = Self.processObjects().compactMap { object -> Entry? in
             guard let pid = Self.int32(object, kAudioProcessPropertyPID) else { return nil }
+            // This app's own process (its tap playing) is not an app making sound.
+            guard pid != ProcessInfo.processInfo.processIdentifier else { return nil }
             return Entry(
                 object: object, pid: pid, bundleID: Self.string(object, kAudioProcessPropertyBundleID),
                 isPlaying: Self.uint32(object, kAudioProcessPropertyIsRunningOutput) == 1)
@@ -106,9 +114,15 @@ final class CoreAudioAppList: AppAudioListing {
         var grouped: [String: MixerApp] = [:]
         var order: [String] = []
         for entry in entries {
-            let owner = AppGrouping.owner(
-                of: entry.pid, parent: { Self.parentPID(of: $0) }, isApp: { Self.isUserApp(pid: $0) })
-            let application = owner.flatMap { NSRunningApplication(processIdentifier: $0) }
+            let application: NSRunningApplication?
+            if let known = owners[entry.pid], known.application?.isTerminated != true {
+                application = known.application
+            } else {
+                let owner = AppGrouping.owner(
+                    of: entry.pid, parent: { Self.parentPID(of: $0) }, isApp: { Self.isUserApp(pid: $0) })
+                application = owner.flatMap { NSRunningApplication(processIdentifier: $0) }
+                owners[entry.pid] = AppOwner(application: application)
+            }
             guard let id = application?.bundleIdentifier ?? entry.bundleID, !id.isEmpty else { continue }
             let name = application?.localizedName ?? id
             if var app = grouped[id] {
@@ -120,6 +134,8 @@ final class CoreAudioAppList: AppAudioListing {
                 order.append(id)
             }
         }
+        let live = Set(entries.map(\.pid))
+        owners = owners.filter { live.contains($0.key) }
         return order.compactMap { grouped[$0] }
     }
 

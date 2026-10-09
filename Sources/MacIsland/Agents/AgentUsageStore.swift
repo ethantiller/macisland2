@@ -63,8 +63,7 @@ enum AgentUsageParser {
     }
 
     private static func int(_ value: Any?) -> Int {
-        if let number = value as? NSNumber { return number.intValue }
-        return 0
+        AgentTokens.count(value)
     }
 
     private static func claude(_ object: [String: Any]) -> AgentUsageLine? {
@@ -128,7 +127,7 @@ enum AgentUsageParser {
             resets = observed.addingTimeInterval(after)
         }
         return CodexRateLimits.Window(
-            usedPercent: used, windowMinutes: (object["window_minutes"] as? NSNumber)?.intValue, resetsAt: resets)
+            usedPercent: used, windowMinutes: (object["window_minutes"] as? NSNumber).map { AgentTokens.count($0) }, resetsAt: resets)
     }
 }
 
@@ -306,7 +305,10 @@ extension AgentUsageData {
         codex = try container.decodeIfPresent(CodexRateLimits.self, forKey: .codex)
         fired = try container.decodeIfPresent([String: Double].self, forKey: .fired) ?? [:]
         sessions = try container.decodeIfPresent([String: AgentSession].self, forKey: .sessions) ?? [:]
-        hours = try container.decodeIfPresent([String: [Int]].self, forKey: .hours) ?? [:]
+        hours = (try container.decodeIfPresent([String: [Int]].self, forKey: .hours) ?? [:]).mapValues {
+            // One count for each hour of the day, whatever a damaged cache holds.
+            Array(($0 + Array(repeating: 0, count: 24)).prefix(24))
+        }
         backfillSeen = try container.decodeIfPresent([UInt64: Int].self, forKey: .backfillSeen) ?? [:]
     }
 
@@ -445,6 +447,8 @@ actor AgentUsageStore {
         do {
             try FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(data).write(to: cacheURL, options: .atomic)
+            // Project paths and usage: for this account only.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: cacheURL.path)
         } catch {
             // A cache that can't be written costs a re-read next launch, nothing more.
         }
@@ -490,7 +494,7 @@ actor AgentUsageStore {
             // The part a version 1 cache counted already is read for sessions and hours only, and no further than where it ended.
             let backfillEnd = state.backfillEnd ?? 0
             let backfilling = backfillEnd > state.offset
-            let take = backfilling ? min(limit, Int(backfillEnd - state.offset)) : limit
+            let take = backfilling ? min(limit, Int(clamping: backfillEnd - state.offset)) : limit
             guard let tail = AgentLogTail.read(URL(fileURLWithPath: path), from: state.offset, limit: take) else { break }
             if tail.lines.isEmpty {
                 if backfilling {
@@ -501,6 +505,12 @@ actor AgentUsageStore {
                 // A line longer than the chunk: take more, up to a sane size. Otherwise there is nothing more to read.
                 if tail.offset == state.offset && size > state.offset + UInt64(limit) && limit < (64 << 20) {
                     limit *= 4
+                    continue
+                }
+                // A line past even that: skip it a chunk at a time instead of reading the same bytes again on every refresh.
+                if tail.offset == state.offset && size > state.offset + UInt64(limit) {
+                    state.offset += UInt64(limit)
+                    limit = chunk
                     continue
                 }
                 break

@@ -17,7 +17,7 @@ enum SystemActions {
 
     static func hexString(for color: NSColor) -> String {
         let rgb = color.usingColorSpace(.sRGB) ?? color
-        func byte(_ component: CGFloat) -> Int { Int((min(max(component, 0), 1) * 255).rounded()) }
+        func byte(_ component: CGFloat) -> Int { safeInt((min(max(component, 0), 1) * 255).rounded()) }
         return String(
             format: "#%02X%02X%02X", byte(rgb.redComponent), byte(rgb.greenComponent), byte(rgb.blueComponent))
     }

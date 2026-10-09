@@ -67,7 +67,7 @@ final class MouseTracker {
     /// dial instead, with its momentum, and a mouse wheel steps a minute (see `ScrollRouting`).
     private func handleScroll(_ event: NSEvent) {
         let location = NSEvent.mouseLocation
-        guard viewModel.hitRect.contains(location) || scrolling.ownsGesture else { return }
+        guard (isNearPanel(location) && viewModel.hitRect.contains(location)) || scrolling.ownsGesture else { return }
         let sample = ScrollSample(
             dx: event.scrollingDeltaX,
             dy: event.scrollingDeltaY,
@@ -127,12 +127,19 @@ final class MouseTracker {
         dragPollTimer = timer
     }
 
+    /// Every mouse move in every app comes here, and working out where the island is costs more than a rectangle test: a pointer
+    /// well away from the panel is not over the island, and nothing else needs to be asked.
+    private func isNearPanel(_ location: CGPoint) -> Bool {
+        panel.frame.insetBy(dx: -40, dy: -40).contains(location)
+    }
+
     private func update() {
         // A drag that started on the island (the scrubber, a shelf item) keeps it open
         // even if the cursor wanders outside before the button is released.
         let location = NSEvent.mouseLocation
         let buttonDown = NSEvent.pressedMouseButtons & 1 != 0
-        let inside = (dragStartedOnIsland && buttonDown) || viewModel.isOverIsland(location)
+        let nearby = isNearPanel(location)
+        let inside = (dragStartedOnIsland && buttonDown) || (nearby && viewModel.isOverIsland(location))
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }
@@ -143,7 +150,7 @@ final class MouseTracker {
             && drag.changeCount != dragPasteboardCount && drag.types?.contains(.fileURL) == true
         viewModel.setFileDragActive(draggingFile)
 
-        let onCompactControl = viewModel.compactControlRect?.contains(location) ?? false
+        let onCompactControl = nearby && (viewModel.compactControlRect?.contains(location) ?? false)
         // While a file is dragged, the island grows to be an easy target but only opens once the
         // file is over it (the drop target opens it), and stays open while the file is on it.
         let canOpen = !draggingFile || viewModel.state != .compact

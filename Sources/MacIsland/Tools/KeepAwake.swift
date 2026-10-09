@@ -158,7 +158,7 @@ final class KeepAwake {
 enum KeepAwakeTime {
     /// "45m" up to an hour, "1h35" past it, rounded up to the minute: a fresh hour reads "60m".
     static func text(remaining: TimeInterval) -> String {
-        let minutes = max(Int((remaining / 60).rounded(.up)), 0)
+        let minutes = max(safeInt((remaining / 60).rounded(.up)), 0)
         guard minutes > 60 else { return "\(minutes)m" }
         return "\(minutes / 60)h" + String(format: "%02d", minutes % 60)
     }

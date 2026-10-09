@@ -2,8 +2,22 @@ import ServiceManagement
 
 /// Start MacIsland when you log in. Only works from the bundled app (`build/MacIsland.app`).
 enum LaunchAtLogin {
+    /// What the last look found. `SMAppService.status` is a synchronous call that takes about 150 ms, so it is made once, and again
+    /// off the main thread by `reload()`.
+    nonisolated(unsafe) private static var known: Bool?
+
     static var isEnabled: Bool {
-        SMAppService.mainApp.status == .enabled
+        if let known { return known }
+        let value = SMAppService.mainApp.status == .enabled
+        known = value
+        return value
+    }
+
+    /// Looks again without holding the main thread, for when the person may have changed Login Items in System Settings.
+    static func reload() async -> Bool {
+        let value = await Task.detached(priority: .utility) { SMAppService.mainApp.status == .enabled }.value
+        known = value
+        return value
     }
 
     /// Returns the state after the change; it stays `false` if macOS refuses (unsigned or unbundled).
@@ -22,6 +36,7 @@ enum LaunchAtLogin {
         if enabled, SMAppService.mainApp.status == .requiresApproval {
             SMAppService.openSystemSettingsLoginItems()
         }
+        known = nil
         return isEnabled
     }
 }

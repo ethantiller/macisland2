@@ -422,7 +422,7 @@ enum Converters {
         let asset = AVURLAsset(url: url)
         let duration = (try? await asset.load(.duration).seconds) ?? 0
         guard duration.isFinite, duration > 0 else { throw FileToolError.unreadable }
-        let count = max(1, Int(min(15, duration) * frameRate))
+        let count = max(1, safeInt(min(15, duration) * frameRate))
         let times = (0..<count).map { CMTime(seconds: Double($0) / frameRate, preferredTimescale: 600) }
 
         let generator = AVAssetImageGenerator(asset: asset)

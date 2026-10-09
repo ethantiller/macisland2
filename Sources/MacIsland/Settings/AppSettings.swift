@@ -750,7 +750,7 @@ final class AppSettings {
 
     /// The user may have changed Login Items in System Settings.
     func refresh() {
-        launchAtLogin = LaunchAtLogin.isEnabled
+        Task { launchAtLogin = await LaunchAtLogin.reload() }
     }
 
     // MARK: Restoring (used by `restore(_:)`, which lives with the archive)
@@ -1138,12 +1138,16 @@ final class AppSettings {
 
     // MARK: Shortcut tools
 
-    /// Every tool: the built-in ones, then the person's own.
-    var allTools: [ToolID] { ToolID.allCases + shortcutTools.map(\.toolID) }
+    /// Every tool: the built-in ones, Agents while that feature is on, then the person's own.
+    var allTools: [ToolID] { ToolID.allCases + (isOn(.agents) ? [.agents] : []) + shortcutTools.map(\.toolID) }
 
-    /// Whether `tool` exists: a built-in, or a Shortcut tool that is still there.
+    /// Rows of six the Tools grid needs for every tool and Less: two, or three once Agents and the person's own tools fill them.
+    var toolsGridRows: Int { max(2, (allTools.count + 1 + 5) / 6) }
+
+    /// Whether `tool` exists: a built-in (Agents only while its feature is on), or a Shortcut tool that is still there.
     func isKnown(_ tool: ToolID) -> Bool {
-        tool.shortcutID.map { id in shortcutTools.contains { $0.id == id } } ?? true
+        if tool == .agents { return isOn(.agents) }
+        return tool.shortcutID.map { id in shortcutTools.contains { $0.id == id } } ?? true
     }
 
     func shortcutTool(for tool: ToolID) -> ShortcutTool? {

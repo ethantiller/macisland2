@@ -79,6 +79,10 @@ struct ToolCatalog {
                 id: id, title: "Record", label: "Record Screen", systemImage: "record.circle",
                 isOn: viewModel.screenRecorder.isRecording
             ) { viewModel.toggleScreenRecording() }
+        case .agents:
+            ToolItem(id: id, title: "Agents", label: "Open AI Agents", systemImage: "sparkles") {
+                viewModel.show(.agents)
+            }
         default:
             shortcutItem(for: id)
         }

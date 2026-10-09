@@ -302,7 +302,7 @@ struct VolumeControl: View {
                     .lineLimit(1)
                     .frame(width: Theme.Metrics.mixerNameWidth, alignment: .leading)
                 slider
-                Text("\(Int((volume * 100).rounded()))%")
+                Text("\(safeInt((volume * 100).rounded()))%")
                     .font(Theme.Typography.numeral)
                     .foregroundStyle(Theme.Palette.secondary)
                     .frame(width: Theme.Metrics.mixerPercentWidth, alignment: .trailing)

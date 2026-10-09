@@ -21,12 +21,6 @@ struct AgentsView: View {
 
     private var usage: AgentUsageModel { viewModel.agents.usage }
 
-    /// The filter is only worth showing once both tools have been used.
-    private var hasBothAgents: Bool {
-        let agents = Set(usage.snapshot?.buckets.map(\.agent) ?? [])
-        return agents.count > 1
-    }
-
     var body: some View {
         VStack(spacing: 6) {
             header
@@ -59,49 +53,62 @@ struct AgentsView: View {
                 }
                 .frame(width: Theme.Metrics.agentsRangeWidth)
             case .stats:
-                if let day = hoveredDay, let date = day.date {
-                    Text("\(AgentUsageFormat.day(date)) \u{00B7} \(day.tokens == 0 ? "no use" : AgentUsageFormat.tokens(day.tokens) + " tokens")")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.secondary)
-                } else if hasBothAgents {
-                    SegmentedChoice(options: StatsFilter.allCases, selection: StatsFilter(agent: viewModel.statsAgent), title: \.rawValue) {
-                        viewModel.setStatsAgent($0.agent)
-                    }
-                    .frame(width: Theme.Metrics.agentsFilterWidth)
-                }
+                AgentFilterMenu(filter: viewModel.statsFilter) { viewModel.setStatsAgent($0.agent) }
             }
         }
     }
 }
 
-/// Now: the tasks that are running, then each agent's plan limits.
+/// Now: the tasks that are running (or one quiet line saying none are), then the plan limits as bars: Claude's session and week
+/// always, Codex's when it has reported any.
 struct AgentsNowView: View {
     let viewModel: IslandViewModel
+
+    /// Claude's two windows, each one drawn even without a reading (an empty bar that says so), then whatever else there is.
+    static func shownLimits(_ limits: [AgentLimit], readsClaude: Bool) -> [AgentLimit] {
+        var shown: [AgentLimit] = []
+        if readsClaude {
+            for kind in AgentLimitKind.allCases {
+                shown.append(
+                    limits.first { $0.agent == .claudeCode && $0.kind == kind }
+                        ?? AgentLimit(agent: .claudeCode, kind: kind, percent: nil, resetsAt: nil, asOf: nil))
+            }
+        }
+        return shown + limits.filter { $0.agent != .claudeCode }
+    }
+
+    /// How tall Now is: the usual height, plus what the running tasks take over the one quiet line, so the runner under the limits keeps
+    /// its room. At most as tall as an island ever gets.
+    static func contentHeight(tasks: Int, limits: Int) -> CGFloat {
+        let shown = min(tasks, limits > 2 ? 1 : 2)
+        guard shown > 0 else { return Theme.Metrics.agentsHeight }
+        let rows = CGFloat(shown) * Theme.Metrics.agentMarkBox + CGFloat(shown - 1) * Theme.Metrics.rowSpacing
+        return min(Theme.Metrics.agentsHeight + rows - Theme.Metrics.agentIdleLineHeight, Theme.Metrics.homeMaxContentHeight)
+    }
 
     var body: some View {
         let tasks = viewModel.agents.liveTasks
         let settings = viewModel.settings
-        let limits = viewModel.agents.usage.snapshot?.limits ?? []
-        VStack(spacing: 4) {
+        let limits = Self.shownLimits(
+            viewModel.agents.usage.snapshot?.limits ?? [], readsClaude: settings.readsClaudeCode)
+        VStack(alignment: .leading, spacing: 8) {
             if tasks.isEmpty {
-                VStack(spacing: 4) {
-                    Label("Nothing is running.", systemImage: "sparkles")
-                        .font(Theme.Typography.bodyEmphasized)
-                        .foregroundStyle(Theme.Palette.secondary)
-                    if !AgentLogLocations.hasLogs() {
-                        Text("Couldn\u{2019}t find the logs of Claude Code or Codex.")
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Palette.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                let idle =
+                    AgentLogLocations.hasLogs() ? "Nothing is running" : "Couldn\u{2019}t find Claude Code or Codex logs"
+                Label(idle, systemImage: "sparkles")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 VStack(spacing: Theme.Metrics.rowSpacing) {
                     ForEach(tasks.prefix(limits.count > 2 ? 1 : 2)) { AgentTaskRow(task: $0, detail: .row) }
                 }
             }
             if !limits.isEmpty {
-                VStack(spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Plan limits")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Palette.secondary)
                     ForEach(limits) {
                         AgentLimitRow(limit: $0, threshold: settings.agentLimitThreshold, showsLeft: settings.showsLimitsLeft)
                     }
@@ -114,7 +121,14 @@ struct AgentsNowView: View {
                     }
                 }
             }
-            Spacer(minLength: 0)
+            // What is left of the tab, if there is room for it: a little Claude running and jumping, by itself, whether or not an
+            // agent is working.
+            GeometryReader { proxy in
+                if proxy.size.height >= Theme.Metrics.runnerHeight {
+                    ClaudeRunnerView()
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+            }
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -191,13 +205,13 @@ struct AgentTaskRow: View {
             if let context = task.contextFraction {
                 HStack(spacing: 8) {
                     LevelBar(fraction: context)
-                    Text("\(Int((context * 100).rounded()))%")
+                    Text("\(safeInt((context * 100).rounded()))%")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.Palette.secondary)
                         .frame(width: 30, alignment: .trailing)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Context used \(Int((context * 100).rounded())) percent")
+                .accessibilityLabel("Context used \(safeInt((context * 100).rounded())) percent")
             }
         }
         .accessibilityElement(children: .contain)

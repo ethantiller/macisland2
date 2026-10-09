@@ -51,9 +51,11 @@ enum Theme {
         static let airDrop = Color(red: 0.16, green: 0.62, blue: 1.0)
     }
 
-    /// The one color that is not a meaning: Claude Code's own orange, drawn only as its mark (like AirDrop blue), never as a tint.
+    /// The one color that is not a meaning: Claude Code's own orange, drawn only as its mark and as the Stats map filtered to Claude Code (like AirDrop blue), never as a tint of what is live.
     enum Mark {
         static let claude = Color(red: 0.851, green: 0.467, blue: 0.341)
+        /// The Stats map while it is filtered to Claude Code: the steps of `Palette.activitySteps`, in its orange.
+        static let claudeActivitySteps = [0.12, 0.3, 0.55, 0.8, 1].map { claude.opacity($0) }
     }
 
     enum Typography {
@@ -182,8 +184,8 @@ enum Theme {
         /// Reminders: the add field, then four rows of the list.
         static let remindersHeight: CGFloat = 28 + 8 + 4 * 30
         static let toolsRowHeight: CGFloat = 54
-        /// Two rows of six.
-        static let toolsGridHeight: CGFloat = 2 * toolsRowHeight + 10
+        /// Rows of six, 10 apart: two, or three when the tools and Less need it.
+        static func toolsGridHeight(rows: Int) -> CGFloat { CGFloat(rows) * toolsRowHeight + CGFloat(rows - 1) * 10 }
         static let ringLightControlsHeight: CGFloat = 30
         /// The Mirror: a 16:9 preview, and the width that gives it.
         static let mirrorHeight: CGFloat = 180
@@ -267,6 +269,17 @@ enum Theme {
         static let mixerPercentWidth: CGFloat = 40
         /// The Agents module, in every mode: its header, then what fits under it (two tasks and the limits; the usage; the map).
         static let agentsHeight: CGFloat = 176
+        /// Usage: the value, the token donut, then models and projects.
+        static let agentsUsageHeight: CGFloat = 208
+        /// The little runner at the bottom of Now while nothing runs; it draws only if there is this much room.
+        static let runnerHeight: CGFloat = 52
+        /// The one small line Now says when nothing is running ("Nothing is running"), which a task row replaces.
+        static let agentIdleLineHeight: CGFloat = 14
+        /// The words after a plan limit's bar ("Resets Tue 1:00 AM, as of 2:55 PM"); the bar takes what is left, so they are never cut off.
+        static let limitResetWidth: CGFloat = 178
+        /// The token donut's outside diameter and ring width.
+        static let tokenDonutSize: CGFloat = 84
+        static let tokenDonutWidth: CGFloat = 11
         /// The header's two choosers: the modes, and the range of the usage.
         static let agentsModeWidth: CGFloat = 190
         static let agentsRangeWidth: CGFloat = 170
@@ -283,7 +296,6 @@ enum Theme {
         static let agentsStatsHeight: CGFloat = 208
         static let statTileHeight: CGFloat = 30
         static let agentsStatsRangeWidth: CGFloat = 190
-        static let agentsFilterWidth: CGFloat = 150
         static let activityGap: CGFloat = 2
         /// The Agents widget's ring, in the 2 by 1 and the 3 by 1.
         static let agentsRing: CGFloat = 36

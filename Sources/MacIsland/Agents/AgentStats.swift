@@ -58,7 +58,7 @@ struct YearMap: Equatable {
         let active = perDay.values.filter { $0 > 0 }.sorted()
         func threshold(_ quarter: Int) -> Int {
             guard !active.isEmpty else { return 0 }
-            let index = Int((Double(active.count) * Double(quarter) / 4).rounded(.up)) - 1
+            let index = safeInt((Double(active.count) * Double(quarter) / 4).rounded(.up)) - 1
             return active[max(0, min(index, active.count - 1))]
         }
         let (q1, q2, q3) = (threshold(1), threshold(2), threshold(3))
@@ -231,7 +231,7 @@ struct AgentStats: Equatable {
     /// *War and Peace* if they are at least two of them; otherwise nothing.
     static func funFact(longestSession: TimeInterval, tokens: Int) -> String? {
         if longestSession >= 2 * nightOfSleep {
-            let nights = Int((longestSession / nightOfSleep).rounded())
+            let nights = safeInt((longestSession / nightOfSleep).rounded())
             return "Longest session \u{2248} \(nights) nights of sleep"
         }
         let books = tokens / warAndPeaceTokens

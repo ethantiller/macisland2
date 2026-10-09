@@ -1,6 +1,6 @@
 import Foundation
 
-/// A tool the Tools tab can show: one of the nine built in, or a tool the person made from one of their Shortcuts. The raw value is
+/// A tool the Tools tab can show: one of the nine built in (and Agents, while AI Agents is on), or a tool the person made from one of their Shortcuts. The raw value is
 /// what is stored and dragged: a built-in's own name ("keepAwake"), or `shortcut:` and the UUID of its `ShortcutTool`. The built-ins
 /// are static members, so `.keepAwake` reads as it did when this was an enum; `allCases` is the built-ins only, and
 /// `AppSettings.allTools` adds the person's own.
@@ -29,13 +29,15 @@ struct ToolID: Hashable, Identifiable, RawRepresentable, Codable, Sendable {
     static let cleanKeyboard = ToolID(unchecked: "cleanKeyboard")
     static let mirror = ToolID(unchecked: "mirror")
     static let recordScreen = ToolID(unchecked: "recordScreen")
+    /// Opens the Agents module. Not in `allCases`: it is a tool only while the AI Agents feature is on (`AppSettings.allTools`).
+    static let agents = ToolID(unchecked: "agents")
 
     /// The built-in tools, in the order the Tools tab shows them.
     static let allCases: [ToolID] = [
         .keepAwake, .ringLight, .muteMic, .pickColor, .screenshot, .focus, .cleanKeyboard, .mirror, .recordScreen,
     ]
 
-    private static let builtInNames = Set(allCases.map(\.rawValue))
+    private static let builtInNames = Set((allCases + [.agents]).map(\.rawValue))
     private static let shortcutPrefix = "shortcut:"
 
     static let defaultPins: [ToolID] = [.keepAwake, .ringLight, .muteMic, .screenshot, .pickColor, .focus]

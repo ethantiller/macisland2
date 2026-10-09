@@ -22,7 +22,7 @@ struct AgentLimit: Identifiable, Equatable {
 
     /// One window, once: the agent, which window, and when it ends.
     var windowKey: String {
-        "\(agent.rawValue)-\(kind.rawValue)-\(Int((resetsAt?.timeIntervalSince1970 ?? 0) / 60))"
+        "\(agent.rawValue)-\(kind.rawValue)-\(safeInt((resetsAt?.timeIntervalSince1970 ?? 0) / 60))"
     }
 
     func isOver(threshold: Double) -> Bool {

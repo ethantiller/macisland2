@@ -1,10 +1,13 @@
-.PHONY: lint format bundle restart build-and-restart first-run doctor
+.PHONY: lint format bundle bundle-debug restart build-and-restart first-run doctor
 
 lint:
 	./scripts/lint.sh
 
 format:
 	./scripts/format.sh
+
+bundle-debug:
+	./scripts/bundle.sh debug
 
 bundle:
 	./scripts/bundle.sh

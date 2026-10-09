@@ -31,6 +31,11 @@ struct SettingsPreviewTests {
         #expect(preview.viewModel.size == reference.size)
         reference.dismissBanner()
 
+        // Now is as tall as what it holds (running tasks make room for the runner), and the preview holds sample agents and limits:
+        // the real island gets the same ones, so the two can be compared.
+        PreviewSamples.seedTasks(in: reference.agents, for: nil)
+        reference.agents.usage.start()
+        reference.agents.usage.show(PreviewSamples.usageSnapshot())
         for tab in IslandModule.allCases where tab.isAvailable {
             preview.show(PreviewContext(presentation: .expanded, tab: tab))
             reference.selectedTab = tab

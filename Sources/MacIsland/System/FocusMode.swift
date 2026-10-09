@@ -46,7 +46,17 @@ final class FocusMode {
     /// the `.task` of a view that shows it.
     func watch() async {
         while !Task.isCancelled {
-            if isStarted { refresh() }
+            // Read off the main thread, and not at all while nobody can see the screen.
+            if isStarted, ScreenActivity.shared.isActive {
+                let (denied, focused) = await Task.detached(priority: .utility) {
+                    let center = INFocusStatusCenter.default
+                    return (center.authorizationStatus == .denied, center.focusStatus.isFocused ?? false)
+                }.value
+                if isStarted {
+                    isDenied = denied
+                    update(focused)
+                }
+            }
             try? await Task.sleep(for: .seconds(3))
         }
     }

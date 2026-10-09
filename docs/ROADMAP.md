@@ -14,13 +14,28 @@ Where the project stands, what is next, and what needs a hand test. Back to the 
 1. **Check `git status`.** Commit any work since the last commit, and commit new work in small steps; `.gitignore` already
    excludes `build/` and `.build/`.
 2. Read [README.md](../README.md), then [ARCHITECTURE.md](ARCHITECTURE.md#gotchas-and-lessons) for the gotchas.
-3. Run `./scripts/test.sh` (983 tests should pass) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
+3. Run `./scripts/test.sh` (1,069 tests; ShelfRowTests fails on a clean checkout and a few timing-based suites flake under load) and `./scripts/bundle.sh && pkill -x MacIsland; open build/MacIsland.app`.
 4. Work through the [hand-test checklist](#hand-test-checklist): most features were verified by tests and renders, not by
    using the app.
 5. Then [Next](#next), below.
 
 Working preferences (also saved in Claude's memory): clean, minimal, Apple-like UI that follows `DESIGN.md`; rebuild and relaunch the
 app after UI changes before saying to look; the user reviews visually and iterates quickly, so prefer small, checked changes.
+
+### QA audit follow-up
+
+A QA audit (45 items) was worked top to bottom. **Fixed:** the calendar link search (linear scan, capped), Notes kept when
+`notes.json` won't load and a failed save noted, the shared `safeInt` for every float-to-Int site, token counts, the Agents cache
+and log guards (CRLF, huge lines, memory spike, world-readable cache, clear racing a refresh, a batch after stop), Open On no
+longer overriding an explicit page (links, Check Camera, the agent activity), links pin the island, the clock texts no longer animate
+every second, the Mixer plays the tap and not a headset microphone, one limiter per output stream, NaN-safe output, atomics for the
+tap's level and heard flag, the app is built as release by default (`make bundle-debug` for the old one), Settings no longer waits on
+`SMAppService`, the Mirror camera starts off the main thread, Shelf thumbnail keys are computed off the main thread, the disk check and the calendar fetch are
+off the main thread, and the pointer tracker skips its work far from the panel. **Also done in a second pass:** the Agents refresh is read at most every 30 s on activity, and the closed island no longer redraws for each log
+line (`AgentActivity.liveCount`); clocks, the clipboard poll, the agenda timer and the Focus poll rest while the screen is locked or
+asleep (`System/ScreenActivity.swift`, `Ticking`); Downloads, Focus and the setup-gate refresh are lighter on the main thread; the
+Mixer caches each process's owning app; the Agents runner rebuilds at most every tenth of a second while resizing. **Not done:** items
+37, 38 and 40 (they need measuring or a recording first). The probes are in `Tests/MacIslandTests/QAFixTests.swift`.
 
 ---
 
@@ -39,6 +54,8 @@ app after UI changes before saying to look; the user reviews visually and iterat
 - **Reach:** menu-bar modules, torn-off windows, Keep on Desktop. (The command palette, its search and translate, answers, and app and Shortcuts index were built and then **removed** on 2026-09-30.)
 
 - **Vorssaint parity (2026-10):** a Features catalog and pane with presets and optional permissions, the Content pane, clipboard search and paste, calendar time left, chosen calendars, month events and countdowns, the System card, AI Agents (live work, usage at API prices, plan limits), the Mixer, Choose the Activity, Downloads in the Shelf, the Input choices (Peek After, hiding, Open On, Show Media From, Keep Awake's time left, Esc stepping back), and Notifications. **All of it was written without a Swift toolchain and has not been compiled or run.** The first job on a Mac is `./scripts/test.sh`, expecting compile errors somewhere, then the *(written, not run)* groups in the checklist below.
+- **Compatibility, the Agents views, and the Mixer fix (2026-10-02):** it deploys to **macOS 15** (Liquid Glass falls back to material, voice notes to the older on-device recognizer) and builds from source with Command Line Tools 26 (`check-toolchain.sh`, `make doctor`, a README Quick start and Troubleshooting); Agents is a **tool** in the Tools grid while it is on (a third row when needed); Stats has an always-visible **All / Claude Code / Codex dropdown** and an orange map for Claude Code; Usage has a **token donut** and a models and projects row; Now has Claude's two limit bars always and a Core Animation **runner** (a critter jumping cacti, with clouds and birds); and the **Mixer** no longer tears its taps down in a loop when its own device appears (live drag, ramped gain, no click across 100%). Covered by tests; hand tests are in the checklist (Mixer, Now tab, Agents tool, Sequoia).
+
 
 Beyond that, the user directed: a redesigned Home, an own Reminders tab, a two-sided tab strip, timer, Pomodoro, and stopwatch
 peeks, and direct control of Music and Spotify.
@@ -53,6 +70,11 @@ Where the app ended up differently from what was first planned, and why. The des
 | Decision | Why |
 | --- | --- |
 | 7 modules; **5 tabs left of the notch and 1 right**, arranged in Settings | User request |
+| **macOS 15** is the deployment target; building needs **Swift 6.2+ and the macOS 26 SDK** (Command Line Tools 26). No release zip, no build that leaves the macOS 26 code out for older Swift | A friend on macOS 26.5.2 could not build: an old Swift toolchain read `Package.swift` and failed on `.v26`. The fix is a clear toolchain check, not older Swift; Sequoia needed only glass and speech fallbacks. A `#if compiler(>=6.2)` build for Xcode 16 was offered and declined. Apple Silicon only |
+| Voice notes on Sequoia use `SFSpeechRecognizer`, **on-device only** | `SpeechTranscriber` is macOS 26; audio must never go to Apple\x27s servers, so a language with no on-device model says so |
+| Agents is **a tool in the Tools grid** (while its feature is on), and can also be a tab | Without a tab or a running agent there was no way into the module. A tenth tool makes the grid 13 slots, so it opens a third row only then; nothing is lost and the Shortcut tool limit stays 2 |
+| The Now tab\x27s runner is **Core Animation**, not a SwiftUI timeline | The user did not want a resource-heavy animation: layers with looping keyframes are played by the render server, so the app does no work per frame (like the sound bars) |
+| The Mixer **ignores a device-list change that changed no real output**, previews a dragged level live, and ramps gain | Its own aggregate device made the list notify, which tore every tap down and made it again in a loop (crunching sound, a stuck slider, a jumping layout) |
 | Default tabs Home, Media, **Clock, Reminders**, Tools. Shelf and Notes are in *Not Shown* | Reminders became its own tab; Shelf still opens on a drop |
 | Reminders is its own module, not part of Home | User request |
 | The Mixer is built after all, as per-app process taps made only for an app that is adjusted and playing | It was dropped for "breaking the idle budget"; a tap that exists only while its app plays costs nothing when nothing is adjusted (see [ARCHITECTURE](ARCHITECTURE.md#the-mixer)) |
@@ -621,6 +643,24 @@ Built and covered by unit tests or renders, but **not yet tried by hand** in the
 - [ ] The sidebar reads General, Features, Content, Home, Notifications, Privacy, and the window still meets its 830 pt minimum
 - [ ] Every former Media, Clock, Shelf, and Tools setting is under Content (click the module's row, or its tab in the preview) and from search, and works as before; the tour's Content stops show their module
 - [ ] A module switched off in Features is listed under Off in Features with Open Features; the island's right-click Edit on a Shortcut tool opens Content on Tools with its sheet
+
+**Mixer (critical, written after a bug)**
+- [ ] Drag an app's slider slowly across 100% and back with music playing: the sound follows the slider as it moves, with no crunching, crackle, or dropout, the percent follows too, and the slider never sticks
+- [ ] Leave it running for a minute at 150%, then at 50%: the sound stays clean and the Media tab does not change height or flicker; the app does not gain a MacIsland row
+- [ ] Let go back at 100%: the sound is the app's own again (no tap), and with Activity Monitor the mixer is quiet when idle
+- [ ] Change the output device or plug in headphones with a tap running: the taps are made again once, not repeatedly
+
+**Now tab**
+- [ ] Now shows "Plan limits" with Claude Session and Week bars even with no fresh reading ("No reading yet"), and one small line when nothing is running
+- [ ] With nothing running and only Claude's two bars, a little Claude critter runs along the bottom, with nothing running and with an agent running (Now grows to leave room for it), fast enough to feel like the game, jumps the cacti without ever hitting one or being cut off at the top of a jump, under clouds with birds flying across, and Activity Monitor shows MacIsland barely above idle while it plays; it is missing only when Codex's bars or two agents fill the space, it stops under Reduce Motion, and the reset words ("Resets Tue 1:00 AM, as of 2:55 PM") are never cut off
+
+**Agents tool**
+- [ ] With AI Agents off, the Tools grid has no Agents button; switching it on in Features makes it appear after Record, with no restart
+- [ ] Pressing Agents opens the Agents module with nothing running, from the Tools tab and from Home's Quick Tools (6 × 2)
+- [ ] With Agents and two Shortcut tools, the expanded Tools tab is three rows (Less alone on the third) and fits above the bottom edge on a notch Mac and a no-notch Mac
+- [ ] Dragging Agents from Not Shown into the tab strip works, and the tool still works too; switching the feature off removes both and switching it on returns them
+- [ ] Usage shows the value, a donut of Input, Output and Cache with each share and its tokens, and models and projects below, for Today, 7 Days and 30 Days; the island is as tall as Stats there, and an empty day draws an empty ring
+- [ ] Stats has a dropdown in the header, always (even with only one agent used): All, Claude Code, Codex; it shows that agent's mark and name, the map is orange for Claude Code and white otherwise, and hovering a day shows its date and tokens beside the range control without moving the dropdown
 
 **Sequoia (macOS 15)** *(built, never run: this Mac is on a newer macOS)*
 - [ ] `make build-and-restart` works on Command Line Tools 26 and the app launches with the island at the notch

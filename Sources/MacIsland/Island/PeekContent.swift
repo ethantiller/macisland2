@@ -108,8 +108,8 @@ struct VoicePeekView: View {
             Glyph(systemName: "waveform", tint: Theme.Tint.working)
                 .symbolEffect(.pulse)
             if let since = voice.startedAt {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(formatTime(context.date.timeIntervalSince(since)))
+                Ticking(interval: 1) { date in
+                    Text(formatTime(date.timeIntervalSince(since)))
                         .font(Theme.Typography.largeNumeral)
                         .foregroundStyle(Theme.Palette.primary)
                 }
